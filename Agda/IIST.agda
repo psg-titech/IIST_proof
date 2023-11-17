@@ -9,7 +9,7 @@ open import Data.Maybe.Categorical using ( monad )
 open import Data.Maybe.Relation.Unary.All using ( All; just; nothing )
 open import Data.Nat using ( ℕ; zero; suc; _⊔_; _⊓_; _+_; _∸_; pred )
 open import Data.Nat.Properties using ( _≟_ ; +-comm ; ∸-+-assoc ; ∸-distribˡ-⊓-⊔ ; ∸-distribˡ-⊔-⊓ )
-open import Data.Product using ( _×_; _,_; proj₁ )
+open import Data.Product using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Vec using ( Vec; []; _∷_; unzip; restrict )
 open import Function using ( _$_ )
 open import Relation.Nullary using ( Dec; yes; no )
@@ -241,14 +241,56 @@ mutual
   ...   | nothing | _ = nothing
   ...   | just zs | ih₂ = {!   !}
 
-  B∙F-⊗ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Z W) {xs : Vec (X × Z) n}
-    → DropLastᵐ ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) xs $ (B⟦ e ⊗ e' ⟧_ ∙ F⟦ e ⊗ e' ⟧_) xs
-  B∙F-⊗ e e' {xs = xzs} with unzip xzs
+  B∙F-⊗ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Z W) {xzs : Vec (X × Z) n}
+    → DropLastᵐ ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) xzs $ (B⟦ e ⊗ e' ⟧_ ∙ F⟦ e ⊗ e' ⟧_) xzs
+  B∙F-⊗ e e' {xzs} with unzip xzs
   ... | xs , zs with F⟦ e ⟧ xs | F⟦ e' ⟧ zs | B∙F e {xs} | B∙F e' {zs}
   ...   | nothing | nothing | _ | _ = nothing
   ...   | nothing | just _ | _ | _ = nothing
   ...   | just _ | nothing | _ | _ = nothing
   ...   | just ys | just ws | ih₁ | ih₂ = {!   !}
+
+
+  F∙B : ∀ (e : E d d' X Y) {ys : Vec Y n}
+    → DropLastᵐ (d + d') ys $ (F⟦ e ⟧_ ∙ B⟦ e ⟧_) ys
+  F∙B (map-fold a f g) = F∙B-map-fold a f g
+  F∙B (delay x) = F∙B-delay x
+  F∙B (hasten x) = F∙B-hasten x
+  F∙B (e ⟫ e') = F∙B-⟫ e e'
+  F∙B (e ⊗ e') = F∙B-⊗ e e'
+
+  F∙B-map-fold : ∀ a (f : A → X ⇌ Y) g {ys : Vec Y n}
+    → DropLastᵐ 0 ys $ (F⟦ map-fold a f g ⟧_ ∙ B⟦ map-fold a f g ⟧_) ys
+  F∙B-map-fold a f g {[]} = just []!
+  F∙B-map-fold a f g {y ∷ ys} with f a .from y in eq
+  ... | nothing = nothing
+  ... | just x with map-fold-backward (g a x) f g ys in eq₁
+  ...   | nothing = nothing
+  ...   | just xs rewrite proj₂ (f a .proof x y) eq with map-fold-forward (g a x) f g xs in eq₂
+  ...     | nothing = nothing
+  ...     | just ys' with F∙B-map-fold (g a x) f g {ys}
+  ...       | ih rewrite eq₁ | eq₂ with ih
+  ...         | just ih' = just (y ∷ ih')
+
+  F∙B-delay = B∙F-hasten
+  F∙B-hasten = B∙F-delay
+
+  F∙B-⟫ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Y Z) {zs : Vec Z n}
+    → DropLastᵐ ((d₁ + d₂) + (d₁' + d₂')) zs $ (F⟦ e ⟫ e' ⟧_ ∙ B⟦ e ⟫ e' ⟧_) zs
+  F∙B-⟫ e e' {zs} with B⟦ e' ⟧ zs | F∙B e' {zs}
+  ... | nothing | _ = nothing
+  ... | just ys | ih₁ with B⟦ e ⟧ ys | F∙B e {ys}
+  ...   | nothing | _ = nothing
+  ...     | just xs | ih₂ = {!   !}
+
+  F∙B-⊗ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Z W) {yws : Vec (Y × W) n}
+    → DropLastᵐ ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) yws $ (F⟦ e ⊗ e' ⟧_ ∙ B⟦ e ⊗ e' ⟧_) yws
+  F∙B-⊗ e e' {yws} with unzip yws
+  ... | ys , ws with B⟦ e ⟧ ys | B⟦ e' ⟧ ws | F∙B e {ys} | F∙B e' {ws}
+  ...   | nothing | nothing | _ | _ = nothing
+  ...   | nothing | just _ | _ | _ = nothing
+  ...   | just _ | nothing | _ | _ = nothing
+  ...   | just xs | just zs | ih₁ | ih₂ = {!   !}
 
 -------------------------------------------------------------------------------
 -- Examples
