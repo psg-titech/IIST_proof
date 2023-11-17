@@ -79,8 +79,11 @@ Qed.
 End prefix.
 
 
+Section prefix2.
+
+
 Theorem split_prefix :
- forall {A B : Type} (abl abl' : list (A * B)) al bl al' bl',
+ forall {A B} (abl abl' : list (A * B)) al bl al' bl',
   prefix abl' abl ->
    (al, bl) = split abl ->
    (al', bl') = split abl' ->
@@ -123,6 +126,9 @@ induction al; intros; simpl in H.
 Qed.
 
 
+End prefix2.
+
+
 Section option_bind.
 
 Definition option_bind {A B : Type} (a : option A) (f : A -> option B) : option B :=
@@ -148,8 +154,7 @@ Record partial_invertible_function (A : Type) (B : Type) : Type := {
 End pinv_fun.
 
 
-
-Print list_ind.
+Section list_tail.
 
 Theorem list_nil_tail_app :
  forall {A : Type} (l : list A),
@@ -179,6 +184,87 @@ induction n.
 Qed.
 
 
+Fixpoint last_elem {A : Type} (a : A) (l : list A) : A :=
+match l with
+| [] => a
+| a' :: l' => last_elem a' l'
+end.
+
+Lemma last_elem_correct :
+ forall A (l : list A) a a',
+  last_elem a (l ++ [a']) = a'.
+induction l; intros; simpl in *; auto.
+Qed.
+
+Lemma last_elem_correct' :
+ forall A (l : list A) a a',
+  last_elem a l = a'
+  -> l = [] /\ a = a' \/ exists l', l = l' ++ [a'].
+intros A l; induction l; [left | right]; simpl in *; auto.
+destruct (IHl _ _ H) as [[? ?] | [l' Hl']].
++ exists []; subst; simpl; now auto.
++ exists (a :: l'); rewrite Hl'; simpl; now auto.
+Qed.
+
+
+Definition last {A : Type} (l : list A) : option A :=
+match l with
+| [] => None
+| a :: l' => Some (last_elem a l')
+end.
+
+Lemma last_correct :
+ forall A (l : list A) a,
+  last (l ++ [a]) = Some a.
+destruct l; intros; simpl in *; auto.
+rewrite last_elem_correct; now auto.
+Qed.
+
+Lemma last_correct' :
+ forall A (l : list A) a,
+  last l = Some a -> exists l', l = l' ++ [a].
+intros; destruct l; inversion H.
+destruct (last_elem_correct' _ _ _ _ H1) as [[? ?] | [? ?]].
++ exists []; subst; now auto.
++ exists (a0 :: x); rewrite H1; rewrite H0; now auto.
+Qed.
+
+
+End list_tail.
+
+
+
+Section EqOneDec.
+
+Class EqOneDec {A} (a : A) :=
+  equiv_one_dec : forall b : A, { a = b } + { a <> b }.
+
+
+Definition eqdec_one {A} `{EqDec A eq} a : EqOneDec a :=
+   fun b => equiv_dec a b.
+
+
+#[global]
+Program Instance option_None_eqdec {A} : @EqOneDec (option A) None.
+Next Obligation.
+destruct b.
++ right; intro H; now inversion H.
++ left; now auto.
+Defined.
+
+
+#[global]
+Program Instance list_nil_eqdec {A} : @EqOneDec (list A) [].
+Next Obligation.
+destruct b.
++ left; now auto.
++ right; intro H; now inversion H.
+Defined.
+
+
+End EqOneDec.
+
+
 
 Section IIST.
 
@@ -190,8 +276,8 @@ Notation "A <~~> B" := (partial_invertible_function A B) (at level 95, no associ
 Inductive IIST : Type -> Type -> Type :=
 | IIST_mapfold : forall {A X Y : Type},
    A -> (A -> X <~~> Y) -> (A -> X -> A) -> IIST X Y
-| IIST_delay : forall {X : Type} `{e : EqDec X eq}, X -> IIST X X
-| IIST_hasten : forall {X : Type} `{e : EqDec X eq}, X -> IIST X X
+| IIST_delay : forall {X : Type} (x : X) `{e : EqOneDec X x}, IIST X X
+| IIST_hasten : forall {X : Type} (x : X) `{e : EqOneDec X x}, IIST X X
 | IIST_seqcomp : forall {X Y Z : Type}, IIST X Y -> IIST Y Z -> IIST X Z
 | IIST_parcomp : forall {X1 X2 Y1 Y2 : Type}, IIST X1 Y1 -> IIST X2 Y2 -> IIST (X1 * X2) (Y1 * Y2)
 .
@@ -211,7 +297,7 @@ match e with
 | IIST_hasten x => fun xs =>
    match xs with
    | nil => Some nil
-   | x' :: xs' => if equiv_dec x x' then Some xs' else None
+   | x' :: xs' => if equiv_one_dec x' then Some xs' else None
    end
 | IIST_seqcomp xz zy => fun xs => option_bind (fwd xz xs) (fwd zy)
 | IIST_parcomp xy1 xy2 => fun x12s =>
@@ -235,7 +321,7 @@ match e with
 | IIST_delay x => fun ys =>
    match ys with
    | nil => Some nil
-   | y' :: ys' => if equiv_dec x y' then Some ys' else None
+   | y' :: ys' => if equiv_one_dec y' then Some ys' else None
    end
 | IIST_hasten x => fun ys => Some (slide x ys)
 | IIST_seqcomp xz zy => fun ys => option_bind (bwd zy ys) (bwd xz)
@@ -282,7 +368,7 @@ induction e; simpl.
 - intros xs ys H.
   destruct xs.
   + inversion H; simpl; now auto.
-  + destruct (equiv_dec x x0); inversion H; simpl; lia.
+  + destruct (equiv_one_dec x0); inversion H; simpl; lia.
 - intros xs zs H.
   case_eq (fwd e1 xs); [intros ys H1 | intro H1]; rewrite H1 in H; simpl in H; inversion H; subst.
   rewrite PeanoNat.Nat.sub_add_distr.
@@ -314,7 +400,7 @@ induction e; simpl.
 - intros ys xs H.
   destruct ys; simpl in *.
   + inversion H; simpl; now auto.
-  + destruct (equiv_dec x x0); inversion H; lia.
+  + destruct (equiv_one_dec x0); inversion H; lia.
 - intros ys xs H; rewrite PeanoNat.Nat.sub_0_r.
   inversion H.
   now apply slide_length.
@@ -358,7 +444,7 @@ induction e; simpl.
   apply prefix_slide; now auto.
 - intros; inversion H; subst; simpl.
   + exists nil; split; auto; now constructor.
-  + destruct (equiv_dec x a); inversion H0; subst.
+  + destruct (equiv_one_dec a); inversion H0; subst.
     exists l1; split; now auto.
 - intros.
   assert (He1 := IHe1 xs xs'); clear IHe1.
@@ -402,7 +488,7 @@ induction e; simpl.
       constructor; now auto.
 - intros; inversion H; subst; simpl.
   + exists nil; split; auto; now constructor.
-  + destruct (equiv_dec x a); inversion H0; unfold equiv in *; subst.
+  + destruct (equiv_one_dec a); inversion H0; subst.
     exists l1; split; now auto.
 - intros.
   exists (slide x ys'); split; auto.
@@ -463,14 +549,14 @@ induction e; intros; simpl in *.
 - inversion H; subst; clear H.
   destruct xs as [ | x' xs ]; simpl.
   + exists nil. split; now constructor.
-  + destruct (equiv_dec x x) as [ e1 | e1 ]; unfold equiv in *.
+  + destruct (equiv_one_dec x) as [ e1 | e1 ].
     * exists (slide x' xs). split; auto.
       now apply slide_prefix.
     * elim e1; now auto.
 - destruct xs as [ | x' xs ]; simpl in H.
   + inversion H; subst; simpl.
     exists nil. split; now constructor.
-  + destruct (equiv_dec x x') as [ e1 | e1 ]; unfold equiv in *; inversion H; subst.
+  + destruct (equiv_one_dec x') as [ e1 | e1 ]; inversion H; subst.
     exists (slide x' ys).
     split; auto.
     now apply slide_prefix.
@@ -537,14 +623,14 @@ induction e; intros; simpl in *.
 - destruct ys as [ | y' ys ]; simpl in H.
   + inversion H; subst; simpl.
     exists nil. split; now constructor.
-  + destruct (equiv_dec x y') as [ e1 | e1 ]; unfold equiv in *; inversion H; subst.
+  + destruct (equiv_one_dec y') as [ e1 | e1 ]; inversion H; subst.
     exists (slide y' xs).
     split; auto.
     now apply slide_prefix.
 - inversion H; subst; clear H.
   destruct ys as [ | y' ys ]; simpl.
   + exists nil. split; now constructor.
-  + destruct (equiv_dec x x) as [ e1 | e1 ]; unfold equiv in *.
+  + destruct (equiv_one_dec x) as [ e1 | e1 ].
     * exists (slide y' ys). split; auto.
       now apply slide_prefix.
     * elim e1; now auto.
@@ -606,52 +692,6 @@ Definition d_MST {X Y} (mst : MST X Y) d :=
 
 Definition d_MIST {X Y} (mst : MST X Y) d :=
  MIST mst /\ d_MST mst d.
-
-
-Fixpoint last_elem {A : Type} (a : A) (l : list A) : A :=
-match l with
-| [] => a
-| a' :: l' => last_elem a' l'
-end.
-
-Lemma last_elem_correct :
- forall A (l : list A) a a',
-  last_elem a (l ++ [a']) = a'.
-induction l; intros; simpl in *; auto.
-Qed.
-
-Lemma last_elem_correct' :
- forall A (l : list A) a a',
-  last_elem a l = a'
-  -> l = [] /\ a = a' \/ exists l', l = l' ++ [a'].
-intros A l; induction l; [left | right]; simpl in *; auto.
-destruct (IHl _ _ H) as [[? ?] | [l' Hl']].
-+ exists []; subst; simpl; now auto.
-+ exists (a :: l'); rewrite Hl'; simpl; now auto.
-Qed.
-
-
-Definition last {A : Type} (l : list A) : option A :=
-match l with
-| [] => None
-| a :: l' => Some (last_elem a l')
-end.
-
-Lemma last_correct :
- forall A (l : list A) a,
-  last (l ++ [a]) = Some a.
-destruct l; intros; simpl in *; auto.
-rewrite last_elem_correct; now auto.
-Qed.
-
-Lemma last_correct' :
- forall A (l : list A) a,
-  last l = Some a -> exists l', l = l' ++ [a].
-intros; destruct l; inversion H.
-destruct (last_elem_correct' _ _ _ _ H1) as [[? ?] | [? ?]].
-+ exists []; subst; now auto.
-+ exists (a0 :: x); rewrite H1; rewrite H0; now auto.
-Qed.
 
 
 Definition MIST_coord {X Y} (mst : MST X Y) (xs : list X) : option Y :=
