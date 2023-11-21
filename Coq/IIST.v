@@ -835,34 +835,36 @@ Search ({_ <= _} + {_ > _}).
 
 
 Definition IIST_f1 {X Y}
-                   (mst : MST X Y) d (xs : list X) x : option (option Y * X) :=
+                   (mst : MST X Y) d (xs : list X) x : option (option Y * option X) :=
  if Compare_dec.le_gt_dec d (length xs) then
    option_bind (mst (xs ++ [x]))
     (fun ys =>
       option_bind (last ys)
-       (fun y => Some (Some y, x))) (* このペアのせいでyのdecidable equalityがいる？ *)
- else Some (None, x).
+       (fun y => Some (Some y, Some x))) (* このペアのせいでyのdecidable equalityがいる？ *)
+ else Some (None, Some x).
 
 
 Definition IIST_f1' {X Y} `{EqDec Y eq} (* f1と違いこちらはequalityの判定が必要 *)
-                    (mst : MST X Y) d (xs : list X) oy_x : option X :=
+                    (mst : MST X Y) d (xs : list X) oy_ox : option X :=
  if Compare_dec.le_gt_dec d (length xs) then
-   match oy_x with
+   match oy_ox with
    | (None, _) => None (* 十分な長さがあるので値があるはず *)
-   | (Some y, x) =>
-       option_bind (mst (xs ++ [x]))
+   | (_, None) => None (* これ自体がxとしてNoneを出すことはない *)
+   | (Some y, Some x) =>
+       option_bind (mst (xs ++ [x])) (* 逆行に失敗したときにNoneを返さなければならないので計算が必要 *)
         (fun ys =>
           option_bind (last ys)
            (fun y' => if equiv_dec y y' then Some x else None))
    end
- else match oy_x with
-      | (None, x) => Some x
+ else match oy_ox with
+      | (None, Some x) => Some x
       | (Some _, _) => None
+      | (_, None) => None
       end.
 
 
 Program Definition IIST_inv_f1 {X Y} `{E : EqDec Y eq}
-                               (mst : MST X Y) d (Hd : d_MST mst d) xs : partial_invertible_function X (option Y * X) :=
+                               (mst : MST X Y) d (Hd : d_MST mst d) xs : partial_invertible_function X (option Y * option X) :=
 {| forward := IIST_f1 mst d xs;
    backward := IIST_f1' mst d xs
 |}.
@@ -872,10 +874,16 @@ destruct (Compare_dec.le_gt_dec d (length xs)) as [Hlen | Hlen]; simpl.
 2: {
   split; intro Hsome.
   + inversion Hsome; now auto.
-  + destruct o; inversion Hsome.
+  + destruct o, o0; inversion Hsome.
     now auto.
 }
 destruct o as [y | ].
+2: {
+  destruct (mst (xs ++ [a])); simpl.
+  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
+  + split; intro Hcon; now inversion Hcon.
+}
+destruct o0 as [x | ].
 2: {
   destruct (mst (xs ++ [a])); simpl.
   + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
@@ -924,7 +932,6 @@ Definition IIST_g1 {X} (xs : list X) x : list X := xs ++ [x].
 Definition IIST_e1 {X Y} `{E : EqDec Y eq}
                                (mst : MST X Y) d (Hd : d_MST mst d) :=
  IIST_mapfold [] (IIST_inv_f1 mst d Hd) IIST_g1.
-
 
 
 
