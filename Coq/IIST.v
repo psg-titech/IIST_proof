@@ -694,8 +694,115 @@ Definition d_MIST {X Y} (mst : MST X Y) d :=
  MIST mst /\ d_MST mst d.
 
 
+Definition MInv {X Y} (mst : MST X Y) (inv : MST Y X) := 
+ forall xs ys, mst xs = Some ys
+ -> exists xs', inv ys = Some xs' /\ prefix xs' xs.
+
+
+Definition MIIST {X Y} (mst : MST X Y) (inv : MST Y X) :=
+ MIST mst /\ MInv mst inv.
+
+
+Definition d_MIIST {X Y} (mst : MST X Y) (inv : MST Y X) d' :=
+ MIIST mst inv /\ d_MIST inv d'.
+
+
+Definition d_d'_MIIST_pair {X Y} (mst : MST X Y) (inv : MST Y X) d d' :=
+ d_MIST mst d /\ d_MIIST mst inv d'.
+
+
+Lemma d_d'_MIIST_pair_min :
+ forall X Y (mst : MST X Y) inv d d',
+  d_d'_MIIST_pair mst inv d d'
+  <-> MIST mst /\ d_MST mst d /\ MInv mst inv /\ MIST inv /\ d_MST inv d'.
+unfold d_d'_MIIST_pair, d_MIIST, d_MIST, MIIST, MIST, MInv.
+intuition.
+Qed.
+
+
+Lemma IIST_MIST :
+ forall X Y (e : IIST X Y),
+  MIST (fwd e).
+unfold MIST.
+intros; eapply fwd_prefix; eauto.
+Qed.
+
+Lemma IIST_d_MST :
+ forall X Y (e : IIST X Y),
+  d_MST (fwd e) (delay_fwd e).
+unfold d_MST.
+intros; apply fwd_length_delay; now auto.
+Qed.
+
+Lemma IIST_MInv :
+ forall X Y (e : IIST X Y),
+  MInv (fwd e) (bwd e).
+unfold MInv.
+intros; apply fwd_bwd; now auto.
+Qed.
+
+Lemma IIST_bwd_MIST :
+ forall X Y (e : IIST X Y),
+  MIST (bwd e).
+unfold MIST.
+intros; eapply bwd_prefix; eauto.
+Qed.
+
+Lemma IIST_bwd_d_MST :
+ forall X Y (e : IIST X Y),
+  d_MST (bwd e) (delay_bwd e).
+unfold d_MST.
+intros; apply bwd_length_delay; now auto.
+Qed.
+
+
+
+Theorem IIST_is_d_d'_MIIST_pair :
+ forall X Y (e : IIST X Y),
+  d_d'_MIIST_pair (fwd e) (bwd e) (delay_fwd e) (delay_bwd e).
+intros X Y e.
+apply d_d'_MIIST_pair_min.
+split; [ now apply IIST_MIST
+| split; [ now apply IIST_d_MST
+| split; [ now apply IIST_MInv
+| split; [ now apply IIST_bwd_MIST
+         | now apply IIST_bwd_d_MST]]]].
+Qed.
+
+
+
+Theorem d_d'_MIIST_IIST :
+ forall X Y (mst : MST X Y) d d',
+  (exists inv, d_d'_MIIST_pair mst inv d d')
+  -> exists e,
+      forall xs, mst xs = fwd e xs
+      /\ delay_fwd e = d
+      /\ delay_bwd e = d'.
+Admitted.
+(* XやYに関するdecidable equalityがいるかも（fold_mapに使う可逆関数の定義に） *)
+
+
+
+
+
+
+
+
+
 Definition MIST_coord {X Y} (mst : MST X Y) (xs : list X) : option Y :=
 option_bind (mst xs) last.
+
+
+Definition inc_coord_elem {X Y} (mst : MST X Y) coord :=
+ forall xs x y,
+  (exists ys, mst (xs ++ [x]) = Some (ys ++ [y]))
+  <-> coord (xs ++ [x]) = Some y.
+
+
+Definition inc_coord_none {X Y} (mst : MST X Y) (coord : list X -> option Y) d :=
+ forall xs,
+  mst xs = None \/ length xs <= d
+  <-> coord xs = None.
 
 
 Theorem d_MIST_coord_correct :
@@ -703,13 +810,11 @@ Theorem d_MIST_coord_correct :
   d_MIST mst d
   ->
     let coord := MIST_coord mst in
-     (forall xs x y,
-       (exists ys, mst (xs ++ [x]) = Some (ys ++ [y]))
-       <-> coord (xs ++ [x]) = Some y)
+     inc_coord_elem mst coord
      /\
-     (forall xs,
-      mst xs = None \/ length xs <= d <-> coord xs = None).
-unfold MIST_coord; intros X Y mst d [Hmist Hd_mst]; split; intros; split; intro.
+     inc_coord_none mst coord d.
+unfold inc_coord_elem, inc_coord_none, MIST_coord.
+intros X Y mst d [Hmist Hd_mst]; split; intros; split; intro.
 + destruct H as [ys H]; rewrite H; simpl. now apply last_correct.
 + destruct (mst (xs ++ [x])); simpl in H; try (inversion H; fail).
   apply last_correct' in H.
@@ -730,21 +835,30 @@ unfold MIST_coord; intros X Y mst d [Hmist Hd_mst]; split; intros; split; intro.
 Qed.
 
 
-Definition MInv {X Y} (mst : MST X Y) (inv : MST Y X) := 
- forall xs ys, mst xs = Some ys
- -> exists xs', inv ys = Some xs' /\ prefix xs' xs.
+
+Fixpoint coord_MIST {X Y} (coord : list X -> option Y) (xt : list X) (xs : list X) : option (list Y) :=
+ match xs with
+ | [] => Some []
+ | x :: xs' =>
+    option_bind (coord (xt ++ [x]))
+      (fun y => option_bind (coord_MIST coord (xt ++ [x]) xs')
+         (fun ys => Some (y :: ys)))
+end.
+
+(* これって正しい？d_MIST（の一部）になってる？ヘッダとしてxtを持っている列変換になると思うのだけど *)
 
 
-Definition MIIST {X Y} (mst : MST X Y) (inv : MST Y X) :=
- MIST mst /\ MInv mst inv.
+Fixpoint coord_d_MIST {X Y} d (coord : list X -> option Y) (xt : list X) : MST X Y :=
+ fun xs =>
+   match d with
+   | O => coord_MIST coord xt xs (* 先頭dをxtにしてリストを計算 *)
+   | S d' =>
+      match xs with
+      | [] => Some []
+      | x :: xs' => coord_d_MIST d' coord (xt ++ [x]) xs'
+      end
+   end.
 
-
-Definition d_MIIST {X Y} (mst : MST X Y) (inv : MST Y X) d' :=
- MIIST mst inv /\ d_MIST inv d'.
-
-
-Definition d_d'_MIIST {X Y} (mst : MST X Y) d d' :=
- d_MIST mst d /\ exists inv, d_MIIST mst inv d'.
 
 
 
