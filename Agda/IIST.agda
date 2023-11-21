@@ -6,10 +6,11 @@ open import Data.List using ( List; []; _∷_ )
 import Data.List.Properties
 open import Data.Maybe using ( Maybe; just; nothing )
 open import Data.Maybe.Categorical using ( monad )
+open import Data.Maybe.Properties using ( just-injective )
 open import Data.Maybe.Relation.Unary.All using ( All; just; nothing )
 open import Data.Nat using ( ℕ; zero; suc; _⊔_; _⊓_; _+_; _∸_; pred )
-open import Data.Nat.Properties using ( +-assoc; +-comm ; ∸-+-assoc ; ∸-distribˡ-⊓-⊔ ; ∸-distribˡ-⊔-⊓; +-suc; +-identityʳ; 0∸n≡0; [m+n]∸[m+o]≡n∸o )
-open import Data.Product using ( _×_; _,_; proj₁; proj₂ )
+open import Data.Nat.Properties using ( +-assoc; +-comm ; ∸-+-assoc ; ∸-distribˡ-⊓-⊔ ; ∸-distribˡ-⊔-⊓; +-suc; +-identityʳ; 0∸n≡0; [m+n]∸[m+o]≡n∸o; m+n∸m≡n )
+open import Data.Product using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
 import Data.Product.Properties
 open import Data.Unit using ( ⊤; tt )
 import Data.Unit.Properties
@@ -28,7 +29,7 @@ instance
 
 private
   variable
-    m n o d d' : ℕ
+    m n o p d d' : ℕ
     A X Y Z W : Set
 
 -------------------------------------------------------------------------------
@@ -45,6 +46,25 @@ _ : shift 0 (1 ∷ 2 ∷ 3 ∷ []) ≡ 0 ∷ 1 ∷ 2 ∷ []
 _ = refl
 
 _$?_ = All
+
+m≡n+o→m∸n≡o : ∀ {m n o}
+  → m ≡ n + o
+  → m ∸ n ≡ o
+m≡n+o→m∸n≡o {n = n} {o = o} p rewrite p | m+n∸m≡n n o = refl
+
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 : ∀ {m n o p}
+  → m ∸ n ≡ 0
+  → o ∸ p ≡ 0
+  → m ⊓ o ∸ (n ⊔ p) ≡ 0
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {zero} {zero} {zero} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {zero} {zero} {suc p} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {zero} {suc o} {suc p} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {suc n} {zero} {zero} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {suc n} {zero} {suc p} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {zero} {suc n} {suc o} {suc p} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {suc m} {suc n} {zero} {zero} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {suc m} {suc n} {zero} {suc p} eq₁ eq₂ = refl
+m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {suc m} {suc n} {suc o} {suc p} eq₁ eq₂ = m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {m} {n} {o} {p} eq₁ eq₂
 
 -------------------------------------------------------------------------------
 -- Partial function and Partial invertible function
@@ -64,6 +84,11 @@ open _⇌_
 ⇌-id .to = just
 ⇌-id .from = just
 ⇌-id .invertible _ _ = sym , sym
+
+boom : X ⇌ X
+boom .to _ = nothing
+boom .from _ = nothing
+boom .invertible _ _ = (λ ()) , (λ ())
 
 -------------------------------------------------------------------------------
 -- Eq typeclass
@@ -239,31 +264,13 @@ DropLast-trans : ∀ {xs : Vec X m} {ys : Vec X n} {zs : Vec X o}
   → DropLast d xs ys
   → DropLast d' ys zs
   → DropLast (d + d') xs zs
-DropLast-trans {m = m} {d = d} {d' = d'} ([] p) ([] _) =
-  [] $ begin
-    m ∸ (d + d')  ≡⟨ sym $ ∸-+-assoc m d d' ⟩
-    m ∸ d ∸ d'    ≡⟨ cong (_∸ d') p ⟩
-    0 ∸ d'        ≡⟨ 0∸n≡0 d' ⟩
-    0             ∎
-  where open ≡-Reasoning
-DropLast-trans {d = d} {d' = d'} (cons {m = m} {n = n} p _ _) ([] q) =
-  [] $ begin
-    suc m ∸ (d + d')        ≡⟨ cong (λ k → suc k ∸ (d + d')) p ⟩
-    suc (d + n) ∸ (d + d')  ≡⟨ cong (_∸ (d + d')) $ sym (+-suc d n) ⟩
-    d + (suc n) ∸ (d + d')  ≡⟨ [m+n]∸[m+o]≡n∸o d (suc n) d' ⟩
-    suc n ∸ d'              ≡⟨ q ⟩
-    0                       ∎
-  where open ≡-Reasoning
-DropLast-trans {d = d} {d' = d'} (cons {m = m} p x dl) (cons {n = n} q _ dl') =
-  cons
-    (begin
-      m             ≡⟨ p ⟩
-      d + _         ≡⟨ cong (d +_) q ⟩
-      d + (d' + n)  ≡⟨ sym $ +-assoc d d' n ⟩
-      d + d' + n    ∎)
-    x
-    (DropLast-trans dl dl')
-  where open ≡-Reasoning
+DropLast-trans {m = m} {d = d} {d' = d'} ([] p) ([] q)
+  with m ∸ (d + d') in eq | sym (∸-+-assoc m d d')
+... | .(m ∸ d ∸ d') | refl rewrite p | q = [] eq
+DropLast-trans {d = d} {d' = d'} (cons {m = m} {n = n} p _ _) ([] q)
+  rewrite sym ([m+n]∸[m+o]≡n∸o d (suc n) d') | +-suc d n | sym p = [] q
+DropLast-trans {d = d} {d' = d'} (cons {m = m} p x dl) (cons {n = n} q _ dl')
+  rewrite p | q | sym (+-assoc d d' n) = x ∷! DropLast-trans dl dl'
 
 Droplast-∷-shift : ∀ x (xs : Vec X n) → DropLast 1 (x ∷ xs) (shift x xs)
 Droplast-∷-shift x [] = []!
@@ -275,13 +282,57 @@ DropLast-shift-shift : ∀ {xs : Vec X m} {ys : Vec X n}
 DropLast-shift-shift ([] p) x = [] p
 DropLast-shift-shift (cons p y dl) x = cons p x (DropLast-shift-shift dl y)
 
+DropLast-unzip : ∀ {xys : Vec (X × Y) m} {xys' : Vec (X × Y) n} {xs ys xs' ys'}
+  → DropLast d xys xys'
+  → unzip xys ≡ (xs , ys)
+  → unzip xys' ≡ (xs' , ys')
+  → DropLast d xs xs' × DropLast d ys ys'
+DropLast-unzip ([] p) refl refl = [] p , [] p
+DropLast-unzip (cons {xs = xys} {ys = xys'} p (x , y) dl) refl refl
+    with unzip xys in eq | unzip xys' in eq'
+... | xs , ys | xs' , ys' with DropLast-unzip dl eq eq'
+...   | dl₁ , dl₂ = cons p x dl₁ , cons p y dl₂
+
+DropLast-restrict : ∀ {xs : Vec X m} {xs' : Vec X n} {ys : Vec X o} {ys' : Vec X p}
+  → DropLast d xs xs'
+  → DropLast d' ys ys'
+  → DropLast (d ⊔ d') (restrict xs ys) (restrict xs' ys')
+DropLast-restrict {d = d} ([] {n = n} p) ([] q) = [] (m∸n≡0→o∸p≡0→[m⊓o]∸[n⊔p]≡0 {n} {d} p q)
+DropLast-restrict ([] p) (cons q y dl') = [] {!   !}
+DropLast-restrict (cons p x dl) ([] q) = [] {!   !}
+DropLast-restrict (cons p x dl) (cons q y dl') = cons {!   !} (x , y) (DropLast-restrict dl dl')
+
 -------------------------------------------------------------------------------
 -- Properties
 
+-- F-DropLast : ∀ (e : E d d' X Y) {xs : Vec X m} {xs' : Vec X n} {ys : Vec Y (m ∸ d)}
+--   → DropLast o xs xs'
+--   → F⟦ e ⟧ xs ≡ just ys
+--   → Σ[ ys' ∈ Vec Y (n ∸ d) ] F⟦ e ⟧ xs' ≡ just ys' × DropLast o ys ys'
+-- F-DropLast (map-fold a f g) ([] p)  _ = [] , refl , [] p
+-- F-DropLast (map-fold a f g) (cons {xs = xs} {ys = xs'} refl x dl) p with f a .to x | p
+-- ... | just y | p' with map-fold-forward (g a x) f g xs in eq | p'
+-- ...   | just ys | p'' with F-DropLast (map-fold (g a x) f g) dl eq
+-- ...     | ys' , q , dl' rewrite sym (just-injective p'') | q = y ∷ ys' , refl , y ∷! dl'
+-- F-DropLast (delay x) {xs' = xs'} dl p rewrite sym $ just-injective p
+--   = shift x xs' , refl , DropLast-shift-shift dl x
+-- F-DropLast (hasten x) ([] p) _ = [] , refl , [] {!   !}
+-- F-DropLast (hasten x) (cons {ys = xs'} p x' dl) q with x == x' | q
+-- ... | yes refl | refl = xs' , refl , dl
+-- F-DropLast (e ⟫ e') {xs} dl p with F⟦ e ⟧ xs in eq | p
+-- ... | just ys | p' with F-DropLast e dl eq
+-- ...   | ys' , q , dl' with F⟦ e' ⟧ ys in eq' | p'
+-- ...     | just zs | p'' with F-DropLast e' dl' eq'
+-- ...       | ih = {!   !}
+-- F-DropLast (e ⊗ e') dl p = {!   !}
+
 mutual
 
+  B∙F⟦_⟧_ : E d d' X Y → Vec X n ⇀ Vec X (n ∸ d ∸ d')
+  B∙F⟦_⟧_ e = B⟦ e ⟧_ ∙ F⟦ e ⟧_
+
   B∙F : ∀ (e : E d d' X Y) {xs : Vec X n}
-    → DropLast (d + d') xs $? (B⟦ e ⟧_ ∙ F⟦ e ⟧_) xs
+    → DropLast (d + d') xs $? B∙F⟦ e ⟧ xs
   B∙F (map-fold a f g) = B∙F-map-fold a f g
   B∙F (delay x) = B∙F-delay x
   B∙F (hasten x) = B∙F-hasten x
@@ -289,7 +340,7 @@ mutual
   B∙F (e ⊗ e') = B∙F-⊗ e e'
 
   B∙F-map-fold : ∀ a (f : A → X ⇌ Y) g {xs : Vec X n}
-    → DropLast 0 xs $? (B⟦ map-fold a f g ⟧_ ∙ F⟦ map-fold a f g ⟧_) xs
+    → DropLast 0 xs $? B∙F⟦ map-fold a f g ⟧ xs
   B∙F-map-fold a f g {[]} = just []!
   B∙F-map-fold a f g {x ∷ xs} with f a .to x in eq
   ... | nothing = nothing
@@ -302,33 +353,33 @@ mutual
   ...         | just ih' = just (x ∷! ih')
 
   B∙F-delay : ∀ {{_ : Eq X}} x {xs : Vec X n}
-    → DropLast 1 xs $? (B⟦ delay x ⟧_ ∙ F⟦ delay x ⟧_) xs
+    → DropLast 1 xs $? B∙F⟦ delay x ⟧ xs
   B∙F-delay x {[]} = just []!
-  B∙F-delay x {x₁ ∷ xs} with x == x
-  ... | yes refl = just (Droplast-∷-shift x₁ xs)
+  B∙F-delay x {y ∷ xs} with x == x
+  ... | yes refl = just (Droplast-∷-shift y xs)
   ... | no _ = nothing
 
   B∙F-hasten : ∀ {{_ : Eq X}} x {xs : Vec X n}
-    → DropLast 1 xs $? (B⟦ hasten x ⟧_ ∙ F⟦ hasten x ⟧_) xs
+    → DropLast 1 xs $? B∙F⟦ hasten x ⟧ xs
   B∙F-hasten x {[]} = just []!
-  B∙F-hasten x {x₁ ∷ xs} with x == x₁
+  B∙F-hasten x {y ∷ xs} with x == y
   ... | yes refl = just (Droplast-∷-shift x xs)
   ... | no _ = nothing
 
   B∙F-⟫ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Y Z) {xs : Vec X n}
-    → DropLast ((d₁ + d₂) + (d₁' + d₂')) xs $? (B⟦ e ⟫ e' ⟧_ ∙ F⟦ e ⟫ e' ⟧_) xs
+    → DropLast ((d₁ + d₂) + (d₁' + d₂')) xs $? B∙F⟦ e ⟫ e' ⟧ xs
   B∙F-⟫ {n = n} {d₁ = d₁} {d₁' = d₁'} {d₂ = d₂} {d₂' = d₂'} e e' {xs} with F⟦ e ⟧ xs | B∙F e {xs}
   ... | nothing | _ = nothing
   ... | just ys | ih₁ with F⟦ e' ⟧ ys | B∙F e' {ys}
   ...   | nothing | _ = nothing
   ...   | just zs | ih₂ rewrite ⟫-forward-cast n d₁ d₂ with B⟦ e' ⟧ zs | ih₂
   ...     | nothing | _ = nothing
-  ...     | just ys' | ih₂' with B⟦ e ⟧ ys'
-  ...       | nothing = nothing
-  ...       | just xs' rewrite ⟫-backward-cast (n ∸ (d₁ + d₂)) d₁' d₂' = {!   !}
+  ...     | just ys' | just ih₂' with B⟦ e ⟧ ys' | ih₁
+  ...       | nothing | _ = nothing
+  ...       | just xs' | ih₁' rewrite ⟫-backward-cast (n ∸ (d₁ + d₂)) d₁' d₂' = {!   !}
 
   B∙F-⊗ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Z W) {xzs : Vec (X × Z) n}
-    → DropLast ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) xzs $? (B⟦ e ⊗ e' ⟧_ ∙ F⟦ e ⊗ e' ⟧_) xzs
+    → DropLast ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) xzs $? B∙F⟦ e ⊗ e' ⟧ xzs
   B∙F-⊗ {n = n} {d₁ = d₁} {d₁' = d₁'} {d₂ = d₂} {d₂' = d₂'} e e' {xzs} with unzip xzs
   ... | xs , zs with F⟦ e ⟧ xs | F⟦ e' ⟧ zs | B∙F e {xs} | B∙F e' {zs}
   ...   | nothing | nothing | _ | _ = nothing
@@ -344,8 +395,11 @@ mutual
   ...           | xzs' rewrite ⊗-backward-cast (n ∸ (d₁ ⊔ d₂)) d₁' d₂' = {!   !}
 
 
+  F∙B⟦_⟧_ : E d d' X Y → Vec Y n ⇀ Vec Y (n ∸ d' ∸ d)
+  F∙B⟦_⟧_ e = F⟦ e ⟧_ ∙ B⟦ e ⟧_
+
   F∙B : ∀ (e : E d d' X Y) {ys : Vec Y n}
-    → DropLast (d + d') ys $? (F⟦ e ⟧_ ∙ B⟦ e ⟧_) ys
+    → DropLast (d + d') ys $? F∙B⟦ e ⟧ ys
   F∙B (map-fold a f g) = F∙B-map-fold a f g
   F∙B (delay x) = F∙B-delay x
   F∙B (hasten x) = F∙B-hasten x
@@ -353,7 +407,7 @@ mutual
   F∙B (e ⊗ e') = F∙B-⊗ e e'
 
   F∙B-map-fold : ∀ a (f : A → X ⇌ Y) g {ys : Vec Y n}
-    → DropLast 0 ys $? (F⟦ map-fold a f g ⟧_ ∙ B⟦ map-fold a f g ⟧_) ys
+    → DropLast 0 ys $? F∙B⟦ map-fold a f g ⟧ ys
   F∙B-map-fold a f g {[]} = just []!
   F∙B-map-fold a f g {y ∷ ys} with f a .from y in eq
   ... | nothing = nothing
@@ -369,7 +423,7 @@ mutual
   F∙B-hasten = B∙F-delay
 
   F∙B-⟫ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Y Z) {zs : Vec Z n}
-    → DropLast ((d₁ + d₂) + (d₁' + d₂')) zs $? (F⟦ e ⟫ e' ⟧_ ∙ B⟦ e ⟫ e' ⟧_) zs
+    → DropLast ((d₁ + d₂) + (d₁' + d₂')) zs $? F∙B⟦ e ⟫ e' ⟧ zs
   F∙B-⟫ e e' {zs} with B⟦ e' ⟧ zs | F∙B e' {zs}
   ... | nothing | _ = nothing
   ... | just ys | ih₁ with B⟦ e ⟧ ys | F∙B e {ys}
@@ -377,7 +431,7 @@ mutual
   ...     | just xs | ih₂ = {!   !}
 
   F∙B-⊗ : ∀ {d₁ d₁' d₂ d₂'} (e : E d₁ d₁' X Y) (e' : E d₂ d₂' Z W) {yws : Vec (Y × W) n}
-    → DropLast ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) yws $? (F⟦ e ⊗ e' ⟧_ ∙ B⟦ e ⊗ e' ⟧_) yws
+    → DropLast ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) yws $? F∙B⟦ e ⊗ e' ⟧ yws
   F∙B-⊗ e e' {yws} with unzip yws
   ... | ys , ws with B⟦ e ⟧ ys | B⟦ e' ⟧ ws | F∙B e {ys} | F∙B e' {ws}
   ...   | nothing | nothing | _ | _ = nothing
