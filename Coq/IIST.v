@@ -862,7 +862,7 @@ Definition IIST_f1' {X Y} `{EqDec Y eq} (* f1と違いこちらはequalityの判
 
 
 Program Definition IIST_inv_f1 {X Y} `{E : EqDec Y eq}
-                               (mst : MST X Y) d (Hd : d_MIST mst d) xs : partial_invertible_function X (option Y * X) :=
+                               (mst : MST X Y) d (Hd : d_MST mst d) xs : partial_invertible_function X (option Y * X) :=
 {| forward := IIST_f1 mst d xs;
    backward := IIST_f1' mst d xs
 |}.
@@ -894,8 +894,7 @@ destruct (mst (xs ++ [a])) as [ys | ] eqn: Hmst; simpl.
 }
 assert (length ys > 0) as Hylen.
 {
-  unfold d_MIST, d_MST in Hd.
-  destruct Hd as [_ Hd].
+  unfold d_MST in Hd.
   apply Hd in Hmst.
   rewrite app_length in Hmst.
   simpl in Hmst.
@@ -917,6 +916,17 @@ split; intro Hxy.
   rewrite Hlast in Hy''; inversion Hy''.
   now auto.
 Qed.
+
+
+Definition IIST_g1 {X} (xs : list X) x : list X := xs ++ [x].
+
+
+Definition IIST_e1 {X Y} `{E : EqDec Y eq}
+                               (mst : MST X Y) d (Hd : d_MST mst d) :=
+ IIST_mapfold [] (IIST_inv_f1 mst d Hd) IIST_g1.
+
+
+
 
 
 Theorem d_d'_MIIST_IIST :
