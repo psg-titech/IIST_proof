@@ -213,12 +213,26 @@ match l with
 | a :: l' => Some (last_elem a l')
 end.
 
+
 Lemma last_correct :
  forall A (l : list A) a,
   last (l ++ [a]) = Some a.
 destruct l; intros; simpl in *; auto.
 rewrite last_elem_correct; now auto.
 Qed.
+
+
+Lemma last_Some :
+ forall A (l : list A),
+  length l > 0 -> exists a, last l = Some a.
+intros; destruct l; simpl in *.
++ unfold gt, lt in H; now contradict H.
++ clear H; revert a.
+  induction l; intros; simpl in *.
+  - exists a; now auto.
+  - destruct IHl with a; eexists; now eauto.
+Qed.
+
 
 Lemma last_correct' :
  forall A (l : list A) a,
@@ -228,6 +242,7 @@ destruct (last_elem_correct' _ _ _ _ H1) as [[? ?] | [? ?]].
 + exists []; subst; now auto.
 + exists (a0 :: x); rewrite H1; rewrite H0; now auto.
 Qed.
+
 
 
 End list_tail.
@@ -259,6 +274,27 @@ Next Obligation.
 destruct b.
 + left; now auto.
 + right; intro H; now inversion H.
+Defined.
+
+
+
+#[global]
+Program Instance option_Some_None_eqdec {A} : @EqOneDec (option (option A)) (Some None).
+Next Obligation.
+destruct b as [[ a | ] | ].
++ right; intro H; now inversion H.
++ left; now auto.
++ right; intro H; now inversion H.
+Defined.
+
+
+Definition eqdec_Some_eqdec {A} (a : A) `{EqOneDec A a} : @EqOneDec (option A) (Some a).
+intro b.
+destruct b.
++ destruct H with a0.
+  - left; subst; now auto.
+  - right; intro H'; apply n; inversion H'; now auto.
++ right; intro H'; now inversion H'.
 Defined.
 
 
@@ -359,7 +395,7 @@ induction e; simpl.
 - intros xs ys H; rewrite PeanoNat.Nat.sub_0_r.
   revert a ys H; induction xs; simpl in *.
   + intros a ys H; inversion H; simpl; now lia.
-  + intros a1 ys H. destruct (forward X Y (p a1) a); simpl in *; try (inversion H; fail).
+  + intros a1 ys H. destruct (forward X Y (p a1) a); simpl in *; try now inversion H.
     case_eq (fwd_mapfold p a0 (a0 a1 a) xs); [intros l H1 | intro H1]; rewrite H1 in H; simpl in H; try inversion H.
     simpl; rewrite IHxs with (a0 a1 a) l; now auto.
 - intros xs ys H; rewrite PeanoNat.Nat.sub_0_r.
@@ -376,7 +412,7 @@ induction e; simpl.
 - intros x12s y12s H.
   case_eq (split x12s); intros x1s x2s Hx12.
   rewrite Hx12 in H.
-  case_eq (fwd e1 x1s); [intros y1s H1s | intro H1s]; rewrite H1s in H; simpl in H; try (inversion H; fail).
+  case_eq (fwd e1 x1s); [intros y1s H1s | intro H1s]; rewrite H1s in H; simpl in H; try now inversion H.
   case_eq (fwd e2 x2s); [intros y2s H2s | intro H2s]; rewrite H2s in H; simpl in H; inversion H.
   assert (Hx1l := split_length_l x12s).
   assert (Hx2l := split_length_r x12s).
@@ -394,7 +430,7 @@ induction e; simpl.
 - intros ys xs H; rewrite PeanoNat.Nat.sub_0_r.
   revert a xs H; induction ys; simpl in *.
   + intros a xs H; inversion H; simpl; now lia.
-  + intros a1 xs H. destruct (backward X Y (p a1) a); simpl in *; try (inversion H; fail).
+  + intros a1 xs H. destruct (backward X Y (p a1) a); simpl in *; try now inversion H.
     case_eq (bwd_mapfold p a0 (a0 a1 x) ys); [intros l H1 | intro H1]; rewrite H1 in H; simpl in H; try inversion H.
     simpl; rewrite IHys with (a0 a1 x) l; now auto.
 - intros ys xs H.
@@ -411,7 +447,7 @@ induction e; simpl.
 - intros y12s x12s H.
   case_eq (split y12s); intros y1s y2s Hy12.
   rewrite Hy12 in H.
-  case_eq (bwd e1 y1s); [intros x1s H1s | intro H1s]; rewrite H1s in H; simpl in H; try (inversion H; fail).
+  case_eq (bwd e1 y1s); [intros x1s H1s | intro H1s]; rewrite H1s in H; simpl in H; try now inversion H.
   case_eq (bwd e2 y2s); [intros x2s H2s | intro H2s]; rewrite H2s in H; simpl in H; inversion H.
   assert (Hy1l := split_length_l y12s).
   assert (Hy2l := split_length_r y12s).
@@ -429,8 +465,8 @@ induction e; simpl.
 - intro xs; revert a; induction xs; intros; simpl in *; inversion H; subst; simpl.
   + exists nil; split; auto; now constructor.
   + exists nil; split; auto; now constructor.
-  + destruct (forward X Y (p a1) a); simpl in *; try (inversion H0; fail).
-    case_eq (fwd_mapfold p a0 (a0 a1 a) xs); [intros l H4 | intro H4]; rewrite H4 in H0; try (inversion H0; fail).
+  + destruct (forward X Y (p a1) a); simpl in *; try now inversion H0.
+    case_eq (fwd_mapfold p a0 (a0 a1 a) xs); [intros l H4 | intro H4]; rewrite H4 in H0; try now inversion H0.
     destruct IHxs with (a := a0 a1 a) (xs' := l1) (ys := l); auto.
     destruct H1.
     exists (y :: x).
@@ -448,7 +484,7 @@ induction e; simpl.
     exists l1; split; now auto.
 - intros.
   assert (He1 := IHe1 xs xs'); clear IHe1.
-  destruct (fwd e1 xs) as [zs | ]; simpl in *; try (inversion H0; fail).
+  destruct (fwd e1 xs) as [zs | ]; simpl in *; try now inversion H0.
   destruct (He1 zs) as [zs' [H1 H2]]; auto; clear He1.
   destruct (IHe2 zs zs' ys) as [ys' [H3 H4]]; auto; clear IHe2.
   exists ys'; split; auto.
@@ -457,7 +493,7 @@ induction e; simpl.
   case_eq (split xs). intros x1s x2s Hx12s.
   rewrite Hx12s in H0; simpl in H0.
   case_eq (split xs'). intros x1s' x2s' Hx12s'.
-  case_eq (fwd e1 x1s); [intros y1s H1 | intro H1]; rewrite H1 in H0; simpl in H0; try (inversion H0; fail).
+  case_eq (fwd e1 x1s); [intros y1s H1 | intro H1]; rewrite H1 in H0; simpl in H0; try now inversion H0.
   case_eq (fwd e2 x2s); [intros y2s H2 | intro H2]; rewrite H2 in H0; simpl in H0; inversion H0; subst.
   destruct (split_prefix _ _ x1s x2s x1s' x2s' H).
   * rewrite Hx12s; now auto.
@@ -477,8 +513,8 @@ induction e; simpl.
 - intro ys; revert a; induction ys; intros; simpl in *; inversion H; subst; simpl.
   + exists nil; split; auto; now constructor.
   + exists nil; split; auto; now constructor.
-  + destruct (backward X Y (p a1) a); simpl in *; try (inversion H0; fail).
-    case_eq (bwd_mapfold p a0 (a0 a1 x) ys); [intros l H4 | intro H4]; rewrite H4 in H0; try (inversion H0; fail).
+  + destruct (backward X Y (p a1) a); simpl in *; try now inversion H0.
+    case_eq (bwd_mapfold p a0 (a0 a1 x) ys); [intros l H4 | intro H4]; rewrite H4 in H0; try now inversion H0.
     destruct IHys with (a := a0 a1 x) (ys' := l1) (xs := l); auto.
     destruct H1.
     exists (x :: x0).
@@ -496,7 +532,7 @@ induction e; simpl.
   apply prefix_slide; now auto.
 - intros.
   assert (He2 := IHe2 ys ys'); clear IHe2.
-  destruct (bwd e2 ys) as [zs | ]; simpl in *; try (inversion H0; fail).
+  destruct (bwd e2 ys) as [zs | ]; simpl in *; try now inversion H0.
   destruct (He2 zs) as [zs' [H1 H2]]; auto; clear He2.
   destruct (IHe1 zs zs' xs) as [xs' [H3 H4]]; auto; clear IHe1.
   exists xs'; split; auto.
@@ -505,7 +541,7 @@ induction e; simpl.
   case_eq (split ys). intros y1s y2s Hy12s.
   rewrite Hy12s in H0; simpl in H0.
   case_eq (split ys'). intros y1s' y2s' Hy12s'.
-  case_eq (bwd e1 y1s); [intros x1s H1 | intro H1]; rewrite H1 in H0; simpl in H0; try (inversion H0; fail).
+  case_eq (bwd e1 y1s); [intros x1s H1 | intro H1]; rewrite H1 in H0; simpl in H0; try now inversion H0.
   case_eq (bwd e2 y2s); [intros x2s H2 | intro H2]; rewrite H2 in H0; simpl in H0; inversion H0; subst.
   destruct (split_prefix _ _ y1s y2s y1s' y2s' H).
   * rewrite Hy12s; now auto.
@@ -529,10 +565,10 @@ induction e; intros; simpl in *.
     exists nil. split; now constructor.
   + case_eq (forward X Y (p a) x);
      [ intros y Hy | intro Hy ]; rewrite Hy in Hfwd; simpl in Hfwd;
-     try (inversion Hfwd; fail).
+     try now inversion Hfwd.
     case_eq (fwd_mapfold p a0 (a0 a x) xs);
      [ intros ys' Hys' | intro Hys' ]; rewrite Hys' in Hfwd; simpl in Hfwd;
-     try (inversion Hfwd; fail).
+     try now inversion Hfwd.
     destruct (IHxs (a0 a x) ys' Hys') as [xs' [ Hxs' Hxsp ]].
     exists (x :: xs').
     split.
@@ -560,7 +596,7 @@ induction e; intros; simpl in *.
     exists (slide x' ys).
     split; auto.
     now apply slide_prefix.
-- case_eq (fwd e1 xs); [intros zs H0 | intro H0]; rewrite H0 in H; simpl in H; try (inversion H; fail).
+- case_eq (fwd e1 xs); [intros zs H0 | intro H0]; rewrite H0 in H; simpl in H; try now inversion H.
   destruct (IHe2 zs ys H) as [ zs' [ H1 H2 ]]; clear IHe2.
   rewrite H1; simpl.
   destruct (IHe1 xs zs H0) as [ xs'' [ H3 H4 ]]; clear IHe1.
@@ -571,9 +607,9 @@ induction e; intros; simpl in *.
 - case_eq (split xs). intros x1s x2s Hx12s.
   rewrite Hx12s in H; simpl in H.
   case_eq (split ys). intros y1s y2s Hy12s.
-  case_eq (fwd e1 x1s); [ intros y1s' H0 | intro H0 ]; rewrite H0 in H; simpl in H; try (inversion H; fail).
+  case_eq (fwd e1 x1s); [ intros y1s' H0 | intro H0 ]; rewrite H0 in H; simpl in H; try now inversion H.
   destruct (IHe1 x1s y1s' H0) as [ x1s' [ H1 H2 ]]; clear IHe1.
-  case_eq (fwd e2 x2s); [ intros y2s' H3 | intro H3 ]; rewrite H3 in H; simpl in H; try (inversion H; fail).
+  case_eq (fwd e2 x2s); [ intros y2s' H3 | intro H3 ]; rewrite H3 in H; simpl in H; try now inversion H.
   destruct (IHe2 x2s y2s' H3) as [ x2s' [ H4 H5 ]]; clear IHe2.
   inversion H; subst; clear H.
   destruct (split_combine_prefix _ _ _ _ Hy12s) as [ H6 H7 ].
@@ -603,10 +639,10 @@ induction e; intros; simpl in *.
     exists nil. split; now constructor.
   + case_eq (backward X Y (p a) y);
      [ intros x Hx | intro Hx ]; rewrite Hx in Hbwd; simpl in Hbwd;
-     try (inversion Hbwd; fail).
+     try now inversion Hbwd.
     case_eq (bwd_mapfold p a0 (a0 a x) ys);
      [ intros xs' Hxs' | intro Hxs' ]; rewrite Hxs' in Hbwd; simpl in Hbwd;
-     try (inversion Hbwd; fail).
+     try now inversion Hbwd.
     destruct (IHys (a0 a x) xs' Hxs') as [ys' [ Hys' Hysp ]].
     exists (y :: ys').
     split.
@@ -634,7 +670,7 @@ induction e; intros; simpl in *.
     * exists (slide y' ys). split; auto.
       now apply slide_prefix.
     * elim e1; now auto.
-- case_eq (bwd e2 ys); [intros zs H0 | intro H0]; rewrite H0 in H; simpl in H; try (inversion H; fail).
+- case_eq (bwd e2 ys); [intros zs H0 | intro H0]; rewrite H0 in H; simpl in H; try now inversion H.
   destruct (IHe1 zs xs H) as [ zs' [ H1 H2 ]]; clear IHe1.
   rewrite H1; simpl.
   destruct (IHe2 ys zs H0) as [ ys'' [ H3 H4 ]]; clear IHe2.
@@ -645,9 +681,9 @@ induction e; intros; simpl in *.
 - case_eq (split ys). intros y1s y2s Hy12s.
   rewrite Hy12s in H; simpl in H.
   case_eq (split xs). intros x1s x2s Hx12s.
-  case_eq (bwd e1 y1s); [ intros x1s' H0 | intro H0 ]; rewrite H0 in H; simpl in H; try (inversion H; fail).
+  case_eq (bwd e1 y1s); [ intros x1s' H0 | intro H0 ]; rewrite H0 in H; simpl in H; try now inversion H.
   destruct (IHe1 y1s x1s' H0) as [ y1s' [ H1 H2 ]]; clear IHe1.
-  case_eq (bwd e2 y2s); [ intros x2s' H3 | intro H3 ]; rewrite H3 in H; simpl in H; try (inversion H; fail).
+  case_eq (bwd e2 y2s); [ intros x2s' H3 | intro H3 ]; rewrite H3 in H; simpl in H; try now inversion H.
   destruct (IHe2 y2s x2s' H3) as [ y2s' [ H4 H5 ]]; clear IHe2.
   inversion H; subst; clear H.
   destruct (split_combine_prefix _ _ _ _ Hx12s) as [ H6 H7 ].
@@ -720,6 +756,14 @@ intuition.
 Qed.
 
 
+
+End Math_IIST.
+
+
+
+
+Section IIST_Math.
+
 Lemma IIST_MIST :
  forall X Y (e : IIST X Y),
   MIST (fwd e).
@@ -739,6 +783,13 @@ Lemma IIST_MInv :
   MInv (fwd e) (bwd e).
 unfold MInv.
 intros; apply fwd_bwd; now auto.
+Qed.
+
+Lemma IIST_bwd_MInv :
+ forall X Y (e : IIST X Y),
+  MInv (bwd e) (fwd e).
+unfold MInv.
+intros; apply bwd_fwd; now auto.
 Qed.
 
 Lemma IIST_bwd_MIST :
@@ -769,6 +820,125 @@ split; [ now apply IIST_MIST
          | now apply IIST_bwd_d_MST]]]].
 Qed.
 
+Theorem inv_IIST_is_d_d'_MIIST_pair :
+ forall X Y (e : IIST X Y),
+  d_d'_MIIST_pair (bwd e) (fwd e) (delay_bwd e) (delay_fwd e).
+intros X Y e.
+apply d_d'_MIIST_pair_min.
+split; [ now apply IIST_bwd_MIST
+| split; [ now apply IIST_bwd_d_MST
+| split; [ now apply IIST_bwd_MInv
+| split; [ now apply IIST_MIST
+         | now apply IIST_d_MST]]]].
+Qed.
+
+
+
+End IIST_Math.
+
+
+
+Section IIST_descriptive.
+
+
+Definition option_wrap {A} (a : option A) : option (option A) :=
+match a with
+| None => None
+| Some a => Some (Some a)
+end.
+
+Search ({_ <= _} + {_ > _}).
+
+
+Definition IIST_f1 {X Y}
+                   (mst : MST X Y) d (xs : list X) x : option (option Y * X) :=
+ if Compare_dec.le_gt_dec d (length xs) then
+   option_bind (mst (xs ++ [x]))
+    (fun ys =>
+      option_bind (last ys)
+       (fun y => Some (Some y, x))) (* このペアのせいでyのdecidable equalityがいる？ *)
+ else Some (None, x).
+
+
+Definition IIST_f1' {X Y} `{EqDec Y eq} (* f1と違いこちらはequalityの判定が必要 *)
+                    (mst : MST X Y) d (xs : list X) oy_x : option X :=
+ if Compare_dec.le_gt_dec d (length xs) then
+   match oy_x with
+   | (None, _) => None (* 十分な長さがあるので値があるはず *)
+   | (Some y, x) =>
+       option_bind (mst (xs ++ [x]))
+        (fun ys =>
+          option_bind (last ys)
+           (fun y' => if equiv_dec y y' then Some x else None))
+   end
+ else match oy_x with
+      | (None, x) => Some x
+      | (Some _, _) => None
+      end.
+
+
+Program Definition IIST_inv_f1 {X Y} `{E : EqDec Y eq}
+                               (mst : MST X Y) d (Hd : d_MIST mst d) xs : partial_invertible_function X (option Y * X) :=
+{| forward := IIST_f1 mst d xs;
+   backward := IIST_f1' mst d xs
+|}.
+Next Obligation.
+unfold IIST_f1, IIST_f1', equiv_dec.
+destruct (Compare_dec.le_gt_dec d (length xs)) as [Hlen | Hlen]; simpl.
+2: {
+  split; intro Hsome.
+  + inversion Hsome; now auto.
+  + destruct o; inversion Hsome.
+    now auto.
+}
+destruct o as [y | ].
+2: {
+  destruct (mst (xs ++ [a])); simpl.
+  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
+  + split; intro Hcon; now inversion Hcon.
+}
+case_eq (mst (xs ++ [a])); simpl.
+2: {
+  intro Hnone.
+  split; intro Hcon.
+  + now inversion Hcon.
+  + case_eq (mst (xs ++ [x])).
+    - intros ys Hcon1.
+      rewrite Hcon1 in Hcon; simpl in Hcon.
+      destruct (last ys); simpl in Hcon; inversion Hcon.
+      destruct (E y y0); simpl in Hcon; inversion Hcon.
+      subst.
+      rewrite Hcon1 in Hnone; now inversion Hnone.
+    - intro Hnone1.
+      rewrite Hnone1 in Hcon; simpl in Hcon.
+      now inversion Hcon.
+}
+intros ys Hmst.
+assert (length ys > 0) as Hylen.
+{
+  unfold d_MIST, d_MST in Hd.
+  destruct Hd as [_ Hd].
+  apply Hd in Hmst.
+  rewrite app_length in Hmst.
+  simpl in Hmst.
+  lia.
+}
+apply last_Some in Hylen.
+destruct Hylen as [y' Hlast].
+rewrite Hlast; simpl.
+split; intro Hxy.
++ inversion Hxy; subst.
+  rewrite Hmst; simpl.
+  rewrite Hlast; simpl.
+  destruct (E y y) as [Hy | Hy]; auto.
+  elim Hy; now auto.
++ destruct (mst (xs ++ [x])) as [ys' |] eqn: Hys'; simpl in Hxy; try now inversion Hxy.
+  destruct (last ys') as [y'' | ] eqn: Hy''; simpl in Hxy; try now inversion Hxy.
+  destruct (E y y'') as[e | e]; simpl in Hxy; inversion Hxy; unfold equiv in e; subst.
+  rewrite Hmst in Hys'; inversion Hys'; subst.
+  rewrite Hlast in Hy''; inversion Hy''.
+  now auto.
+Qed.
 
 
 Theorem d_d'_MIIST_IIST :
@@ -816,7 +986,7 @@ Theorem d_MIST_coord_correct :
 unfold inc_coord_elem, inc_coord_none, MIST_coord.
 intros X Y mst d [Hmist Hd_mst]; split; intros; split; intro.
 + destruct H as [ys H]; rewrite H; simpl. now apply last_correct.
-+ destruct (mst (xs ++ [x])); simpl in H; try (inversion H; fail).
++ destruct (mst (xs ++ [x])); simpl in H; try now inversion H.
   apply last_correct' in H.
   destruct H as [l' H]; exists l'; rewrite H; now auto.
 + destruct H.
@@ -862,6 +1032,5 @@ Fixpoint coord_d_MIST {X Y} d (coord : list X -> option Y) (xt : list X) : MST X
 
 
 
+End IIST_descriptive.
 
-
-End Math_IIST.
