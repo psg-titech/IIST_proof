@@ -5,16 +5,16 @@ module IIST where
 open import Category.Monad using ( RawMonad )
 open RawMonad {{...}} using ( _>>=_; return ) renaming ( _<=<_ to _∙_ )
 open import Data.List using ( List; []; _∷_; zip; unzip; length )
-import Data.List.Properties
+open import Data.List.Properties using ( length-zipWith )
 open import Data.Maybe using ( Maybe; just; nothing )
 open import Data.Maybe.Categorical using ( monad )
 open import Data.Maybe.Relation.Unary.All using ( All; just; nothing )
 open import Data.Maybe.Properties using ( just-injective )
 open import Data.Nat using ( ℕ; zero; suc; _+_; _∸_; _⊔_ )
-import Data.Nat.Properties
+open import Data.Nat.Properties using ( +-comm; ∸-+-assoc; ∸-distribˡ-⊔-⊓ )
 open import Data.Product using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
 import Data.Product.Properties
-open import Function using ( _$_ )
+open import Function using ( id; _$_ )
 open import Relation.Nullary using ( Dec; yes; no )
 open import Relation.Binary.PropositionalEquality
 
@@ -48,6 +48,15 @@ shift-length x (y ∷ xs) = cong suc (shift-length y xs)
 
 _$?_ : (X → Set) → (Maybe X → Set)
 _$?_ = All
+
+length-unzip : ∀ {xzs : List (X × Z)} {xs zs}
+  → unzip xzs ≡ (xs , zs)
+  → length xzs ≡ length xs × length xzs ≡ length zs
+length-unzip {xzs = []} refl = refl , refl
+length-unzip {xzs = (x , z) ∷ xzs} refl
+  with xs , zs ← unzip xzs in eq
+  with ih₁ , ih₂ ← length-unzip eq
+  = cong suc ih₁ , cong suc ih₂
 
 -------------------------------------------------------------------------------
 -- Partial function and Partial invertible function
@@ -142,6 +151,20 @@ B-map-fold a f g (y ∷ ys) = do
   xs ← B-map-fold (g a x) f g ys
   return $ x ∷ xs
 
+_ : F⟦ delay 0 ⟫ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
+_ = refl
+
+_ : B⟦ delay 0 ⟫ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
+_ = refl
+
+_ : F⟦ delay 0 ⟫ hasten 1 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ nothing
+_ = refl
+
+_ :
+  F⟦ delay 0 ⊗ hasten 0 ⟧ ((1 , 0) ∷ (2 , 1) ∷ (3 , 2) ∷ (4 , 3) ∷ []) ≡
+  just ((0 , 1) ∷ (1 , 2) ∷ (2 , 3) ∷ [])
+_ = refl
+
 -------------------------------------------------------------------------------
 -- Relations and Predicates
 
@@ -195,83 +218,95 @@ _ = (0 ∷ []) , refl
 _ : DropLast 5 (0 ∷ 1 ∷ 2 ∷ []) []
 _ = [] , refl
 
-IsIncremental : (List X ⇀ List Y) → Set
-IsIncremental f = ∀ {xs ys}
+IsIST : (List X ⇀ List Y) → Set
+IsIST f = ∀ {xs ys}
   → f xs ≡ just ys
   → ∀ {xs'} → xs' ⊆ xs
   → Σ[ ys' ∈ _ ] (ys' ⊆ ys) × (f xs' ≡ just ys')
 
+Is-dST : ℕ → (List X ⇀ List Y) → Set
+Is-dST d f = ∀ {xs ys}
+  → f xs ≡ just ys
+  → length ys ≡ length xs ∸ d
+
+record Is-dIST (d : ℕ) (f : List X ⇀ List Y) : Set where
+  field
+    isIST : IsIST f
+    is-dST : Is-dST d f
+
+open Is-dIST
+
 -------------------------------------------------------------------------------
 -- Properties of The Forward and Backward Semantics
 
-F-Incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧_
-F-Incremental (map-fold {A} a f g) = ind a
+F-IST : ∀ (e : E X Y) → IsIST F⟦ e ⟧_
+F-IST (map-fold {A} a f g) = ind a
   where
-    ind : (a : A) → IsIncremental F⟦ map-fold a f g ⟧_
+    ind : (a : A) → IsIST F⟦ map-fold a f g ⟧_
     ind a eq [] = [] , [] , refl
     ind a eq (_∷_ x {xs = xs} pfx)
       with just y ← f a .to x
-      with just ys ← F⟦ map-fold (g a x) f g ⟧ xs in eq₁
+      with just ys ← F-map-fold (g a x) f g xs in eq₁
       with ys' , pfx' , eq₂ ← ind (g a x) eq₁ pfx
       rewrite sym (just-injective eq) | eq₂ =
         y ∷ ys' , y ∷ pfx' , refl
-F-Incremental (delay x) refl {xs'} pfx = shift x xs' , ⊆-shift x pfx , refl
-F-Incremental (hasten x) _ [] = [] , [] , refl
-F-Incremental (hasten x) eq (_∷_ x' {xs' = xs'} pfx)
+F-IST (delay x) refl {xs'} pfx = shift x xs' , ⊆-shift x pfx , refl
+F-IST (hasten x) _ [] = [] , [] , refl
+F-IST (hasten x) eq (_∷_ x' {xs' = xs'} pfx)
   with yes refl ← x == x'
   rewrite just-injective eq =
     xs' , pfx , refl
-F-Incremental (e ⟫ e') {xs} eq {xs'} pfxx
+F-IST (e ⟫ e') {xs} eq {xs'} pfxx
   with just ys ← F⟦ e ⟧ xs in eq₁
-  with ys' , pfxy , eq₂ ← F-Incremental e eq₁ pfxx
+  with ys' , pfxy , eq₂ ← F-IST e eq₁ pfxx
   with just zs ← F⟦ e' ⟧ ys in eq₃
-  with zs' , pfxz , eq₄ ← F-Incremental e' eq₃ pfxy
+  with zs' , pfxz , eq₄ ← F-IST e' eq₃ pfxy
   rewrite sym (just-injective eq) | eq₂ | eq₄ =
     zs' , pfxz , refl
-F-Incremental (e ⊗ e') {xzs} eq {xzs'} pfxxz
+F-IST (e ⊗ e') {xzs} eq {xzs'} pfxxz
   with xs' , zs' ← unzip xzs' in eq₁
   with xs , zs ← unzip xzs in eq₂
   with pfxx , pfxz ← ⊆-unzip pfxxz eq₁ eq₂
   with just ys ← F⟦ e ⟧ xs in eq₃
   with just ws ← F⟦ e' ⟧ zs in eq₄
-  with ys' , pfxy , eq₅ ← F-Incremental e eq₃ pfxx
-  with ws' , pfxw , eq₆ ← F-Incremental e' eq₄ pfxz
+  with ys' , pfxy , eq₅ ← F-IST e eq₃ pfxx
+  with ws' , pfxw , eq₆ ← F-IST e' eq₄ pfxz
   rewrite sym (just-injective eq) | eq₅ | eq₆ =
     zip ys' ws' , ⊆-zip pfxy pfxw , refl
 
 
-B-Incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧_
-B-Incremental (map-fold {A} a f g) = ind a
+B-IST : ∀ (e : E X Y) → IsIST B⟦ e ⟧_
+B-IST (map-fold {A} a f g) = ind a
   where
-    ind : (a : A) → IsIncremental B⟦ map-fold a f g ⟧_
+    ind : (a : A) → IsIST B⟦ map-fold a f g ⟧_
     ind a eq [] = [] , [] , refl
     ind a eq (_∷_ y {xs = ys} pfx)
       with just x ← f a .from y
-      with just xs ← B⟦ map-fold (g a x) f g ⟧ ys in eq₁
+      with just xs ← B-map-fold (g a x) f g ys in eq₁
       with xs' , pfx' , eq₂ ← ind (g a x) eq₁ pfx
       rewrite sym (just-injective eq) | eq₂ =
         x ∷ xs' , x ∷ pfx' , refl
-B-Incremental (delay x) _ [] = [] , [] ,  refl
-B-Incremental (delay x) eq (_∷_ x' {xs' = xs} pfx)
+B-IST (delay x) _ [] = [] , [] ,  refl
+B-IST (delay x) eq (_∷_ x' {xs' = xs} pfx)
   with yes refl ← x == x'
   rewrite just-injective eq =
     xs , pfx , refl
-B-Incremental (hasten x) refl {xs'} pfx = shift x xs' , ⊆-shift x pfx , refl
-B-Incremental (e ⟫ e') {zs} eq {zs'} pfxz
+B-IST (hasten x) refl {xs'} pfx = shift x xs' , ⊆-shift x pfx , refl
+B-IST (e ⟫ e') {zs} eq {zs'} pfxz
   with just ys ← B⟦ e' ⟧ zs in eq₁
-  with ys' , pfxy , eq₂ ← B-Incremental e' eq₁ pfxz
+  with ys' , pfxy , eq₂ ← B-IST e' eq₁ pfxz
   with just xs ← B⟦ e ⟧ ys in eq₃
-  with xs' , pfxx , eq₄ ← B-Incremental e eq₃ pfxy
+  with xs' , pfxx , eq₄ ← B-IST e eq₃ pfxy
   rewrite sym (just-injective eq) | eq₂ | eq₄ =
     xs' , pfxx , refl
-B-Incremental (e ⊗ e') {yws} eq {yws'} pfxyw
+B-IST (e ⊗ e') {yws} eq {yws'} pfxyw
     with ys' , ws' ← unzip yws' in eq₁
     with ys , ws ← unzip yws in eq₂
     with pfxy , pfxw ← ⊆-unzip pfxyw eq₁ eq₂
     with just xs ← B⟦ e ⟧ ys in eq₃
     with just zs ← B⟦ e' ⟧ ws in eq₄
-    with xs' , pfxx , eq₅ ← B-Incremental e eq₃ pfxy
-    with zs' , pfxz , eq₆ ← B-Incremental e' eq₄ pfxw
+    with xs' , pfxx , eq₅ ← B-IST e eq₃ pfxy
+    with zs' , pfxz , eq₆ ← B-IST e' eq₄ pfxw
     rewrite sym (just-injective eq) | eq₅ | eq₆ =
       zip xs' zs' , ⊆-zip pfxx pfxz , refl
 
@@ -287,57 +322,115 @@ dB⟦_⟧ : E X Y → ℕ
 dB⟦ map-fold a f g ⟧ = 0
 dB⟦ delay x ⟧ = 1
 dB⟦ hasten x ⟧ = 0
-dB⟦ e ⟫ e' ⟧ = dB⟦ e ⟧ + dB⟦ e ⟧
+dB⟦ e ⟫ e' ⟧ = dB⟦ e ⟧ + dB⟦ e' ⟧
 dB⟦ e ⊗ e' ⟧ = dB⟦ e ⟧ ⊔ dB⟦ e' ⟧
 
-B∙F⟦_⟧_ : E X Y → List X ⇀ List X
-B∙F⟦_⟧_ e = B⟦ e ⟧_ ∙ F⟦ e ⟧_
 
-F∙B⟦_⟧_ : E X Y → List Y ⇀ List Y
-F∙B⟦_⟧_ e = F⟦ e ⟧_ ∙ B⟦ e ⟧_
+F-dST : ∀ (e : E X Y) → Is-dST dF⟦ e ⟧ F⟦ e ⟧_
+F-dST (map-fold {A} a f g) {xs} = ind a {xs}
+  where
+    ind : (a : A) → Is-dST dF⟦ map-fold a f g ⟧ F⟦ map-fold a f g ⟧_
+    ind a {[]} refl = refl
+    ind a {x ∷ xs} eq
+      with just y ← f a .to x | just ys ← F-map-fold (g a x) f g xs in eq₁
+      with ih ← ind (g a x) {xs} eq₁
+      rewrite sym (just-injective eq) =
+        cong suc ih
+F-dST (delay x) {xs} refl = shift-length x xs
+F-dST (hasten x) {[]} refl = refl
+F-dST (hasten x) {x' ∷ xs} eq
+  with yes refl ← x == x'
+  rewrite sym (just-injective eq) =
+    refl
+F-dST (e ⟫ e') {xs} eq
+  with just ys ← F⟦ e ⟧ xs in eq₁
+  with ih₁ ← F-dST e eq₁
+  with just zs ← F⟦ e' ⟧ ys in eq₂
+  with ih₂ ← F-dST e' eq₂
+  rewrite sym (just-injective eq) | ih₁ | ih₂ =
+    ∸-+-assoc (length xs) dF⟦ e ⟧ dF⟦ e' ⟧
+F-dST (e ⊗ e') {xzs} eq
+  with xs , zs ← unzip xzs in eq₁
+  with just ys ← F⟦ e ⟧ xs in eq₂ | just ws ← F⟦ e' ⟧ zs in eq₃
+  with ih₁ ← F-dST e eq₂ | ih₂ ← F-dST e' eq₃
+  rewrite sym (just-injective eq) | length-zipWith _,_ ys ws | ih₁ | ih₂
+  with eq₄ , eq₅ ← length-unzip eq₁
+  rewrite sym eq₄ | sym eq₅ =
+    sym (∸-distribˡ-⊔-⊓ (length xzs) dF⟦ e ⟧ dF⟦ e' ⟧)
 
-mutual
+B-dST : ∀ (e : E X Y) → Is-dST dB⟦ e ⟧ B⟦ e ⟧_
+B-dST (map-fold {A} a f g) {ys} = ind a {ys}
+  where
+    ind : (a : A) → Is-dST dB⟦ map-fold a f g ⟧ B⟦ map-fold a f g ⟧_
+    ind a {[]} refl = refl
+    ind a {y ∷ ys} eq
+      with just x ← f a .from y
+      with just xs ← B-map-fold (g a x) f g ys in eq₁
+      with ih ← ind (g a x) {ys} eq₁
+      rewrite sym (just-injective eq) =
+        cong suc ih
+B-dST (delay x) {[]} refl = refl
+B-dST (delay x) {x' ∷ xs} eq
+  with yes refl ← x == x'
+  rewrite sym (just-injective eq) =
+    refl
+B-dST (hasten x) {xs} refl = shift-length x xs
+B-dST (e ⟫ e') {zs} eq
+  with just ys ← B⟦ e' ⟧ zs in eq₁
+  with ih₁ ← B-dST e' eq₁
+  with just xs ← B⟦ e ⟧ ys in eq₂
+  with ih₂ ← B-dST e eq₂
+  rewrite sym (just-injective eq) | ih₁ | ih₂
+  rewrite ∸-+-assoc (length zs) dB⟦ e' ⟧ dB⟦ e ⟧ =
+    cong (length zs ∸_) (+-comm dB⟦ e' ⟧ dB⟦ e ⟧)
+B-dST (e ⊗ e') {yws} eq
+  with ys , ws ← unzip yws in eq₁
+  with just xs ← B⟦ e ⟧ ys in eq₂ | just zs ← B⟦ e' ⟧ ws in eq₃
+  with ih₁ ← B-dST e eq₂ | ih₂ ← B-dST e' eq₃
+  rewrite sym (just-injective eq) | length-zipWith _,_ xs zs | ih₁ | ih₂
+  with eq₄ , eq₅ ← length-unzip eq₁
+  rewrite sym eq₄ | sym eq₅ =
+    sym (∸-distribˡ-⊔-⊓ (length yws) dB⟦ e ⟧ dB⟦ e' ⟧)
 
-  B∙F : ∀ (e : E X Y) xs
-    → DropLast (dF⟦ e ⟧ + dB⟦ e ⟧) xs $? B∙F⟦ e ⟧ xs
-  B∙F (map-fold {A} a f g) = ind a
-    where
-      ind : ∀ (a : A) xs → DropLast 0 xs $? B∙F⟦ map-fold a f g ⟧ xs
-      ind a [] = just ([] , refl)
-      ind a (x ∷ xs) with f a .to x in eq
-      ... | nothing = nothing
-      ... | just y with F-map-fold (g a x) f g xs in eq₁
-      ...   | nothing = nothing
-      ...   | just ys with f a .from y | f a .invertible x y .proj₁ eq
-      ...     | just .x | refl with B-map-fold (g a x) f g ys in eq₂
-      ...       | nothing = nothing
-      ...       | just xs' with ind (g a x) xs
-      ...         | ih rewrite eq₁ | eq₂ with ih
-      ...           | just (pfx , len-eq) = just (x ∷ pfx , cong suc len-eq)
-  B∙F (delay x) [] = just ([] , refl)
-  B∙F (delay x) (x' ∷ xs) with x == x
-  ... | no _ = nothing
-  ... | yes refl = just (shift-⊆-∷ x' xs , sym (shift-length x' xs))
-  B∙F (hasten x) [] = just ([] , refl)
-  B∙F (hasten x) (x' ∷ xs) with x == x'
-  ... | no _ = nothing
-  ... | yes refl = just (shift-⊆-∷ x xs , sym (shift-length x xs))
-  B∙F (e ⟫ e') = {!   !}
-  B∙F (e ⊗ e') = {!   !}
+F-dIST : ∀ (e : E X Y) → Is-dIST dF⟦ e ⟧ F⟦ e ⟧_
+F-dIST e .isIST = F-IST e
+F-dIST e .is-dST = F-dST e
 
--------------------------------------------------------------------------------
--- Examples
+B-dIST : ∀ (e : E X Y) → Is-dIST dB⟦ e ⟧ B⟦ e ⟧_
+B-dIST e .isIST = B-IST e
+B-dIST e .is-dST = B-dST e
 
-_ : F⟦ delay 0 ⟫ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
-_ = refl
+-- B∙F⟦_⟧_ : E X Y → List X ⇀ List X
+-- B∙F⟦_⟧_ e = B⟦ e ⟧_ ∙ F⟦ e ⟧_
 
-_ : B⟦ delay 0 ⟫ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
-_ = refl
+-- F∙B⟦_⟧_ : E X Y → List Y ⇀ List Y
+-- F∙B⟦_⟧_ e = F⟦ e ⟧_ ∙ B⟦ e ⟧_
 
-_ : F⟦ delay 0 ⟫ hasten 1 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ nothing
-_ = refl
+-- mutual
 
-_ :
-  F⟦ delay 0 ⊗ hasten 0 ⟧ ((1 , 0) ∷ (2 , 1) ∷ (3 , 2) ∷ (4 , 3) ∷ []) ≡
-  just ((0 , 1) ∷ (1 , 2) ∷ (2 , 3) ∷ [])
-_ = refl
+--   B∙F : ∀ (e : E X Y) xs
+--     → DropLast (dF⟦ e ⟧ + dB⟦ e ⟧) xs $? B∙F⟦ e ⟧ xs
+--   B∙F (map-fold {A} a f g) = ind a
+--     where
+--       ind : ∀ (a : A) xs → DropLast 0 xs $? B∙F⟦ map-fold a f g ⟧ xs
+--       ind a [] = just ([] , refl)
+--       ind a (x ∷ xs) with f a .to x in eq
+--       ... | nothing = nothing
+--       ... | just y with F-map-fold (g a x) f g xs in eq₁
+--       ...   | nothing = nothing
+--       ...   | just ys with f a .from y | f a .invertible x y .proj₁ eq
+--       ...     | just .x | refl with B-map-fold (g a x) f g ys in eq₂
+--       ...       | nothing = nothing
+--       ...       | just xs' with ind (g a x) xs
+--       ...         | ih rewrite eq₁ | eq₂ with ih
+--       ...           | just (pfx , len-eq) = just (x ∷ pfx , cong suc len-eq)
+--   B∙F (delay x) [] = just ([] , refl)
+--   B∙F (delay x) (x' ∷ xs) with x == x
+--   ... | no _ = nothing
+--   ... | yes refl = just (shift-⊆-∷ x' xs , sym (shift-length x' xs))
+--   B∙F (hasten x) [] = just ([] , refl)
+--   B∙F (hasten x) (x' ∷ xs) with x == x'
+--   ... | no _ = nothing
+--   ... | yes refl = just (shift-⊆-∷ x xs , sym (shift-length x xs))
+--   B∙F (e ⟫ e') = {!   !}
+--   B∙F (e ⊗ e') = {!   !}
