@@ -276,16 +276,6 @@ Defined.
 
 
 
-#[global]
-Program Instance option_Some_None_eqdec {A} : @EqOneDec (option (option A)) (Some None).
-Next Obligation.
-destruct b as [[ a | ] | ].
-+ right; intro H; now inversion H.
-+ left; now auto.
-+ right; intro H; now inversion H.
-Defined.
-
-
 Definition eqdec_Some_eqdec {A} (a : A) `{EqOneDec A a} : @EqOneDec (option A) (Some a).
 intro b.
 destruct b.
@@ -804,7 +794,7 @@ split; [ now apply IIST_MIST
          | now apply IIST_bwd_d_MST]]]].
 Qed.
 
-Theorem inv_IIST_is_d_d'_MIIST_pair :
+Theorem inv_IIST_is_d'_d_MIIST_pair :
  forall X Y (e : IIST X Y),
   d_d'_MIIST_pair (bwd e) (fwd e) (delay_bwd e) (delay_fwd e).
 intros X Y e.
@@ -824,47 +814,75 @@ End IIST_Math.
 
 Section IIST_descriptive.
 
+(* 計算可能性のoptionと見分けるためにmaybeを定義して、データの余計な要素はこちらで表現 *)
+#[universes(template)]
+Inductive maybe (A : Type) : Type :=
+| Just : A -> maybe A
+| Nothing : maybe A.
 
-Definition option_wrap {A} (a : option A) : option (option A) :=
+Arguments Just {A} a.
+Arguments Nothing {A}.
+
+
+Definition option_wrap {A} (a : option A) : option (maybe A) :=
 match a with
 | None => None
-| Some a => Some (Some a)
+| Some a => Some (Just a)
 end.
 
-Search ({_ <= _} + {_ > _}).
+
+Definition maybe_option {A} (m : maybe A) : option A :=
+ match m with
+ | Just a => Some a
+ | Nothing => None
+ end.
+
+
+#[global]
+Program Instance maybe_Nothing_eqdec {A} : @EqOneDec (maybe A) Nothing.
+Next Obligation.
+destruct b as [ a | ].
++ right; intro H; now inversion H.
++ left; now auto.
+Defined.
+
+
+#[global]
+Instance option_Some_None_eqdec {A} : @EqOneDec (option (maybe A)) (Some Nothing) :=
+ eqdec_Some_eqdec Nothing.
+
+
 
 
 Definition IIST_f1 {X Y}
-                   (mst : MST X Y) d (xs : list X) x : option (option Y * option X) :=
+                   (mst : MST X Y) d (xs : list X) x : option (maybe Y * X) :=
  if Compare_dec.le_gt_dec d (length xs) then
    option_bind (mst (xs ++ [x]))
     (fun ys =>
       option_bind (last ys)
-       (fun y => Some (Some y, Some x))) (* このペアのせいでyのdecidable equalityがいる？ *)
- else Some (None, Some x).
+       (fun y => Some (Just y, x))) (* このペアのせいでyのdecidable equalityがいる？ *)
+ else Some (Nothing, x).
 
 
 Definition IIST_f1' {X Y} `{EqDec Y eq} (* f1と違いこちらはequalityの判定が必要 *)
-                    (mst : MST X Y) d (xs : list X) oy_ox : option X :=
+                    (mst : MST X Y) d (xs : list X) my_x : option X :=
  if Compare_dec.le_gt_dec d (length xs) then
-   match oy_ox with
-   | (None, _) => None (* 十分な長さがあるので値があるはず *)
-   | (_, None) => None (* これ自体がxとしてNoneを出すことはない *)
-   | (Some y, Some x) =>
+   match my_x with
+   | (Nothing, _) => None (* 十分な長さがあるので値があるはず *)
+   | (Just y, x) =>
        option_bind (mst (xs ++ [x])) (* 逆行に失敗したときにNoneを返さなければならないので計算が必要 *)
         (fun ys =>
           option_bind (last ys)
            (fun y' => if equiv_dec y y' then Some x else None))
    end
- else match oy_ox with
-      | (None, Some x) => Some x
-      | (Some _, _) => None
-      | (_, None) => None
+ else match my_x with
+      | (Nothing, x) => Some x
+      | (Just _, _) => None
       end.
 
 
-Program Definition IIST_inv_f1 {X Y} `{E : EqDec Y eq}
-                               (mst : MST X Y) d (Hd : d_MST mst d) xs : partial_invertible_function X (option Y * option X) :=
+Program Definition IIST_pinv_f1 {X Y} `{E : EqDec Y eq}
+                               (mst : MST X Y) d (Hd : d_MST mst d) xs : partial_invertible_function X (maybe Y * X) :=
 {| forward := IIST_f1 mst d xs;
    backward := IIST_f1' mst d xs
 |}.
@@ -874,16 +892,10 @@ destruct (Compare_dec.le_gt_dec d (length xs)) as [Hlen | Hlen]; simpl.
 2: {
   split; intro Hsome.
   + inversion Hsome; now auto.
-  + destruct o, o0; inversion Hsome.
+  + destruct m; inversion Hsome.
     now auto.
 }
-destruct o as [y | ].
-2: {
-  destruct (mst (xs ++ [a])); simpl.
-  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
-  + split; intro Hcon; now inversion Hcon.
-}
-destruct o0 as [x | ].
+destruct m as [y | ].
 2: {
   destruct (mst (xs ++ [a])); simpl.
   + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
@@ -930,21 +942,214 @@ Definition IIST_g1 {X} (xs : list X) x : list X := xs ++ [x].
 
 
 Definition IIST_e1 {X Y} `{E : EqDec Y eq}
-                               (mst : MST X Y) d (Hd : d_MST mst d) :=
- IIST_mapfold [] (IIST_inv_f1 mst d Hd) IIST_g1.
+                          (mst : MST X Y) d (Hd : d_MST mst d) : IIST X (maybe Y * X) :=
+ IIST_mapfold [] (IIST_pinv_f1 mst d Hd) IIST_g1.
 
 
+
+(* e2のyはNothingが外に出ないのでここで処理 *)
+Program Definition IIST_e2_1last {Y} : IIST (maybe Y) Y :=
+ IIST_mapfold tt (fun u => {| forward := maybe_option; backward := fun y => Some (Just y); |}) (fun _ _ => tt).
+Next Obligation.
+unfold maybe_option.
+destruct a; simpl; split; intro H; inversion H; now auto.
+Qed.
+
+
+Fixpoint IIST_e2_1 {Y} d : IIST (maybe Y) Y :=
+ match d with
+ | O => IIST_e2_1last
+ | S d' => IIST_seqcomp (IIST_hasten Nothing) (IIST_e2_1 d')
+ end.
+
+
+Program Definition IIST_e2_2last {X} : IIST X (maybe X) :=
+ IIST_mapfold tt (fun u => {| forward := fun x => Some (Just x); backward := maybe_option; |}) (fun _ _ => tt).
+Next Obligation.
+unfold maybe_option.
+destruct b; simpl; split; intro H; inversion H; now auto.
+Qed.
+
+
+Fixpoint IIST_e2_2 {X} d' : IIST X (maybe X) :=
+ match d' with
+ | O => IIST_e2_2last
+ | S d => IIST_seqcomp (IIST_e2_2 d) (IIST_delay Nothing)
+ end.
+
+
+Definition IIST_e2 {X Y} d d' : IIST (maybe Y * X) (Y * maybe X):=
+ IIST_parcomp (IIST_e2_1 d) (IIST_e2_2 d').
+
+
+
+
+(* originalではf2/g2だったが、項の番号と合わせるためにf3に変更 *)
+Definition IIST_f3 {X Y} `{EqDec X eq}
+                   (inv : MST Y X) d' (ys : list Y) y_mx : option Y :=
+ if Compare_dec.le_gt_dec d' (length ys) then
+   match y_mx with
+   | (_, Nothing) => None (* xとしてNoneを出すのはd'までのはず *)
+   | (y, Just x) =>
+       option_bind (inv (ys ++ [y])) (* 逆行に失敗したときにNoneを返さなければならないので計算が必要 *)
+        (fun xs =>
+          option_bind (last xs)
+           (fun x' => if equiv_dec x x' then Some y else None))
+   end
+ else match y_mx with
+      | (y, Nothing) => Some y
+      | (_, Just _) => None (* ここはxは来ないはず *)
+      end.
+
+
+Definition IIST_f3' {X Y}
+                    (inv : MST Y X) d' (ys : list Y) y : option (Y * maybe X) :=
+ if Compare_dec.le_gt_dec d' (length ys) then
+   option_bind (inv (ys ++ [y]))
+    (fun xs =>
+      option_bind (last xs)
+       (fun x => Some (y, Just x)))
+ else Some (y, Nothing).
+
+
+Program Definition IIST_pinv_f3 {X Y} `{E : EqDec X eq}
+                               (inv : MST Y X) d' (Hd' : d_MST inv d') ys : partial_invertible_function (Y * maybe X) Y :=
+{| forward := IIST_f3 inv d' ys;
+   backward := IIST_f3' inv d' ys
+|}.
+Next Obligation.
+unfold IIST_f3, IIST_f3', equiv_dec.
+destruct (Compare_dec.le_gt_dec d' (length ys)) as [Hlen | Hlen]; simpl.
+2: {
+  split; intro Hsome.
+  + destruct m; inversion Hsome.
+    now auto.
+  + inversion Hsome; now auto.
+}
+destruct m as [x | ].
+2: {
+  destruct (inv (ys ++ [b])); simpl.
+  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
+  + split; intro Hcon; now inversion Hcon.
+}
+destruct (inv (ys ++ [b])) as [xs | ] eqn: Hinv; simpl.
+2: {
+  split; intro Hcon.
+  + destruct (inv (ys ++ [y])) as [xs | ] eqn: Hinv1; simpl in Hcon.
+    - destruct (last xs); simpl in Hcon; try now inversion Hcon.
+      destruct (E x x0); simpl in Hcon; inversion Hcon.
+      subst.
+      rewrite Hinv in Hinv1; now inversion Hinv1.
+    - now inversion Hcon.
+  + now inversion Hcon.
+}
+assert (length xs > 0) as Hxlen.
+{
+  unfold d_MST in Hd'.
+  apply Hd' in Hinv.
+  rewrite app_length in Hinv.
+  simpl in Hinv.
+  lia.
+}
+apply last_Some in Hxlen.
+destruct Hxlen as [x' Hlast].
+rewrite Hlast; simpl.
+split; intro Hxy.
++ destruct (inv (ys ++ [y])) as [xs' |] eqn: Hxs'; simpl in Hxy; try now inversion Hxy.
+  destruct (last xs') as [x'' | ] eqn: Hx''; simpl in Hxy; try now inversion Hxy.
+  destruct (E x x'') as[e | e]; simpl in Hxy; inversion Hxy; unfold equiv in e; subst.
+  rewrite Hinv in Hxs'; inversion Hxs'; subst.
+  rewrite Hlast in Hx''; inversion Hx''.
+  now auto.
++ inversion Hxy; subst.
+  rewrite Hinv; simpl.
+  rewrite Hlast; simpl.
+  destruct (E x x) as [Hx | Hx]; auto.
+  elim Hx; now auto.
+Qed.
+
+
+Definition IIST_g3 {X Y} (ys : list Y) (y_mx : Y * maybe X) : list Y :=
+ let (y, _) := y_mx in ys ++ [y].
+
+
+Definition IIST_e3 {X Y} `{E : EqDec X eq}
+                          (inv : MST Y X) d' (Hd' : d_MST inv d') :=
+ IIST_mapfold [] (IIST_pinv_f3 inv d' Hd') IIST_g3.
+
+
+
+Definition IIST_e {X Y} `{EX : EqDec X eq} `{EY : EqDec Y eq}
+                         (mst : MST X Y) d (inv : MST Y X) d'
+                         (Hd : d_MST mst d) (Hd' : d_MST inv d') : IIST X Y :=
+ IIST_seqcomp (IIST_e1 mst d Hd) (IIST_seqcomp (IIST_e2 d d') (IIST_e3 inv d' Hd')).
+
+
+Lemma IIST_e_delay_fwd :
+ forall X Y `{EqDec X eq} `{EqDec Y eq}
+             (mst : MST X Y) d inv d' Hd Hd',
+ delay_fwd (IIST_e mst d inv d' Hd Hd') = d.
+intros X Y ? ? ? ? ? d ? d' ? ?.
+unfold IIST_e, IIST_e1, IIST_e2, IIST_e3; simpl.
+clear.
+rewrite PeanoNat.Nat.add_0_r.
+assert (delay_fwd (@IIST_e2_2 X d') = 0) as H.
+{
+  induction d'; simpl; auto.
+  rewrite IHd'; now auto.
+}
+rewrite H; clear.
+induction d; simpl; auto.
+destruct (delay_fwd (IIST_e2_1 d)); simpl in IHd; now auto.
+Qed.
+
+
+Lemma IIST_e_delay_bwd :
+ forall X Y `{EqDec X eq} `{EqDec Y eq}
+             (mst : MST X Y) d inv d' Hd Hd',
+ delay_bwd (IIST_e mst d inv d' Hd Hd') = d'.
+intros X Y ? ? ? ? ? d ? d' ? ?.
+unfold IIST_e, IIST_e1, IIST_e2, IIST_e3; simpl.
+clear.
+rewrite PeanoNat.Nat.add_0_r.
+assert (delay_bwd (@IIST_e2_1 Y d) = 0) as H.
+{
+  induction d; simpl; auto.
+}
+rewrite H; clear; simpl.
+induction d'; simpl; auto.
+rewrite IHd'; lia.
+Qed.
+
+
+Lemma IIST_e_mst :
+ forall X Y `{EqDec X eq} `{EqDec Y eq}
+            (mst : MST X Y) d inv d' Hd Hd',
+ MIST mst
+ -> MInv mst inv
+ -> MIST inv
+ -> forall xs,
+     mst xs = fwd (IIST_e mst d inv d' Hd Hd') xs.
+Admitted. (* ラスボス *)
 
 
 Theorem d_d'_MIIST_IIST :
- forall X Y (mst : MST X Y) d d',
+ forall X Y `{EqDec X eq} `{EqDec Y eq} (mst : MST X Y) d d',
   (exists inv, d_d'_MIIST_pair mst inv d d')
   -> exists e,
       forall xs, mst xs = fwd e xs
       /\ delay_fwd e = d
       /\ delay_bwd e = d'.
-Admitted.
-(* XやYに関するdecidable equalityがいるかも（fold_mapに使う可逆関数の定義に） *)
+intros X Y eq1 EX eq2 EY mst d d' H.
+destruct H as [inv Hpair].
+apply d_d'_MIIST_pair_min in Hpair.
+destruct Hpair as [Hmist [Hd [Hinv [Himist Hd']]]].
+exists (IIST_e mst d inv d' Hd Hd').
+intro xs; intuition.
++ apply IIST_e_mst; now auto.
++ now apply IIST_e_delay_fwd.
++ now apply IIST_e_delay_bwd.
+Qed.
 
 
 
@@ -953,7 +1158,7 @@ Admitted.
 
 
 
-
+(* 上の証明に使ったものの簡略化版（dに対する性質が弱いので上では使えない） *)
 Definition MIST_coord {X Y} (mst : MST X Y) (xs : list X) : option Y :=
 option_bind (mst xs) last.
 
