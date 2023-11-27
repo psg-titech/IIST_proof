@@ -1,7 +1,5 @@
 {-# OPTIONS --guardedness #-}
 
-module IST where
-
 open import Category.Monad using ( RawMonad )
 open RawMonad {{...}} using ( _>>=_; return ) renaming ( _<=<_ to _∙_ )
 open import Data.Bool using ( Bool; true; false; T )
@@ -10,9 +8,7 @@ open import Data.Maybe using ( Maybe; just; nothing )
 open import Data.Maybe.Categorical using ( monad )
 open import Data.Maybe.Properties using ( just-injective )
 open import Data.Nat using ( ℕ; zero; suc; _+_; _∸_; _⊔_ )
-open import Data.Nat.Properties using ( 0∸n≡0; +-∸-assoc; +-suc; _≤?_; m≤n⇒m∸n≡0; ≰⇒> )
 open import Data.Product using ( _×_; _,_; proj₁; proj₂ )
-open import Data.Vec using ( Vec; []; _∷_ )
 open import Function using ( _$_ )
 open import Relation.Nullary using ( Dec; yes; no )
 open import Relation.Binary.PropositionalEquality
@@ -44,7 +40,7 @@ record _⇌_ (X Y : Set) : Set where
   field
     to : X ⇀ Y
     from : Y ⇀ X
-    invertible : ∀ x y → to x ≡ just y ↔ from y ≡ just x
+    invertible : ∀ {x y} → to x ≡ just y ↔ from y ≡ just x
 
 open _⇌_
 
@@ -58,131 +54,87 @@ record Eq (A : Set) : Set where
 
 open Eq {{...}}
 
-instance
-
-  eqNat : Eq ℕ
-  _==_ {{eqNat}} = Data.Nat.Properties._≟_
-
 -------------------------------------------------------------------------------
 -- Incremental Sequence Transformation
 
-{-
-
-newtype IST x y = IST { runIST :: x -> Step x y }
-data Step x y
-  = Yield y (IST x y)
-  | Next (IST x y)
-
--}
-
 mutual
 
-  IST : Set → Set → ℕ → Set
-  IST X Y d = X ⇀ Step X Y d
+  IST : Set → Set → Set
+  IST X Y =  X ⇀ Step X Y
 
-  data Step (X Y : Set) : ℕ → Set where
-    next : ∞IST X Y d → Step X Y (suc d)
-    yield : Y → ∞IST X Y d → Step X Y d
+  data Step (X Y : Set) : Set where
+    next : ∞IST X Y → Step X Y
+    yield : Y → ∞IST X Y → Step X Y
 
-  record ∞IST (X Y : Set) (d : ℕ) : Set where
+  record ∞IST (X Y : Set) : Set where
     coinductive
     constructor delay
     field
-      force : IST X Y d
+      force : IST X Y
 
 open ∞IST
 
-yield-injective : ∀ {y y' : Y} {f f'} → yield {X = X} {d = d} y f ≡ yield y' f' → y ≡ y'
+yield-injective : ∀ {y y' : Y} {f f'} → yield {X = X} y f ≡ yield y' f' → y ≡ y'
 yield-injective refl = refl
 
-runIST : IST X Y d → Vec X n ⇀ Vec Y (n ∸ d)
-runIST {d = d} t [] rewrite 0∸n≡0 d = return []
-runIST {d = d} t (_∷_ {n = n} x xs) with t x
+runIST : IST X Y → List X ⇀ List Y
+runIST _ [] = return []
+runIST f (x ∷ xs) with f x
 ... | nothing = nothing
-... | just (next t') = runIST (t' .force) xs
-... | just (yield y t') with d ≤? n
-...   | no d≰n rewrite m≤n⇒m∸n≡0 (≰⇒> d≰n) = return []
-...   | yes d≤n rewrite +-∸-assoc 1 d≤n = do
-          ys ← runIST (t' .force) xs
-          return (y ∷ ys)
+... | just (next f') = runIST (f' .force) xs
+... | just (yield y f') = do
+        ys ← runIST (f' .force) xs
+        return (y ∷ ys)
 
-id : IST X X 0
+id : IST X X
 id x = just $ yield x λ where .force → id
 
-compose : IST X Y d → IST Y Z d' → IST X Z (d + d')
-compose {d = d} f g x with f x
+compose : IST X Y → IST Y Z → IST X Z
+compose f g x with f x
 ... | nothing = nothing
 ... | just (next f') =
       just $ next λ where .force → compose (f' .force) g
 ... | just (yield y f') with g y
 ...   | nothing = nothing
-...   | just (next {d = d'} g') rewrite +-suc d d' =
+...   | just (next g') =
         just $ next λ where .force → compose (f' .force) (g' .force)
 ...   | just (yield z g') =
         just $ yield z λ where .force → compose (f' .force) (g' .force)
 
---------------------------------------------------------------------------------
--- Syntax
+parallel : IST X Y → IST Z W → IST (X × Z) (Y × W)
+parallel = sub
+  where
+    sub : IST X Y → IST Z W → IST (X × Z) (Y × W)
+    waitY : List W → IST X Y → IST Z W → IST (X × Z) (Y × W)
+    waitW : List Y → IST X Y → IST Z W → IST (X × Z) (Y × W)
 
-data E : ℕ → ℕ → Set → Set → Set₁ where
-  map-fold : A → (A → X ⇌ Y) → (A → X → A) → E 0 0 X Y
-  delay : {{_ : Eq X}} → X → E 0 1 X X
-  hasten : {{_ : Eq X}} → X → E 1 0 X X
-  _⟫_ : ∀ {d₁ d₁' d₂ d₂'}
-    → E d₁ d₁' X Y
-    → E d₂ d₂' Y Z
-    → E (d₁ + d₂) (d₁' + d₂') X Z
-  _⊗_ : ∀ {d₁ d₁' d₂ d₂'}
-    → E d₁ d₁' X Y
-    → E d₂ d₂' Z W
-    → E (d₁ ⊔ d₂) (d₁' ⊔ d₂') (X × Z) (Y × W)
+    sub f g (x , z) with f x | g z
+    ... | nothing | nothing = nothing
+    ... | nothing | just _  = nothing
+    ... | just _  | nothing = nothing
+    ... | just (next f') | just (next g') =
+          just $ next λ where .force → sub (f' .force) (g' .force)
+    ... | just (next f') | just (yield w g') =
+          just $ next λ where .force → waitY (w ∷ []) (f' .force) (g' .force)
+    ... | just (yield y f') | just (next g') =
+          just $ next λ where .force → waitW (y ∷ []) (f' .force) (g' .force)
+    ... | just (yield y f') | just (yield w g') =
+          just $ yield (y , w) λ where .force → sub (f' .force) (g' .force)
 
---------------------------------------------------------------------------------
--- Semantics
+    waitY [] f g = sub f g
+    waitY (w ∷ ws) f g (x , z) with f x | g z
+    ... | nothing | nothing = nothing
+    ... | nothing | just _  = nothing
+    ... | just _  | nothing = nothing
+    ... | just (next f') | just (next g') =
+          just $ next λ where .force → sub (f' .force) (g' .force)
+    ... | just (next f') | just (yield w g') =
+          just $ next λ where .force → waitY (w ∷ []) (f' .force) (g' .force)
+    ... | just (yield y f') | just (next g') =
+          just $ next λ where .force → waitW (y ∷ []) (f' .force) (g' .force)
+    ... | just (yield y f') | just (yield w g') =
+          just $ yield (y , w) λ where .force → sub (f' .force) (g' .force)
 
-F⟦_⟧ : E d d' X Y → IST X Y d
-F⟦ map-fold a f g ⟧ x with f a .to x
-... | nothing = nothing
-... | just y = just $ yield y λ where .force → F⟦ map-fold (g a x) f g ⟧
+    waitW [] f g = sub f g
+    waitW (y ∷ ys) f g = {!   !}
 
-F⟦ delay x ⟧ y = just $ yield x λ where .force → F⟦ delay y ⟧
-
-F⟦ hasten x ⟧ y with x == y
-... | no _ = nothing
-... | yes refl = just $ next λ where .force → id
-
-F⟦ e ⟫ e' ⟧ = {!   !}
-
-F⟦ e ⊗ e' ⟧ = {!   !}
-
-B⟦_⟧ : E d d' X Y → IST Y X d'
-B⟦ map-fold a f g ⟧ y with f a .from y
-... | nothing = nothing
-... | just x = just $ yield x λ where .force → B⟦ map-fold (g a x) f g ⟧
-
-B⟦ delay x ⟧ y with x == y
-... | no _ = nothing
-... | yes refl = just $ next λ where .force → id
-
-B⟦ hasten x ⟧ y = just $ yield x λ where .force → B⟦ hasten y ⟧
-
-B⟦ e ⟫ e' ⟧ = {!   !}
-
-B⟦ e ⊗ e' ⟧ = {!   !}
-
-B∙F⟦_⟧ : E d d' X Y → IST X X (d + d')
-B∙F⟦ e ⟧ = compose F⟦ e ⟧ B⟦ e ⟧
-
-B∙F : ∀ (e : E d d' X Y) x {x' f} → B∙F⟦ e ⟧ x ≡ just (yield x' f) → x ≡ x'
-B∙F (map-fold a f g) x p with f a .to x in eq
-... | just y with f a .from y in eq₁
-...   | just x' with f a .invertible x y .proj₁ eq | yield-injective (just-injective p)
-...     | eq₂ | eq₃ rewrite eq₁ | just-injective eq₂ | eq₃ = refl
-B∙F (delay x) y p with x == x | p
-... | yes refl | ()
-... | no _ | ()
-B∙F (hasten x) y p with x == y | p
-... | yes refl | ()
-... | no _ | ()
-B∙F (e ⟫ e') x p = {!   !}
-B∙F (e ⊗ e') x p = {!   !}

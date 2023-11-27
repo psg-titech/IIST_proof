@@ -1,5 +1,3 @@
-module IIST where
-
 open import Category.Monad using ( RawMonad )
 open RawMonad {{...}} using ( _>>=_; return ) renaming ( _<=<_ to _∙_ )
 open import Data.List using ( List; []; _∷_ )
