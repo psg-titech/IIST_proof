@@ -2,14 +2,14 @@
 
 module IIST where
 
-open import Data.List using ( List; []; _∷_; zip; unzip; length )
-open import Data.List.Properties using ( length-zipWith; zipWith-unzipWith )
-open import Data.Maybe using ( Maybe; just; nothing; maybe; _>>=_ )
+open import Data.List.Base using ( List; []; _∷_; zip; unzip; length; _∷ʳ_; initLast;  _∷ʳ′_ )
+open import Data.List.Properties using ( length-zipWith; zipWith-unzipWith; length-++ )
+open import Data.Maybe.Base using ( Maybe; just; nothing; maybe; _>>=_ )
 open import Data.Maybe.Properties using ( just-injective )
-open import Data.Nat using ( ℕ; zero; suc; _+_; _∸_; _⊔_ )
+open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _∸_; _⊔_ )
 open import Data.Nat.Instances
-open import Data.Nat.Properties using ( +-comm; ∸-+-assoc; ∸-distribˡ-⊔-⊓ )
-open import Data.Product using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
+open import Data.Nat.Properties using ( +-comm; ∸-+-assoc; ∸-distribˡ-⊔-⊓; suc-injective )
+open import Data.Product.Base using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
 open import Function using ( id; _∘_ )
 open import Relation.Nullary using ( yes; no )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; cong; sym )
@@ -61,6 +61,23 @@ length-shift : ∀ (x : X) xs → length (shift x xs) ≡ length xs
 length-shift x [] = refl
 length-shift x (y ∷ xs) = cong suc (length-shift y xs)
 
+length-snoc : ∀ (x : X) xs → length (xs ∷ʳ x) ≡ suc (length xs)
+length-snoc x xs rewrite length-++ xs {x ∷ []} = +-comm (length xs) 1
+
+List-induction-reverse : ∀ {P : List X → Set}
+  → P []
+  → (∀ x {xs} → P xs → P (xs ∷ʳ x))
+  → ∀ xs → P xs
+List-induction-reverse {X} {P} base step xs = ind (length xs) xs refl
+  where
+    ind : ∀ n → (xs : List X) → length xs ≡ n → P xs
+    ind n xs eq with initLast xs
+    ind zero .[] _ | [] = base
+    ind zero .(xs ∷ʳ x) eq | xs ∷ʳ′ x rewrite length-snoc x xs with eq
+    ... | ()
+    ind (suc n) .(xs ∷ʳ x) eq | xs ∷ʳ′ x rewrite length-snoc x xs =
+      step x (ind n xs (suc-injective eq))
+
 length-unzip : ∀ {xzs : List (X × Z)} {xs zs}
   → unzip xzs ≡ (xs , zs)
   → length xzs ≡ length xs × length xzs ≡ length zs
@@ -74,6 +91,7 @@ zip-unzip : ∀ {xzs : List (X × Z)} {xs zs}
   → unzip xzs ≡ (xs , zs)
   → zip xs zs ≡ xzs
 zip-unzip {xzs = xzs} refl = zipWith-unzipWith id _,_ (λ _ → refl) xzs
+
 
 -- xs' ≺ xs : xs' is a prefix of xs
 data _≺_ {X : Set} : List X → List X → Set where
@@ -126,7 +144,6 @@ shift-≺-∷ x (x' ∷ xs) = x ∷ shift-≺-∷ x' xs
   with pfx , pfy ← ≺-zip-unzip eq =
     x ∷ pfx , y ∷ pfy
 
-
 -------------------------------------------------------------------------------
 -- Sequence transformation
 
@@ -147,6 +164,7 @@ HasDelay d st = ∀ {xs ys}
 -- Is d -IST st : st is a d-incremental sequence transformation
 record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
   field
+    empty : st [] ≡ just []
     isIncremental : IsIncremental st
     hasDelay : HasDelay d st
 
@@ -270,6 +288,21 @@ _ = refl
 
 -------------------------------------------------------------------------------
 -- Properties of The Forward and Backward Semantics
+
+F-empty : ∀ (e : E X Y) → F⟦ e ⟧ [] ≡ just []
+F-empty (map-fold a f g) = refl
+F-empty (delay x) = refl
+F-empty (hasten x) = refl
+F-empty (e ⟫ e') rewrite F-empty e | F-empty e' = refl
+F-empty (e ⊗ e') rewrite F-empty e | F-empty e' = refl
+
+B-empty : ∀ (e : E X Y) → B⟦ e ⟧ [] ≡ just []
+B-empty (map-fold a f g) = refl
+B-empty (delay x) = refl
+B-empty (hasten x) = refl
+B-empty (e ⟫ e') rewrite B-empty e' | B-empty e = refl
+B-empty (e ⊗ e') rewrite B-empty e | B-empty e' = refl
+
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧_
 F-incremental (map-fold {A} a f g) = F-map-fold-incremental a
@@ -502,10 +535,18 @@ B-IIST (e ⊗ e') {xzs} eq
 
 
 F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧_
-F-d-IST e = record { isIncremental = F-incremental e; hasDelay = F-delay e }
+F-d-IST e = record
+  { empty = F-empty e
+  ; isIncremental = F-incremental e
+  ; hasDelay = F-delay e
+  }
 
 B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧_
-B-d-IST e = record { isIncremental = B-incremental e; hasDelay = B-delay e }
+B-d-IST e = record
+  { empty = B-empty e
+  ; isIncremental = B-incremental e
+  ; hasDelay = B-delay e
+  }
 
 F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧_ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧_
 F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
@@ -546,8 +587,8 @@ F∘I≡B (e ⟫ e') zs rewrite F∘I≡B e' zs with B⟦ e' ⟧ zs
 ... | nothing = refl
 ... | just ys = F∘I≡B e ys
 F∘I≡B (e ⊗ e') xzs
-  with xs , zs ← unzip xzs in eq
-  rewrite eq | F∘I≡B e xs | F∘I≡B e' zs =
+  with xs , zs ← unzip xzs
+  rewrite F∘I≡B e xs | F∘I≡B e' zs =
     refl
 
 B∘I≡F : ∀ (e : E X Y) (xs : List X) → B⟦ I⟦ e ⟧ ⟧ xs ≡ F⟦ e ⟧ xs
@@ -568,6 +609,6 @@ B∘I≡F (e ⟫ e') xs rewrite B∘I≡F e xs with F⟦ e ⟧ xs
 ... | nothing = refl
 ... | just ys = B∘I≡F e' ys
 B∘I≡F (e ⊗ e') xzs
-  with xs , zs ← unzip xzs in eq
-  rewrite eq | B∘I≡F e xs | B∘I≡F e' zs =
+  with xs , zs ← unzip xzs
+  rewrite B∘I≡F e xs | B∘I≡F e' zs =
     refl
