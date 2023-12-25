@@ -16,36 +16,12 @@ open import Relation.Binary.PropositionalEquality using ( _≡_; refl; cong; sym
 open import Relation.Binary.Structures using ( IsDecEquivalence )
 open import Relation.Binary.TypeClasses using ( _≟_ )
 
+open import IIST.Common
+open _⇌_
 
 private
   variable
     A X Y Z W : Set
-
-Eq : Set → Set
-Eq A = IsDecEquivalence {A = A} _≡_
-
--------------------------------------------------------------------------------
--- Partial function and Partial invertible function
-
-infix 0 _⇀_ _⇌_
-
-_⇀_ : Set → Set → Set
-X ⇀ Y = X → Maybe Y
-
-record _⇌_ (X Y : Set) : Set where
-  field
-    to : X ⇀ Y
-    from : Y ⇀ X
-    invertible₁ : ∀ {x y} → to x ≡ just y → from y ≡ just x
-    invertible₂ : ∀ {x y} → from y ≡ just x → to x ≡ just y
-
-open _⇌_
-
-inv⇌ : X ⇌ Y → Y ⇌ X
-inv⇌ f .to = f .from
-inv⇌ f .from = f .to
-inv⇌ f .invertible₁ = f .invertible₂
-inv⇌ f .invertible₂ = f .invertible₁
 
 -------------------------------------------------------------------------------
 -- Additional functions and relations on lists
