@@ -30,7 +30,7 @@ record _⇌_ (A B : Set) : Set where
     invertible₁ : ∀ {x y} → to x ≡ just y → from y ≡ just x
     invertible₂ : ∀ {x y} → from y ≡ just x → to x ≡ just y
 
-open _⇌_
+open _⇌_ public
 
 inv⇌ : A ⇌ B → B ⇌ A
 inv⇌ f .to = f .from

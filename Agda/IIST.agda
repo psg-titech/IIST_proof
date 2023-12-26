@@ -17,7 +17,6 @@ open import Relation.Binary.Structures using ( IsDecEquivalence )
 open import Relation.Binary.TypeClasses using ( _≟_ )
 
 open import IIST.Common
-open _⇌_
 
 private
   variable
@@ -185,14 +184,14 @@ F-map-fold a f g (x ∷ xs) = do
   ys ← F-map-fold (g a x) f g xs
   just (y ∷ ys)
 
-F⟦_⟧_ : E X Y → ST X Y
+F⟦_⟧ : E X Y → ST X Y
 F⟦ map-fold a f g ⟧ xs = F-map-fold a f g xs
 F⟦ delay x ⟧ xs = just (shift x xs)
 F⟦ hasten x ⟧ [] = just []
 F⟦ hasten x ⟧ (x' ∷ xs) with x ≟ x'
 ... | no _ = nothing
 ... | yes refl = just xs
-F⟦ e ⟫ e' ⟧ xs = F⟦ e ⟧ xs >>= F⟦ e' ⟧_
+F⟦ e ⟫ e' ⟧ xs = F⟦ e ⟧ xs >>= F⟦ e' ⟧
 F⟦ e ⊗ e' ⟧ xzs = do
   let xs , zs = unzip xzs
   ys ← F⟦ e ⟧ xs
@@ -208,14 +207,14 @@ B-map-fold a f g (y ∷ ys) = do
   xs ← B-map-fold (g a x) f g ys
   just (x ∷ xs)
 
-B⟦_⟧_ : E X Y → ST Y X
+B⟦_⟧ : E X Y → ST Y X
 B⟦ map-fold a f g ⟧ xs = B-map-fold a f g xs
 B⟦ delay x ⟧ [] = just []
 B⟦ delay x ⟧ (x' ∷ xs) with x ≟ x'
 ... | no _ = nothing
 ... | yes refl = just xs
 B⟦ hasten x ⟧ xs = just (shift x xs)
-B⟦ e ⟫ e' ⟧ zs = B⟦ e' ⟧ zs >>= B⟦ e ⟧_
+B⟦ e ⟫ e' ⟧ zs = B⟦ e' ⟧ zs >>= B⟦ e ⟧
 B⟦ e ⊗ e' ⟧ yws = do
   let ys , ws = unzip yws
   xs ← B⟦ e ⟧ ys
@@ -280,10 +279,10 @@ B-empty (e ⟫ e') rewrite B-empty e' | B-empty e = refl
 B-empty (e ⊗ e') rewrite B-empty e | B-empty e' = refl
 
 
-F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧_
+F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
 F-incremental (map-fold {A} a f g) = F-map-fold-incremental a
   where
-    F-map-fold-incremental : (a : A) → IsIncremental F⟦ map-fold a f g ⟧_
+    F-map-fold-incremental : (a : A) → IsIncremental F⟦ map-fold a f g ⟧
     F-map-fold-incremental a eq [] = [] , [] , refl
     F-map-fold-incremental a eq (_∷_ x {xs = xs} pf)
       with just y ← f a .to x
@@ -316,10 +315,10 @@ F-incremental (e ⊗ e') {xzs} eq {xzs'} pfxz
     zip ys' ws' , ≺-zip pfy pfw , refl
 
 
-B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧_
+B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧
 B-incremental (map-fold {A} a f g) = B-map-fold-incremental a
   where
-    B-map-fold-incremental : (a : A) → IsIncremental B⟦ map-fold a f g ⟧_
+    B-map-fold-incremental : (a : A) → IsIncremental B⟦ map-fold a f g ⟧
     B-map-fold-incremental a eq [] = [] , [] , refl
     B-map-fold-incremental a eq (_∷_ y {xs = ys} pf)
       with just x ← f a .from y
@@ -352,10 +351,10 @@ B-incremental (e ⊗ e') {yws} eq {yws'} pfyw
     zip xs' zs' , ≺-zip pfx pfz , refl
 
 
-F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧_
+F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
 F-delay (map-fold {A} a f g) {xs} = F-map-fold-delay a {xs}
   where
-    F-map-fold-delay : (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧_
+    F-map-fold-delay : (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
     F-map-fold-delay a {[]} refl = refl
     F-map-fold-delay a {x ∷ xs} eq
       with just y ← f a .to x
@@ -387,10 +386,10 @@ F-delay (e ⊗ e') {xzs} eq
   rewrite sym eq₄ | sym eq₅ =
     sym (∸-distribˡ-⊔-⊓ (length xzs) DF⟦ e ⟧ DF⟦ e' ⟧)
 
-B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧_
+B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
 B-delay (map-fold {A} a f g) {ys} = B-map-fold-delay a {ys}
   where
-    B-map-fold-delay : (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧_
+    B-map-fold-delay : (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
     B-map-fold-delay a {[]} refl = refl
     B-map-fold-delay a {y ∷ ys} eq
       with just x ← f a .from y
@@ -423,10 +422,10 @@ B-delay (e ⊗ e') {yws} eq
     sym (∸-distribˡ-⊔-⊓ (length yws) DB⟦ e ⟧ DB⟦ e' ⟧)
 
 
-F-IIST : ∀ (e : E X Y) → F⟦ e ⟧_ IsIISTOf B⟦ e ⟧_
+F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (map-fold {A = A} a f g) = F-map-fold-IIST a
   where
-    F-map-fold-IIST : (a : A) → F⟦ map-fold a f g ⟧_ IsIISTOf B⟦ map-fold a f g ⟧_
+    F-map-fold-IIST : (a : A) → F⟦ map-fold a f g ⟧ IsIISTOf B⟦ map-fold a f g ⟧
     F-map-fold-IIST a {[]} refl = [] , [] , refl
     F-map-fold-IIST a {y ∷ ys} eq
       with just x ← f a .from y in eq₁
@@ -466,10 +465,10 @@ F-IIST (e ⊗ e') {yws} eq
   rewrite sym (zip-unzip eq₁) | eq₅ | eq₆ =
     zip ys'' ws'' , ≺-zip (≺-trans pfy' pfy) (≺-trans pfw' pfw) , refl
 
-B-IIST : ∀ (e : E X Y) → B⟦ e ⟧_ IsIISTOf F⟦ e ⟧_
+B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (map-fold {A = A} a f g) = B-map-fold-IIST a
   where
-    B-map-fold-IIST : (a : A) → B⟦ map-fold a f g ⟧_ IsIISTOf F⟦ map-fold a f g ⟧_
+    B-map-fold-IIST : (a : A) → B⟦ map-fold a f g ⟧ IsIISTOf F⟦ map-fold a f g ⟧
     B-map-fold-IIST a {[]} refl = [] , [] , refl
     B-map-fold-IIST a {x ∷ xs} eq
       with just y ← f a .to x in eq₁
@@ -510,36 +509,36 @@ B-IIST (e ⊗ e') {xzs} eq
     zip xs'' zs'' , ≺-zip (≺-trans pfx' pfx) (≺-trans pfz' pfz) , refl
 
 
-F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧_
+F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
 F-d-IST e = record
   { empty = F-empty e
   ; isIncremental = F-incremental e
   ; hasDelay = F-delay e
   }
 
-B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧_
+B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧
 B-d-IST e = record
   { empty = B-empty e
   ; isIncremental = B-incremental e
   ; hasDelay = B-delay e
   }
 
-F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧_ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧_
+F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
 F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
 
-B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧_ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧_
+B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
 B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
 
-F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧_
+F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
 F-d-d'-IIST e = record
-  { inverse = B⟦ e ⟧_
+  { inverse = B⟦ e ⟧
   ; is-d-IST = F-d-IST e
   ; inverse-is-d'-IIST = B-d-IIST e
   }
 
-B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧_
+B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
 B-d-d'-IIST e = record
-  { inverse = F⟦ e ⟧_
+  { inverse = F⟦ e ⟧
   ; is-d-IST = B-d-IST e
   ; inverse-is-d'-IIST = F-d-IIST e
   }
