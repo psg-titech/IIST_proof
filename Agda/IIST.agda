@@ -1,5 +1,3 @@
--- Tested with agda 2.6.4 and agda-stdlib 1.7.3
-
 module IIST where
 
 open import Data.List.Base using ( List; []; _∷_; zip; unzip; length; _∷ʳ_; initLast;  _∷ʳ′_ )
@@ -13,10 +11,9 @@ open import Data.Product.Base using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
 open import Function using ( id; _∘_ )
 open import Relation.Nullary using ( yes; no )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; cong; sym )
-open import Relation.Binary.Structures using ( IsDecEquivalence )
-open import Relation.Binary.TypeClasses using ( _≟_ )
 
 open import IIST.Common
+open import IIST.Syntax
 
 private
   variable
@@ -165,17 +162,6 @@ record Is⟨_,_⟩-IIST_ (d d' : ℕ) (st : ST X Y) : Set where
 -------------------------------------------------------------------------------
 -- IIST constructors and semantics
 
-infixr 9 _⟫_
-infixr 3 _⊗_
-
-data E : Set → Set → Set₁ where
-  map-fold : A → (A → X ⇌ Y) → (A → X → A) → E X Y
-  delay : {{_ : Eq X}} → X → E X X
-  hasten : {{_ : Eq X}} → X → E X X
-  _⟫_ : E X Y → E Y Z → E X Z
-  _⊗_ : E X Y → E Z W → E (X × Z) (Y × W)
-
-
 -- Forward semantics
 F-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST X Y
 F-map-fold a f g [] = just []
@@ -220,32 +206,6 @@ B⟦ e ⊗ e' ⟧ yws = do
   xs ← B⟦ e ⟧ ys
   zs ← B⟦ e' ⟧ ws
   just (zip xs zs)
-
-
-D⟦_⟧ : E X Y → ℕ × ℕ
-D⟦ map-fold a f g ⟧ = 0 , 0
-D⟦ delay x ⟧ = 0 , 1
-D⟦ hasten x ⟧ = 1 , 0
-D⟦ e ⟫ e' ⟧ =
-  let d₁ , d₁' = D⟦ e ⟧
-      d₂ , d₂' = D⟦ e' ⟧
-   in d₁ + d₂ , d₁' + d₂'
-D⟦ e ⊗ e' ⟧ =
-  let d₁ , d₁' = D⟦ e ⟧
-      d₂ , d₂' = D⟦ e' ⟧
-   in d₁ ⊔ d₂ , d₁' ⊔ d₂'
-
-DF⟦_⟧ DB⟦_⟧ : E X Y → ℕ
-DF⟦ e ⟧ = D⟦ e ⟧ .proj₁
-DB⟦ e ⟧ = D⟦ e ⟧ .proj₂
-
-
-I⟦_⟧ : E X Y → E Y X
-I⟦ map-fold a f g ⟧ = map-fold a (inv⇌ ∘ f) (λ a → maybe (g a) a ∘ f a .from)
-I⟦ delay x ⟧ = hasten x
-I⟦ hasten x ⟧ = delay x
-I⟦ e ⟫ e' ⟧ = I⟦ e' ⟧ ⟫ I⟦ e ⟧
-I⟦ e ⊗ e' ⟧ = I⟦ e ⟧ ⊗ I⟦ e' ⟧
 
 
 _ : F⟦ delay 0 ⟫ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
