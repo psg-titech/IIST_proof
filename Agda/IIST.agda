@@ -368,9 +368,8 @@ B-delay (e ⟫ e') {zs} eq
   with ih₁ ← B-delay e' eq₁
   with just xs ← B⟦ e ⟧ ys in eq₂
   with ih₂ ← B-delay e eq₂
-  rewrite sym (just-injective eq) | ih₁ | ih₂
-  rewrite ∸-+-assoc (length zs) DB⟦ e' ⟧ DB⟦ e ⟧ =
-    cong (length zs ∸_) (+-comm DB⟦ e' ⟧ DB⟦ e ⟧)
+  rewrite sym (just-injective eq) | ih₁ | ih₂ =
+    ∸-+-assoc (length zs) DB⟦ e' ⟧ DB⟦ e ⟧
 B-delay (e ⊗ e') {yws} eq
   with ys , ws ← unzip yws in eq₁
   with just xs ← B⟦ e ⟧ ys in eq₂ | just zs ← B⟦ e' ⟧ ws in eq₃
@@ -390,7 +389,7 @@ F-IIST (map-fold {A = A} a f g) = F-map-fold-IIST a
     F-map-fold-IIST a {y ∷ ys} eq
       with just x ← f a .from y in eq₁
       with just xs ← B-map-fold (g a x) f g ys in eq₂
-      rewrite sym (just-injective eq) | f a .invertible₂ eq₁
+      rewrite sym (just-injective eq) | f a .from→to eq₁
       with ys' , pf , eq₃ ← F-map-fold-IIST (g a x) {ys} eq₂
       rewrite eq₃ =
         y ∷ ys' , y ∷ pf , refl
@@ -433,7 +432,7 @@ B-IIST (map-fold {A = A} a f g) = B-map-fold-IIST a
     B-map-fold-IIST a {x ∷ xs} eq
       with just y ← f a .to x in eq₁
       with just ys ← F-map-fold (g a x) f g xs in eq₂
-      rewrite sym (just-injective eq) | f a .invertible₁ eq₁
+      rewrite sym (just-injective eq) | f a .to→from eq₁
       with xs' , pf , eq₃ ← B-map-fold-IIST (g a x) {xs} eq₂
       rewrite eq₃ =
         x ∷ xs' , x ∷ pf , refl
@@ -512,7 +511,7 @@ F∘I≡B {Y = Y} (map-fold {A} a f g) = F∘I≡B-map-fold a
     F∘I≡B-map-fold a [] = refl
     F∘I≡B-map-fold a (y ∷ ys) with f a .from y in eq
     ... | nothing = refl
-    ... | just x rewrite f a .invertible₂ eq | F∘I≡B-map-fold (g a x) ys = refl
+    ... | just x rewrite f a .from→to eq | F∘I≡B-map-fold (g a x) ys = refl
 F∘I≡B (delay x) [] = refl
 F∘I≡B (delay x) (x' ∷ xs) with x ≟ x'
 ... | no _ = refl
@@ -534,7 +533,7 @@ B∘I≡F {X} (map-fold {A} a f g) = B∘I≡F-map-fold a
     B∘I≡F-map-fold a [] = refl
     B∘I≡F-map-fold a (x ∷ xs) with f a .to x in eq
     ... | nothing = refl
-    ... | just y rewrite f a .invertible₁ eq | B∘I≡F-map-fold (g a x) xs = refl
+    ... | just y rewrite f a .to→from eq | B∘I≡F-map-fold (g a x) xs = refl
 B∘I≡F (delay x) xs = refl
 B∘I≡F (hasten x) [] = refl
 B∘I≡F (hasten x) (x' ∷ xs) with x ≟ x'

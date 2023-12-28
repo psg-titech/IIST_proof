@@ -4,13 +4,11 @@ module IIST.Experiment.DefinitionallyIncremental where
 
 open import Data.Maybe.Base as Maybe using ( Maybe; just; nothing )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_; NonZero )
-open import Data.Nat.Instances
-open import Data.Nat.Properties using ( +-suc; +-identityʳ; ⊔-identityʳ )
+open import Data.Nat.Properties using ( +-suc; +-identityʳ; ⊔-identityʳ; +-comm )
 open import Data.List.Base using ( List; []; _∷_ )
 open import Data.Product.Base using ( _×_; _,_ )
-open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; cong )
-open import Relation.Binary.TypeClasses using ( _≟_ )
-open import Relation.Nullary using ( ¬_; yes; no )
+open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; cong; subst )
+open import Relation.Nullary using ( yes; no )
 
 open import IIST.Common
 open import IIST.Syntax
@@ -18,6 +16,9 @@ open import IIST.Syntax
 private
   variable
     A X Y Z W : Set
+
+--------------------------------------------------------------------------------
+-- Definitionally d-IST
 
 mutual
 
@@ -45,15 +46,8 @@ feed f (x ∷ xs) with f x
 ... | next! f' = feed (force f') xs
 ... | yield! y f' = Maybe.map (y ∷_) (feed (force f') xs)
 
-F-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ⟨ 0 ⟩-IST X Y
-F-map-fold a f g x with f a .to x
-... | nothing = fail
-... | just y = yield! y λ where .force → F-map-fold (g a x) f g
-
-B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ⟨ 0 ⟩-IST Y X
-B-map-fold a f g y with f a .from y
-... | nothing = fail
-... | just x = yield! x λ where .force → B-map-fold (g a x) f g
+--------------------------------------------------------------------------------
+-- Semantics
 
 id : ⟨ 0 ⟩-IST X X
 id x = yield! x λ where .force → id
@@ -65,6 +59,16 @@ unshift : {{_ : Eq X}} → X → ⟨ 1 ⟩-IST X X
 unshift x y with x ≟ y
 ... | no _ = fail
 ... | yes refl = next! λ where .force → id
+
+F-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ⟨ 0 ⟩-IST X Y
+F-map-fold a f g x with f a .to x
+... | nothing = fail
+... | just y = yield! y λ where .force → F-map-fold (g a x) f g
+
+B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ⟨ 0 ⟩-IST Y X
+B-map-fold a f g y with f a .from y
+... | nothing = fail
+... | just x = yield! x λ where .force → B-map-fold (g a x) f g
 
 _∙_ : ∀ {d d'} → ⟨ d ⟩-IST X Y → ⟨ d' ⟩-IST Y Z → ⟨ d + d' ⟩-IST X Z
 (f ∙ g) x with f x
@@ -87,110 +91,125 @@ _∥_ : ∀ {d d'} → ⟨ d ⟩-IST X Y → ⟨ d' ⟩-IST Z W → ⟨ d ⊔ d'
 ... | yield! _ _  | next! g'    = next! λ where .force → (shift x ∙ f) ∥ force g'
 ... | yield! y f' | yield! w g' = yield! (y , w) λ where .force → force f' ∥ force g'
 
+F⟦_⟧ : (e : E X Y) → ⟨ DF⟦ e ⟧ ⟩-IST X Y
+F⟦ map-fold a f g ⟧ = F-map-fold a f g
+F⟦ delay x ⟧ = shift x
+F⟦ hasten x ⟧ = unshift x
+F⟦ e ⟫ e' ⟧ = F⟦ e ⟧ ∙ F⟦ e' ⟧
+F⟦ e ⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
+
+B⟦_⟧ : (e : E X Y) → ⟨ DB⟦ e ⟧ ⟩-IST Y X
+B⟦ map-fold a f g ⟧ = B-map-fold a f g
+B⟦ delay x ⟧ = unshift x
+B⟦ hasten x ⟧ = shift x
+B⟦ e ⟫ e' ⟧ = B⟦ e' ⟧ ∙ B⟦ e ⟧
+B⟦ e ⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
+
 --------------------------------------------------------------------------------
 -- Bisimulation
 
 mutual
 
-  _≈_ : {d : ℕ} (f g : ⟨ d ⟩-IST X Y) → Set
+  _≈_ : ∀ {d₁ d₂} → ⟨ d₁ ⟩-IST X Y → ⟨ d₂ ⟩-IST X Y → Set
   f ≈ g = ∀ x → f x Step≈ g x
 
-  data _Step≈_ {X Y : Set} : ∀ {d} (s s' : Step d X Y) → Set where
-    fail : ∀ {d} → (fail {d = d}) Step≈ fail
-    next : ∀ {d} {f g : ∞⟨ d ⟩-IST X Y}
+  data _Step≈_ {X Y : Set} {d₁ d₂ : ℕ} : Step d₁ X Y → Step d₂ X Y → Set where
+    ≈fail : d₁ ≡ d₂ → fail Step≈ fail
+    ≈next : ∀ {d₁' d₂'} {f : ∞⟨ d₁' ⟩-IST X Y} {g : ∞⟨ d₂' ⟩-IST X Y}
+      → d₁ ≡ d₂
+      → (p : d₁ ≡ suc d₁')
+      → (q : d₂ ≡ suc d₂')
       → f ∞≈ g
-      → next! f Step≈ next! g
-    yield : ∀ {x y f g}
+      → next p f Step≈ next q g
+    ≈yield : ∀ {x y f g}
+      → (p : d₁ ≡ 0)
+      → (q : d₂ ≡ 0)
       → x ≡ y
       → f ∞≈ g
-      → yield! x f Step≈ yield! y g
+      → yield p x f Step≈ yield q y g
 
-  record _∞≈_ {d : ℕ} (f g : ∞⟨ d ⟩-IST X Y) : Set where
+  record _∞≈_ {d d'} (f : ∞⟨ d ⟩-IST X Y) (g : ∞⟨ d' ⟩-IST X Y): Set where
     coinductive
     field force : force f ≈ force g
 
 open _∞≈_
 
+pattern ≈fail! = ≈fail refl
+pattern ≈next! f≈g = ≈next refl refl refl f≈g
+pattern ≈yield! x≡y f≈g = ≈yield refl refl x≡y f≈g
+
 ≈-refl : ∀ {d} {f : ⟨ d ⟩-IST X Y} → f ≈ f
 ≈-refl {f = f} x with f x
-... | fail = fail
-... | next! f' = next λ where .force → ≈-refl
-... | yield! y f' = yield refl λ where .force → ≈-refl
+... | fail = ≈fail!
+... | next! f' = ≈next! λ where .force → ≈-refl
+... | yield! y f' = ≈yield! refl λ where .force → ≈-refl
 
 ≈-sym : ∀ {d} {f g : ⟨ d ⟩-IST X Y} → f ≈ g → g ≈ f
 ≈-sym {f = f} {g = g} f≈g x with f x | g x | f≈g x
-... | fail | fail | fail = fail
-... | next! _ | next! _ | next f'≈g' =
-      next λ where .force → ≈-sym (force f'≈g')
-... | yield! _ _ | yield! _ _ | yield refl f'≈g' =
-      yield refl λ where .force → ≈-sym (force f'≈g')
+... | fail | fail | ≈fail! = ≈fail!
+... | next! _ | next! _ | ≈next! f'≈g' =
+      ≈next! λ where .force → ≈-sym (force f'≈g')
+... | yield! _ _ | yield! _ _ | ≈yield! refl f'≈g' =
+      ≈yield! refl λ where .force → ≈-sym (force f'≈g')
 
 ≈-trans : ∀ {d} {f g h : ⟨ d ⟩-IST X Y} → f ≈ g → g ≈ h → f ≈ h
 ≈-trans {f = f} {g = g} {h = h} f≈g g≈h x with f x | g x | h x | f≈g x | g≈h x
-... | fail | fail | fail | fail | fail = fail
-... | next! _ | next! _ | next! _ | next f'≈g' | next g'≈h' =
-      next λ where .force → ≈-trans (force f'≈g') (force g'≈h')
-... | yield! _ _ | yield! _ _ | yield! _ _ | yield refl f'≈g' | yield refl g'≈h' =
-      yield refl λ where .force → ≈-trans (force f'≈g') (force g'≈h')
+... | fail | fail | fail | ≈fail! | ≈fail! = ≈fail!
+... | next! _ | next! _ | next! _ | ≈next! f'≈g' | ≈next! g'≈h' =
+      ≈next! λ where .force → ≈-trans (force f'≈g') (force g'≈h')
+... | yield! _ _ | yield! _ _ | yield! _ _ | ≈yield! refl f'≈g' | ≈yield! refl g'≈h' =
+      ≈yield! refl λ where .force → ≈-trans (force f'≈g') (force g'≈h')
 
 ≈-feed : ∀ {d} {f g : ⟨ d ⟩-IST X Y}
   → f ≈ g
   → ∀ xs → feed f xs ≡ feed g xs
 ≈-feed f≈g [] = refl
 ≈-feed {f = f} {g} f≈g (x ∷ xs) with f x | g x | f≈g x
-... | fail | fail | fail = refl
-... | next! _ | next! _ | next f'≈g'
+... | fail | fail | ≈fail! = refl
+... | next! _ | next! _ | ≈next! f'≈g'
       rewrite ≈-feed (force f'≈g') xs = refl
-... | yield! _ _ | yield! _ _ | yield refl f'≈g'
+... | yield! _ _ | yield! _ _ | ≈yield! refl f'≈g'
       rewrite ≈-feed (force f'≈g') xs = refl
 
 --------------------------------------------------------------------------------
 
-map-fold-lem1 : ∀ a (f : A → X ⇌ Y) g
-  → (F-map-fold a f g ∙ B-map-fold a f g) ≈ id
-map-fold-lem1 a f g x with f a .to x in eq
-... | nothing = {!   !}
-... | just y rewrite f a .invertible₁ eq =
-      yield refl λ where .force → map-fold-lem1 (g a x) f g
-
-map-fold-lem2 : ∀ a (f : A → X ⇌ Y) g
-  → (B-map-fold a f g ∙ F-map-fold a f g) ≈ id
-map-fold-lem2 a f g y with f a .from y in eq
-... | nothing = {!   !}
-... | just x rewrite f a .invertible₂ eq =
-      yield refl λ where .force → map-fold-lem2 (g a x) f g
-
-shift-unshift : {{_ : Eq X}} (x : X) → (shift x ∙ unshift x) ≈ later id
-shift-unshift x x' with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = next λ where .force → ≈-refl
-
-unshift-shift : {{_ : Eq X}} (x : X) → (unshift x ∙ shift x) ≈ later id
-unshift-shift x x' with x ≟ x'
-... | no _ = {!   !}
-... | yes refl = next λ where .force → lem x
-  where
-    lem : (x : X) → (id ∙ shift x) ≈ (shift x ∙ id)
-    lem x x' = yield refl λ where .force → lem x'
+F∘I≈B : ∀ (e : E X Y) → F⟦ I⟦ e ⟧ ⟧ ≈ B⟦ e ⟧
+F∘I≈B (map-fold a f g) y with f a .from y
+... | nothing = ≈fail!
+... | just x = ≈yield! refl λ where .force → {!   !}
+F∘I≈B (delay x) = ≈-refl
+F∘I≈B (hasten x) = ≈-refl
+F∘I≈B (e ⟫ e') z with F⟦ I⟦ e' ⟧ ⟧ z | B⟦ e' ⟧ z | F∘I≈B e' z
+... | fail | fail | ≈fail _ = ≈fail (DF∘I≡DB (e ⟫ e'))
+... | next _ _ | next _ _ | ≈next _ _ _ ih = {!   !}
+... | yield _ _ _ | yield _ _ _ | ≈yield _ _ ih₁ ih₂ = {!   !}
+F∘I≈B (e ⊗ e') (y , w) = {!   !}
 
 --------------------------------------------------------------------------------
--- Examples
 
-_ : feed (shift 10) (0 ∷ 1 ∷ 2 ∷ []) ≡ just (10 ∷ 0 ∷ 1 ∷ [])
-_ = refl
+-- map-fold-lem1 : ∀ a (f : A → X ⇌ Y) g
+--   → (F-map-fold a f g ∙ B-map-fold a f g) ≈ id
+-- map-fold-lem1 a f g x with f a .to x in eq
+-- ... | nothing = {!   !}
+-- ... | just y rewrite f a .to→from eq =
+--       yield refl λ where .force → map-fold-lem1 (g a x) f g
 
-_ : feed (unshift 0) (0 ∷ 1 ∷ 2 ∷ []) ≡ just (1 ∷ 2 ∷ [])
-_ = refl
+-- map-fold-lem2 : ∀ a (f : A → X ⇌ Y) g
+--   → (B-map-fold a f g ∙ F-map-fold a f g) ≈ id
+-- map-fold-lem2 a f g y with f a .from y in eq
+-- ... | nothing = {!   !}
+-- ... | just x rewrite f a .from→to eq =
+--       yield refl λ where .force → map-fold-lem2 (g a x) f g
 
-_ : feed (unshift 10) (0 ∷ 1 ∷ 2 ∷ []) ≡ nothing
-_ = refl
+-- shift-unshift : {{_ : Eq X}} (x : X) → (shift x ∙ unshift x) ≈ later id
+-- shift-unshift x x' with x ≟ x
+-- ... | no contra with () ← contra refl
+-- ... | yes refl = next λ where .force → ≈-refl
 
-_ : feed (later id) (0 ∷ 1 ∷ 2 ∷ []) ≡ just (0 ∷ 1 ∷ [])
-_ = refl
-
-_ : feed (later id ∙ shift 10) (0 ∷ 1 ∷ 2 ∷ []) ≡ just (10 ∷ 0 ∷ [])
-_ = refl
-
-_ : feed (shift 100 ∥ unshift 0) ((0 , 0) ∷ (1 , 1) ∷ (2 , 2) ∷ (3 , 3) ∷ (4 , 4) ∷ [])
-  ≡ just ((100 , 1) ∷ (0 , 2) ∷ (1 , 3) ∷ (2 , 4) ∷ [])
-_ = refl
+-- unshift-shift : {{_ : Eq X}} (x : X) → (unshift x ∙ shift x) ≈ later id
+-- unshift-shift x x' with x ≟ x'
+-- ... | no _ = {!   !}
+-- ... | yes refl = next λ where .force → lem x
+--   where
+--     lem : (x : X) → (id ∙ shift x) ≈ (shift x ∙ id)
+--     lem x x' = yield refl λ where .force → lem x'

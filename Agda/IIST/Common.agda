@@ -28,19 +28,19 @@ record _⇌_ (A B : Set) : Set where
   field
     to : A ⇀ B
     from : B ⇀ A
-    invertible₁ : ∀ {x y} → to x ≡ just y → from y ≡ just x
-    invertible₂ : ∀ {x y} → from y ≡ just x → to x ≡ just y
+    to→from : ∀ {x y} → to x ≡ just y → from y ≡ just x
+    from→to : ∀ {x y} → from y ≡ just x → to x ≡ just y
 
-  invertible₃ : ∀ {x} → to x ≡ nothing → ∀ {y} → from y ≢ just x
-  invertible₃ p q with () ← trans (sym p) (invertible₂ q)
+  ¬dom[to]→¬cod[from] : ∀ {x} → to x ≡ nothing → ∀ {y} → from y ≢ just x
+  ¬dom[to]→¬cod[from] p q with () ← trans (sym p) (from→to q)
 
-  invertible₄ : ∀ {y} → from y ≡ nothing → ∀ {x} → to x ≢ just y
-  invertible₄ p q with () ← trans (sym p) (invertible₁ q)
+  ¬dom[from]→¬cod[to] : ∀ {y} → from y ≡ nothing → ∀ {x} → to x ≢ just y
+  ¬dom[from]→¬cod[to] p q with () ← trans (sym p) (to→from q)
 
 open _⇌_ public
 
 inv⇌ : A ⇌ B → B ⇌ A
 inv⇌ f .to = f .from
 inv⇌ f .from = f .to
-inv⇌ f .invertible₁ = f .invertible₂
-inv⇌ f .invertible₂ = f .invertible₁
+inv⇌ f .to→from = f .from→to
+inv⇌ f .from→to = f .to→from

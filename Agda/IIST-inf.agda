@@ -8,7 +8,7 @@ open import Data.Nat.Properties using ( +-identityʳ; +-comm )
 open import Data.Product.Base as Prod using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
 open import Data.Unit.Base using ( ⊤; tt )
 open import Function using ( _∘_ )
-open import Relation.Binary.PropositionalEquality using ( _≡_; _≢_; refl; sym; trans )
+open import Relation.Binary.PropositionalEquality using ( _≡_; _≢_; refl; sym; trans; cong )
 open import Relation.Nullary using ( ¬_; yes; no )
 
 open import Codata.FallibleColist as Colistˣ
@@ -236,7 +236,7 @@ F-IIST (map-fold {A} a f g) = helper a
     helper a fail = fail
     helper a (y ∷ ys) with f a .from y in eq
     ... | nothing = {!   !}
-    ... | just x rewrite f a .invertible₂ eq =
+    ... | just x rewrite f a .from→to eq =
           y ∷ λ where .force → helper (g a x) (force ys)
 F-IIST (delay x) [] = []
 F-IIST (delay x) fail = {!   !}
@@ -267,7 +267,7 @@ B-IIST (map-fold {A} a f g) = helper a
     helper a fail = fail
     helper a (x ∷ xs) with f a .to x in eq
     ... | nothing = {!   !}
-    ... | just y rewrite f a .invertible₁ eq =
+    ... | just y rewrite f a .to→from eq =
           x ∷ λ where .force → helper (g a x) (force xs)
 B-IIST (delay x) [] = []
 B-IIST (delay x) fail with x ≟ x
@@ -377,15 +377,16 @@ B-≈ (e ⊗ e') xs≈ys = ≈-zip (B-≈ e (≈-unzipₗ xs≈ys)) (B-≈ e' (�
 
 F∘I≡B : ∀ (e : E X Y) (ys : Colistˣ Y)
   → F⟦ I⟦ e ⟧ ⟧ ys Colistˣ.≈ B⟦ e ⟧ ys
-F∘I≡B {Y = Y} (map-fold {A} a f g) = helper a
+F∘I≡B {Y = Y} (map-fold {A} a f g) = helper refl
   where
-    helper : ∀ (a : A) (ys : Colistˣ Y)
-      → F⟦ I⟦ map-fold a f g ⟧ ⟧ ys Colistˣ.≈ B⟦ map-fold a f g ⟧ ys
-    helper a [] = []
-    helper a fail = fail
-    helper a (y ∷ ys) with f a .from y in eq
+    helper : ∀ {a a' : A} → a ≡ a' → (ys : Colistˣ Y)
+      → F⟦ I⟦ map-fold a f g ⟧ ⟧ ys Colistˣ.≈ B⟦ map-fold a' f g ⟧ ys
+    helper _ [] = []
+    helper _ fail = fail
+    helper {a} refl (y ∷ ys) with f a .from y in eq
     ... | nothing = fail
-    ... | just x rewrite f a .invertible₂ eq = refl ∷ λ where .force → {!   !}
+    ... | just x =
+          refl ∷ λ where .force → helper (cong (maybe (g a) a) eq) (force ys)
 F∘I≡B (delay x) ys = Colistˣ.≈-refl
 F∘I≡B (hasten x) ys = Colistˣ.≈-refl
 F∘I≡B (e ⟫ e') ys =
@@ -399,15 +400,17 @@ F∘I≡B (e ⊗ e') yws =
 
 B∘I≡F : ∀ (e : E X Y) (xs : Colistˣ X)
   → B⟦ I⟦ e ⟧ ⟧ xs Colistˣ.≈ F⟦ e ⟧ xs
-B∘I≡F {X = X} (map-fold {A} a f g) = helper a
+B∘I≡F {X = X} (map-fold {A} a f g) = helper refl
   where
-    helper : ∀ (a : A) (xs : Colistˣ X)
-      → B⟦ I⟦ map-fold a f g ⟧ ⟧ xs Colistˣ.≈ F⟦ map-fold a f g ⟧ xs
-    helper a [] = []
-    helper a fail = fail
-    helper a (x ∷ xs) with f a .to x in eq
+    helper : ∀ {a a' : A} → a ≡ a' → (xs : Colistˣ X)
+      → B⟦ I⟦ map-fold a f g ⟧ ⟧ xs Colistˣ.≈ F⟦ map-fold a' f g ⟧ xs
+    helper _ [] = []
+    helper _ fail = fail
+    helper {a} refl (x ∷ xs) with f a .to x in eq
     ... | nothing = fail
-    ... | just y rewrite f a .invertible₁ eq = refl ∷ λ where .force → {!   !}
+    ... | just y =
+          refl ∷ λ where
+            .force → helper (cong (maybe (g a) a) (f a .to→from eq)) (force xs)
 B∘I≡F (delay x) xs = Colistˣ.≈-refl
 B∘I≡F (hasten x) xs = Colistˣ.≈-refl
 B∘I≡F (e ⟫ e') xs =
