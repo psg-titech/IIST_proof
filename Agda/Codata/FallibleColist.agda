@@ -8,16 +8,17 @@ open import Relation.Binary.Bundles using ( Setoid )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans )
 open import Relation.Binary.Structures using ( IsEquivalence )
 
-open import Codata.FallibleConat as Coℕˣ using ( Coℕˣ; zero; fail; suc; force; _⊓_ )
+open import Codata.FallibleConat as Coℕˣ using ( Coℕˣ; zero; fail; suc; force; _⊓_; ≈zero; ≈fail; ≈suc )
 
 private
   variable
     A B : Set
 
-infixr 5 _∷_
 
 --------------------------------------------------------------------------------
 -- Fallible Colist
+
+infixr 5 _∷_
 
 mutual
 
@@ -66,21 +67,21 @@ unzipᵣ : Colistˣ (A × B) → Colistˣ B
 unzipᵣ = map proj₂
 
 colength-map : ∀ (f : A → B) xs → colength (map f xs) Coℕˣ.≈ colength xs
-colength-map f [] = zero
-colength-map f fail = fail
-colength-map f (x ∷ xs) = suc λ where .force → colength-map f (force xs)
+colength-map f [] = ≈zero
+colength-map f fail = ≈fail
+colength-map f (x ∷ xs) = ≈suc λ where .force → colength-map f (force xs)
 
 colength-zip : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
   → colength (zip xs ys) Coℕˣ.≈ (colength xs ⊓ colength ys)
-colength-zip {xs = []} {[]} = zero
-colength-zip {xs = []} {fail} = fail
-colength-zip {xs = []} {_ ∷ _} = zero
-colength-zip {xs = fail} {[]} = fail
-colength-zip {xs = fail} {fail} = fail
-colength-zip {xs = fail} {_ ∷ _} = fail
-colength-zip {xs = _ ∷ _} {[]} = zero
-colength-zip {xs = _ ∷ _} {fail} = fail
-colength-zip {xs = x ∷ xs} {y ∷ ys} = suc λ where .force → colength-zip
+colength-zip {xs = []} {[]} = ≈zero
+colength-zip {xs = []} {fail} = ≈fail
+colength-zip {xs = []} {_ ∷ _} = ≈zero
+colength-zip {xs = fail} {[]} = ≈fail
+colength-zip {xs = fail} {fail} = ≈fail
+colength-zip {xs = fail} {_ ∷ _} = ≈fail
+colength-zip {xs = _ ∷ _} {[]} = ≈zero
+colength-zip {xs = _ ∷ _} {fail} = ≈fail
+colength-zip {xs = x ∷ xs} {y ∷ ys} = ≈suc λ where .force → colength-zip
 
 colength-unzipₗ : ∀ {xs : Colistˣ (A × B)} → colength (unzipₗ xs) Coℕˣ.≈ colength xs
 colength-unzipₗ = colength-map _ _
@@ -121,13 +122,14 @@ noFail-zip (x ∷ xs) (y ∷ ys) =
 -- Bisimulation
 
 infix 4 _≈_ _∞≈_
+infixr 5 _≈∷_
 
 mutual
 
   data _≈_ {A : Set} : Colistˣ A → Colistˣ A → Set where
-    [] : [] ≈ []
-    fail : fail ≈ fail
-    _∷_ : ∀ {x y xs ys} → x ≡ y → xs ∞≈ ys → (x ∷ xs) ≈ (y ∷ ys)
+    ≈[] : [] ≈ []
+    ≈fail : fail ≈ fail
+    _≈∷_ : ∀ {x y xs ys} → x ≡ y → xs ∞≈ ys → (x ∷ xs) ≈ (y ∷ ys)
 
   record _∞≈_ (xs ys : ∞Colistˣ A) : Set where
     coinductive
@@ -136,20 +138,20 @@ mutual
 open _∞≈_ public
 
 ≈-refl : ∀ {xs : Colistˣ A} → xs ≈ xs
-≈-refl {xs = []} = []
-≈-refl {xs = fail} = fail
-≈-refl {xs = x ∷ xs} = refl ∷ λ where .force → ≈-refl
+≈-refl {xs = []} = ≈[]
+≈-refl {xs = fail} = ≈fail
+≈-refl {xs = x ∷ xs} = refl ≈∷ λ where .force → ≈-refl
 
 ≈-sym : ∀ {xs ys : Colistˣ A} → xs ≈ ys → ys ≈ xs
-≈-sym [] = []
-≈-sym fail = fail
-≈-sym (x≡y ∷ xs≈ys) = sym x≡y ∷ λ where .force → ≈-sym (force xs≈ys)
+≈-sym ≈[] = ≈[]
+≈-sym ≈fail = ≈fail
+≈-sym (x≡y ≈∷ xs≈ys) = sym x≡y ≈∷ λ where .force → ≈-sym (force xs≈ys)
 
 ≈-trans : ∀ {xs ys zs : Colistˣ A} → xs ≈ ys → ys ≈ zs → xs ≈ zs
-≈-trans [] ys≈zs = ys≈zs
-≈-trans fail ys≈zs = ys≈zs
-≈-trans (x≡y ∷ xs≈ys) (y≡z ∷ ys≈zs) =
-  trans x≡y y≡z ∷ λ where .force → ≈-trans (force xs≈ys) (force ys≈zs)
+≈-trans ≈[] ys≈zs = ys≈zs
+≈-trans ≈fail ys≈zs = ys≈zs
+≈-trans (x≡y ≈∷ xs≈ys) (y≡z ≈∷ ys≈zs) =
+  trans x≡y y≡z ≈∷ λ where .force → ≈-trans (force xs≈ys) (force ys≈zs)
 
 
 ≈-isEquivalence : ∀ {A} → IsEquivalence {A = Colistˣ A} _≈_
@@ -165,22 +167,22 @@ open _∞≈_ public
 ≈-map : ∀ {xs xs' : Colistˣ A} (f : A → B)
   → xs ≈ xs'
   → map f xs ≈ map f xs'
-≈-map f [] = []
-≈-map f fail = fail
-≈-map f (refl ∷ xs≈xs') = refl ∷ λ where .force → ≈-map f (force xs≈xs')
+≈-map f ≈[] = ≈[]
+≈-map f ≈fail = ≈fail
+≈-map f (refl ≈∷ xs≈xs') = refl ≈∷ λ where .force → ≈-map f (force xs≈xs')
 
 ≈-zip : ∀ {xs xs' : Colistˣ A} {ys ys' : Colistˣ B}
   → xs ≈ xs'
   → ys ≈ ys'
   → zip xs ys ≈ zip xs' ys'
-≈-zip fail _ = fail
-≈-zip [] fail = fail
-≈-zip (_ ∷ _) fail = fail
-≈-zip [] [] = []
-≈-zip [] (_ ∷ _) = []
-≈-zip (_ ∷ _) [] = []
-≈-zip (refl ∷ xs≈xs') (refl ∷ ys≈ys') =
-  refl ∷ λ where .force → ≈-zip (force xs≈xs') (force ys≈ys')
+≈-zip ≈fail _ = ≈fail
+≈-zip ≈[] ≈fail = ≈fail
+≈-zip (_ ≈∷ _) ≈fail = ≈fail
+≈-zip ≈[] ≈[] = ≈[]
+≈-zip ≈[] (_ ≈∷ _) = ≈[]
+≈-zip (_ ≈∷ _) ≈[] = ≈[]
+≈-zip (refl ≈∷ xs≈xs') (refl ≈∷ ys≈ys') =
+  refl ≈∷ λ where .force → ≈-zip (force xs≈xs') (force ys≈ys')
 
 ≈-unzipₗ : ∀ {xs xs' : Colistˣ (A × B)} → xs ≈ xs' → unzipₗ xs ≈ unzipₗ xs'
 ≈-unzipₗ = ≈-map _

@@ -53,9 +53,9 @@ infix 4 _≈_ _∞≈_
 mutual
 
   data _≈_ : Coℕˣ → Coℕˣ → Set where
-    zero : zero ≈ zero
-    fail : fail ≈ fail
-    suc : ∀ {m n} → m ∞≈ n → suc m ≈ suc n
+    ≈zero : zero ≈ zero
+    ≈fail : fail ≈ fail
+    ≈suc : ∀ {m n} → m ∞≈ n → suc m ≈ suc n
 
   record _∞≈_ (m n : ∞Coℕˣ) : Set where
     coinductive
@@ -64,19 +64,19 @@ mutual
 open _∞≈_ public
 
 ≈-refl : ∀ {n} → n ≈ n
-≈-refl {zero} = zero
-≈-refl {fail} = fail
-≈-refl {suc n} = suc λ where .force → ≈-refl
+≈-refl {zero} = ≈zero
+≈-refl {fail} = ≈fail
+≈-refl {suc n} = ≈suc λ where .force → ≈-refl
 
 ≈-sym : ∀ {m n} → m ≈ n → n ≈ m
-≈-sym zero = zero
-≈-sym fail = fail
-≈-sym (suc m≈n) = suc λ where .force → ≈-sym (force m≈n)
+≈-sym ≈zero = ≈zero
+≈-sym ≈fail = ≈fail
+≈-sym (≈suc m≈n) = ≈suc λ where .force → ≈-sym (force m≈n)
 
 ≈-trans : ∀ {m n o} → m ≈ n → n ≈ o → m ≈ o
-≈-trans zero n≈o = n≈o
-≈-trans fail n≈o = n≈o
-≈-trans (suc m≈n) (suc n≈o) = suc λ where .force → ≈-trans (force m≈n) (force n≈o)
+≈-trans ≈zero n≈o = n≈o
+≈-trans ≈fail n≈o = n≈o
+≈-trans (≈suc m≈n) (≈suc n≈o) = ≈suc λ where .force → ≈-trans (force m≈n) (force n≈o)
 
 ≈-isEquivalence : IsEquivalence _≈_
 ≈-isEquivalence = record
@@ -89,59 +89,56 @@ open _∞≈_ public
 ≈-setoid = record { isEquivalence = ≈-isEquivalence }
 
 ≈suc-injective : ∀ {m n} → suc m ≈ suc n → m ∞≈ n
-≈suc-injective (suc p) = p
-
-suc-inf : suc (delay inf) ≈ inf
-suc-inf = suc λ where .force → ≈-refl
+≈suc-injective (≈suc p) = p
 
 ≈-∸ℕ : ∀ {m n} o → m ≈ n → m ∸ℕ o ≈ n ∸ℕ o
 ≈-∸ℕ zero m≈n = m≈n
-≈-∸ℕ (suc o) zero = zero
-≈-∸ℕ (suc o) fail = fail
-≈-∸ℕ (suc o) (suc m≈n) = ≈-∸ℕ o (force m≈n)
+≈-∸ℕ (suc o) ≈zero = ≈zero
+≈-∸ℕ (suc o) ≈fail = ≈fail
+≈-∸ℕ (suc o) (≈suc m≈n) = ≈-∸ℕ o (force m≈n)
 
 ≈-⊓ : ∀ {m n o p} → m ≈ n → o ≈ p → m ⊓ o ≈ n ⊓ p
-≈-⊓ zero zero = zero
-≈-⊓ zero fail = fail
-≈-⊓ zero (suc _) = zero
-≈-⊓ fail zero = fail
-≈-⊓ fail fail = fail
-≈-⊓ fail (suc _) = fail
-≈-⊓ (suc _) zero = zero
-≈-⊓ (suc _) fail = fail
-≈-⊓ (suc m≈n) (suc o≈p) = suc λ where .force → ≈-⊓ (force m≈n) (force o≈p)
+≈-⊓ ≈zero ≈zero = ≈zero
+≈-⊓ ≈zero ≈fail = ≈fail
+≈-⊓ ≈zero (≈suc _) = ≈zero
+≈-⊓ ≈fail ≈zero = ≈fail
+≈-⊓ ≈fail ≈fail = ≈fail
+≈-⊓ ≈fail (≈suc _) = ≈fail
+≈-⊓ (≈suc _) ≈zero = ≈zero
+≈-⊓ (≈suc _) ≈fail = ≈fail
+≈-⊓ (≈suc m≈n) (≈suc o≈p) = ≈suc λ where .force → ≈-⊓ (force m≈n) (force o≈p)
 
 ∸-+-assoc : ∀ m n o → m ∸ℕ n ∸ℕ o ≈ m ∸ℕ (n + o)
 ∸-+-assoc m zero o = ≈-refl
 ∸-+-assoc m (suc n) zero rewrite +-identityʳ n = ≈-refl
-∸-+-assoc zero (suc n) (suc o) = zero
-∸-+-assoc fail (suc n) (suc o) = fail
+∸-+-assoc zero (suc n) (suc o) = ≈zero
+∸-+-assoc fail (suc n) (suc o) = ≈fail
 ∸-+-assoc (suc m) (suc n) (suc o) = ∸-+-assoc (force m) n (suc o)
 
 ⊓-idem : ∀ n → n ⊓ n ≈ n
-⊓-idem zero = zero
-⊓-idem fail = fail
-⊓-idem (suc n) = suc λ where .force → ⊓-idem (force n)
+⊓-idem zero = ≈zero
+⊓-idem fail = ≈fail
+⊓-idem (suc n) = ≈suc λ where .force → ⊓-idem (force n)
 
 ⊓-∸ₗ : ∀ m n → (m ∸ℕ n) ⊓ m ≈ m ∸ℕ n
 ⊓-∸ₗ m zero = ⊓-idem m
-⊓-∸ₗ zero (suc n) = zero
-⊓-∸ₗ fail (suc n) = fail
+⊓-∸ₗ zero (suc n) = ≈zero
+⊓-∸ₗ fail (suc n) = ≈fail
 ⊓-∸ₗ (suc m) (suc n) = lem (⊓-∸ₗ (force m) n)
   where
     lem : ∀ {m n} → m ⊓ n ≈ m → m ⊓ suc (delay n) ≈ m
     lem {zero} {zero} p = p
     lem {fail} {zero} p = p
-    lem {zero} {fail} p = zero
+    lem {zero} {fail} p = ≈zero
     lem {fail} {fail} p = p
     lem {zero} {suc n} p = p
     lem {fail} {suc n} p = p
-    lem {suc m} {suc n} p = suc λ where .force → lem (force (≈suc-injective p))
+    lem {suc m} {suc n} p = ≈suc λ where .force → lem (force (≈suc-injective p))
 
 ⊓-∸ᵣ : ∀ m n → m ⊓ (m ∸ℕ n) ≈ m ∸ℕ n
 ⊓-∸ᵣ m zero = ⊓-idem m
-⊓-∸ᵣ zero (suc n) = zero
-⊓-∸ᵣ fail (suc n) = fail
+⊓-∸ᵣ zero (suc n) = ≈zero
+⊓-∸ᵣ fail (suc n) = ≈fail
 ⊓-∸ᵣ (suc m) (suc n) = lem (⊓-∸ᵣ (force m) n)
   where
     lem : ∀ {m n} → m ⊓ n ≈ n → suc (delay m) ⊓ n ≈ n
@@ -150,12 +147,12 @@ suc-inf = suc λ where .force → ≈-refl
     lem {fail} {fail} p = p
     lem {suc m} {zero} p = p
     lem {suc m} {fail} p = p
-    lem {suc m} {suc n} p = suc λ where .force → lem (force (≈suc-injective p))
+    lem {suc m} {suc n} p = ≈suc λ where .force → lem (force (≈suc-injective p))
 
 ∸ℕ-distribˡ-⊔-⊓ : ∀ m n o → m ∸ℕ (n ⊔ o) ≈ (m ∸ℕ n) ⊓ (m ∸ℕ o)
 ∸ℕ-distribˡ-⊔-⊓ m zero zero = ≈-sym (⊓-idem m)
 ∸ℕ-distribˡ-⊔-⊓ m zero (suc o) = ≈-sym (⊓-∸ᵣ m (suc o))
 ∸ℕ-distribˡ-⊔-⊓ m (suc n) zero = ≈-sym (⊓-∸ₗ m (suc n))
-∸ℕ-distribˡ-⊔-⊓ zero (suc n) (suc o) = zero
-∸ℕ-distribˡ-⊔-⊓ fail (suc n) (suc o) = fail
+∸ℕ-distribˡ-⊔-⊓ zero (suc n) (suc o) = ≈zero
+∸ℕ-distribˡ-⊔-⊓ fail (suc n) (suc o) = ≈fail
 ∸ℕ-distribˡ-⊔-⊓ (suc m) (suc n) (suc o) = ∸ℕ-distribˡ-⊔-⊓ (force m) n o

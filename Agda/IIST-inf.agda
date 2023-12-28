@@ -171,13 +171,13 @@ B-incremental (e ⊗ e') yws'≺yws =
 -- d-Incrementality of F⟦_⟧ and B⟦_⟧
 
 shift-colength : ∀ (x : A) xs → colength (shift x xs) Coℕˣ.≈ colength xs
-shift-colength x [] = zero
+shift-colength x [] = ≈zero
 shift-colength x fail = {!   !}
-shift-colength x (y ∷ xs) = suc λ where .force → shift-colength y (force xs)
+shift-colength x (y ∷ xs) = ≈suc λ where .force → shift-colength y (force xs)
 
 unshift-colength : ∀ {{_ : Eq A}} (x : A) xs → colength (unshift x xs) Coℕˣ.≈ (colength xs ∸ℕ 1)
-unshift-colength x [] = zero
-unshift-colength x fail = fail
+unshift-colength x [] = ≈zero
+unshift-colength x fail = ≈fail
 unshift-colength x (y ∷ xs) with x ≟ y
 ... | no _ = {!   !}
 ... | yes _ = Coℕˣ.≈-refl
@@ -186,11 +186,11 @@ F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
 F-delay (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
-    helper a [] = zero
-    helper a fail = fail
+    helper a [] = ≈zero
+    helper a fail = ≈fail
     helper a (x ∷ xs) with f a .to x
     ... | nothing = {!   !}
-    ... | just y = suc λ where .force → helper (g a x) (force xs)
+    ... | just y = ≈suc λ where .force → helper (g a x) (force xs)
 F-delay (delay x) = shift-colength x
 F-delay (hasten x) = unshift-colength x
 F-delay (e ⟫ e') xs =
@@ -216,11 +216,11 @@ B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
 B-delay (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
-    helper a [] = zero
-    helper a fail = fail
+    helper a [] = ≈zero
+    helper a fail = ≈fail
     helper a (y ∷ ys) with f a .from y
     ... | nothing = {!   !}
-    ... | just x = suc λ where .force → helper (g a x) (force ys)
+    ... | just x = ≈suc λ where .force → helper (g a x) (force ys)
 B-delay (delay x) = unshift-colength x
 B-delay (hasten x) = shift-colength x
 B-delay (e ⟫ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
@@ -307,6 +307,22 @@ B-IIST (e ⊗ e') yws =
       ih' = B-IIST e' (unzipᵣ yws)
    in {!   !}
 
+{-
+
+delay : failが未来に送られる
+hasten : 失敗する
+map-fold : 失敗する
+
+ih   : B⟦ e ⟧  (F⟦ e ⟧ (unzipₗ yws)) ≺ unzipₗ yws
+ih'  : B⟦ e' ⟧ (F⟦ e' ⟧ (unzipᵣ yws)) ≺ unzipᵣ yws
+goal :
+  zip
+    (B⟦ e ⟧  (unzipₗ (zip (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))))
+    (B⟦ e' ⟧ (unzipᵣ (zip (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))))
+  ≺ yws
+
+-}
+
 --------------------------------------------------------------------------------
 -- Bundles
 
@@ -348,15 +364,15 @@ B-d-d'-IIST e = record
 -- Properties of I⟦_⟧
 
 ≈-shift : ∀ (x : A) {xs ys} → xs Colistˣ.≈ ys → shift x xs Colistˣ.≈ shift x ys
-≈-shift x [] = []
-≈-shift x fail = refl ∷ λ where .force → fail
-≈-shift x (refl ∷ xs≈ys) = refl ∷ λ where .force → ≈-shift _ (force xs≈ys)
+≈-shift x ≈[] = ≈[]
+≈-shift x ≈fail = refl ≈∷ λ where .force → ≈fail
+≈-shift x (refl ≈∷ xs≈ys) = refl ≈∷ λ where .force → ≈-shift _ (force xs≈ys)
 
 ≈-unshift : ∀ {{_ : Eq A}} (x : A) {xs ys} → xs Colistˣ.≈ ys → unshift x xs Colistˣ.≈ unshift x ys
-≈-unshift x [] = []
-≈-unshift x fail = fail
-≈-unshift x (_∷_ {y = y} refl xs≈ys) with x ≟ y
-... | no _ = fail
+≈-unshift x ≈[] = ≈[]
+≈-unshift x ≈fail = ≈fail
+≈-unshift x (_≈∷_ {y = y} refl xs≈ys) with x ≟ y
+... | no _ = ≈fail
 ... | yes _ = force xs≈ys
 
 F-≈ : ∀ (e : E X Y) {xs ys : Colistˣ X}
@@ -367,11 +383,11 @@ F-≈ {X = X} (map-fold {A} a f g) = helper a
     helper : (a : A) {xs ys : Colistˣ X}
       → xs Colistˣ.≈ ys
       → F⟦ map-fold a f g ⟧ xs Colistˣ.≈ F⟦ map-fold a f g ⟧ ys
-    helper a [] = []
-    helper a fail = fail
-    helper a (_∷_ {x = x} refl xs≈ys) with f a .to x
-    ... | nothing = fail
-    ... | just y = refl ∷ λ where .force → helper (g a x) (force xs≈ys)
+    helper a ≈[] = ≈[]
+    helper a ≈fail = ≈fail
+    helper a (_≈∷_ {x = x} refl xs≈ys) with f a .to x
+    ... | nothing = ≈fail
+    ... | just y = refl ≈∷ λ where .force → helper (g a x) (force xs≈ys)
 F-≈ (delay x) = ≈-shift x
 F-≈ (hasten x) = ≈-unshift x
 F-≈ (e ⟫ e') = F-≈ e' ∘ F-≈ e
@@ -385,11 +401,11 @@ B-≈ {Y = Y} (map-fold {A} a f g) = helper a
     helper : (a : A) {xs ys : Colistˣ Y}
       → xs Colistˣ.≈ ys
       → B⟦ map-fold a f g ⟧ xs Colistˣ.≈ B⟦ map-fold a f g ⟧ ys
-    helper a [] = []
-    helper a fail = fail
-    helper a (_∷_ {x = y} refl xs≈ys) with f a .from y
-    ... | nothing = fail
-    ... | just x = refl ∷ λ where .force → helper (g a x) (force xs≈ys)
+    helper a ≈[] = ≈[]
+    helper a ≈fail = ≈fail
+    helper a (_≈∷_ {x = y} refl xs≈ys) with f a .from y
+    ... | nothing = ≈fail
+    ... | just x = refl ≈∷ λ where .force → helper (g a x) (force xs≈ys)
 B-≈ (delay x) = ≈-unshift x
 B-≈ (hasten x) = ≈-shift x
 B-≈ (e ⟫ e') = B-≈ e ∘ B-≈ e'
@@ -401,12 +417,12 @@ F∘I≡B {Y = Y} (map-fold {A} a f g) = helper refl
   where
     helper : ∀ {a a' : A} → a ≡ a' → (ys : Colistˣ Y)
       → F⟦ I⟦ map-fold a f g ⟧ ⟧ ys Colistˣ.≈ B⟦ map-fold a' f g ⟧ ys
-    helper _ [] = []
-    helper _ fail = fail
+    helper _ [] = ≈[]
+    helper _ fail = ≈fail
     helper {a} refl (y ∷ ys) with f a .from y in eq
-    ... | nothing = fail
+    ... | nothing = ≈fail
     ... | just x =
-          refl ∷ λ where .force → helper (cong (maybe (g a) a) eq) (force ys)
+          refl ≈∷ λ where .force → helper (cong (maybe (g a) a) eq) (force ys)
 F∘I≡B (delay x) ys = Colistˣ.≈-refl
 F∘I≡B (hasten x) ys = Colistˣ.≈-refl
 F∘I≡B (e ⟫ e') ys =
@@ -424,12 +440,12 @@ B∘I≡F {X = X} (map-fold {A} a f g) = helper refl
   where
     helper : ∀ {a a' : A} → a ≡ a' → (xs : Colistˣ X)
       → B⟦ I⟦ map-fold a f g ⟧ ⟧ xs Colistˣ.≈ F⟦ map-fold a' f g ⟧ xs
-    helper _ [] = []
-    helper _ fail = fail
+    helper _ [] = ≈[]
+    helper _ fail = ≈fail
     helper {a} refl (x ∷ xs) with f a .to x in eq
-    ... | nothing = fail
+    ... | nothing = ≈fail
     ... | just y =
-          refl ∷ λ where
+          refl ≈∷ λ where
             .force → helper (cong (maybe (g a) a) (f a .to→from eq)) (force xs)
 B∘I≡F (delay x) xs = Colistˣ.≈-refl
 B∘I≡F (hasten x) xs = Colistˣ.≈-refl
