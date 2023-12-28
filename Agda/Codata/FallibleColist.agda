@@ -4,9 +4,11 @@ module Codata.FallibleColist where
 
 open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Nat.Base using ( ℕ; zero; suc )
+open import Relation.Binary.Bundles using ( Setoid )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans )
+open import Relation.Binary.Structures using ( IsEquivalence )
 
-open import Codata.FallibleConat using ( Coℕˣ; zero; fail; suc; force )
+open import Codata.FallibleConat as Coℕˣ using ( Coℕˣ; zero; fail; suc; force; _⊓_ )
 
 private
   variable
@@ -63,6 +65,29 @@ unzipₗ = map proj₁
 unzipᵣ : Colistˣ (A × B) → Colistˣ B
 unzipᵣ = map proj₂
 
+colength-map : ∀ (f : A → B) xs → colength (map f xs) Coℕˣ.≈ colength xs
+colength-map f [] = zero
+colength-map f fail = fail
+colength-map f (x ∷ xs) = suc λ where .force → colength-map f (force xs)
+
+colength-zip : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
+  → colength (zip xs ys) Coℕˣ.≈ (colength xs ⊓ colength ys)
+colength-zip {xs = []} {[]} = zero
+colength-zip {xs = []} {fail} = fail
+colength-zip {xs = []} {_ ∷ _} = zero
+colength-zip {xs = fail} {[]} = fail
+colength-zip {xs = fail} {fail} = fail
+colength-zip {xs = fail} {_ ∷ _} = fail
+colength-zip {xs = _ ∷ _} {[]} = zero
+colength-zip {xs = _ ∷ _} {fail} = fail
+colength-zip {xs = x ∷ xs} {y ∷ ys} = suc λ where .force → colength-zip
+
+colength-unzipₗ : ∀ {xs : Colistˣ (A × B)} → colength (unzipₗ xs) Coℕˣ.≈ colength xs
+colength-unzipₗ = colength-map _ _
+
+colength-unzipᵣ : ∀ {xs : Colistˣ (A × B)} → colength (unzipᵣ xs) Coℕˣ.≈ colength xs
+colength-unzipᵣ = colength-map _ _
+
 --------------------------------------------------------------------------------
 -- No Fail
 
@@ -95,6 +120,8 @@ noFail-zip (x ∷ xs) (y ∷ ys) =
 --------------------------------------------------------------------------------
 -- Bisimulation
 
+infix 4 _≈_ _∞≈_
+
 mutual
 
   data _≈_ {A : Set} : Colistˣ A → Colistˣ A → Set where
@@ -124,6 +151,17 @@ open _∞≈_ public
 ≈-trans (x≡y ∷ xs≈ys) (y≡z ∷ ys≈zs) =
   trans x≡y y≡z ∷ λ where .force → ≈-trans (force xs≈ys) (force ys≈zs)
 
+
+≈-isEquivalence : ∀ {A} → IsEquivalence {A = Colistˣ A} _≈_
+≈-isEquivalence = record
+  { refl = ≈-refl
+  ; sym = ≈-sym
+  ; trans = ≈-trans
+  }
+
+≈-setoid : ∀ {A} → Setoid _ _
+≈-setoid {A} = record { isEquivalence = ≈-isEquivalence {A} }
+
 ≈-map : ∀ {xs xs' : Colistˣ A} (f : A → B)
   → xs ≈ xs'
   → map f xs ≈ map f xs'
@@ -152,6 +190,8 @@ open _∞≈_ public
 
 -------------------------------------------------------------------------------
 -- Prefix
+
+infix 4 _≺_ _∞≺_
 
 mutual
 

@@ -134,6 +134,9 @@ B-empty (hasten x) = refl
 B-empty (e ⟫ e') rewrite B-empty e' | B-empty e = refl
 B-empty (e ⊗ e') rewrite B-empty e | B-empty e' = refl
 
+--------------------------------------------------------------------------------
+-- Incrementality of F⟦_⟧ and B⟦_⟧
+
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
 F-incremental (map-fold {A} a f g) = helper a
   where
@@ -165,6 +168,7 @@ B-incremental (e ⊗ e') yws'≺yws =
   ≺-zip (B-incremental e (≺-unzipₗ yws'≺yws)) (B-incremental e' (≺-unzipᵣ yws'≺yws))
 
 --------------------------------------------------------------------------------
+-- d-Incrementality of F⟦_⟧ and B⟦_⟧
 
 shift-colength : ∀ (x : A) xs → colength (shift x xs) Coℕˣ.≈ colength xs
 shift-colength x [] = zero
@@ -200,14 +204,20 @@ F-delay (e ⟫ e') xs =
 F-delay (e ⊗ e') xzs =
   let ih = F-delay e (unzipₗ xzs)
       ih' = F-delay e' (unzipᵣ xzs)
-   in {!   !}
+   in Coℕˣ.≈-trans
+        (Coℕˣ.≈-trans
+          colength-zip
+          (≈-⊓
+            (Coℕˣ.≈-trans ih (≈-∸ℕ DF⟦ e ⟧ colength-unzipₗ))
+            (Coℕˣ.≈-trans ih' (≈-∸ℕ DF⟦ e' ⟧ colength-unzipᵣ))))
+        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength xzs) DF⟦ e ⟧ DF⟦ e' ⟧))
 
 B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
 B-delay (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
     helper a [] = zero
-    helper a fail = {!   !}
+    helper a fail = fail
     helper a (y ∷ ys) with f a .from y
     ... | nothing = {!   !}
     ... | just x = suc λ where .force → helper (g a x) (force ys)
@@ -224,9 +234,16 @@ B-delay (e ⟫ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
 B-delay (e ⊗ e') yws =
   let ih = B-delay e (unzipₗ yws)
       ih' = B-delay e' (unzipᵣ yws)
-   in {!   !}
+   in Coℕˣ.≈-trans
+        (Coℕˣ.≈-trans
+          colength-zip
+          (≈-⊓
+            (Coℕˣ.≈-trans ih (≈-∸ℕ DB⟦ e ⟧ colength-unzipₗ))
+            (Coℕˣ.≈-trans ih' (≈-∸ℕ DB⟦ e' ⟧ colength-unzipᵣ))))
+        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength yws) DB⟦ e ⟧ DB⟦ e' ⟧))
 
 --------------------------------------------------------------------------------
+-- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (map-fold {A} a f g) = helper a
@@ -288,8 +305,10 @@ B-IIST (e ⟫ e') zs =
 B-IIST (e ⊗ e') yws =
   let ih = B-IIST e (unzipₗ yws)
       ih' = B-IIST e' (unzipᵣ yws)
-      lem = ≺-zip ih ih'
    in {!   !}
+
+--------------------------------------------------------------------------------
+-- Bundles
 
 F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
 F-d-IST e = record
@@ -326,6 +345,7 @@ B-d-d'-IIST e = record
   }
 
 --------------------------------------------------------------------------------
+-- Properties of I⟦_⟧
 
 ≈-shift : ∀ (x : A) {xs ys} → xs Colistˣ.≈ ys → shift x xs Colistˣ.≈ shift x ys
 ≈-shift x [] = []
