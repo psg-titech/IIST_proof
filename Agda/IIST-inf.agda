@@ -74,7 +74,9 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
     hasDelay : HasDelay d st
 
 _IsIISTOf_ : ST X Y → ST Y X → Set
-st' IsIISTOf st = ∀ xs → st' (st xs) ≺ xs
+st' IsIISTOf st = ∀ {xs}
+  → Colistˣ.NoFail (st xs)
+  → st' (st xs) ≺ xs
 
 record _Is_-IISTOf_ (st' : ST X Y) (d : ℕ) (st : ST Y X) : Set where
   field
@@ -245,73 +247,105 @@ B-delay (e ⊗ e') yws =
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
+zip-input-noFailₗ : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
+  → NoFail (zip xs ys)
+  → NoFail xs
+zip-input-noFailₗ {xs = []} {ys} nf = []
+zip-input-noFailₗ {xs = x ∷ xs} {[]} nf = {!   !}
+zip-input-noFailₗ {xs = x ∷ xs} {x₁ ∷ x₂} nf = {!   !}
+
+shift-input-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (shift x xs) → NoFail xs
+shift-input-noFail x {[]} [] = []
+shift-input-noFail x {fail} (.x ∷ nf) with () ← force nf
+shift-input-noFail x {y ∷ xs} (.x ∷ nf) = y ∷ λ where .force → shift-input-noFail y (force nf)
+
+unshift-input-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (unshift x xs) → NoFail xs
+unshift-input-noFail x {[]} [] = []
+unshift-input-noFail x {y ∷ xs} nf with x ≟ y
+unshift-input-noFail x {y ∷ xs} () | no _
+unshift-input-noFail x {y ∷ xs} nf | yes refl = x ∷ λ where .force → nf
+
+F-input-noFail : ∀ (e : E X Y) {xs} → NoFail (F⟦ e ⟧ xs) → NoFail xs
+F-input-noFail (map-fold {A} a f g) = helper a
+  where
+    helper : ∀ (a : A) {ys} → NoFail (F⟦ map-fold a f g ⟧ ys) → NoFail ys
+    helper a {[]} [] = []
+    helper a {x ∷ xs} nf with f a .to x
+    helper a {x ∷ xs} () | nothing
+    helper a {x ∷ xs} (.y ∷ nf) | just y = x ∷ λ where .force → helper (g a x) (force nf)
+F-input-noFail (delay x) = shift-input-noFail x
+F-input-noFail (hasten x) = unshift-input-noFail x
+F-input-noFail (e ⟫ e') = F-input-noFail e ∘ F-input-noFail e'
+F-input-noFail (e ⊗ e') {yzs} nf = {!   !}
+
+B-input-noFail : ∀ (e : E X Y) {ys} → NoFail (B⟦ e ⟧ ys) → NoFail ys
+B-input-noFail (map-fold {A} a f g) = helper a
+  where
+    helper : ∀ (a : A) {ys} → NoFail (B⟦ map-fold a f g ⟧ ys) → NoFail ys
+    helper a {[]} [] = []
+    helper a {y ∷ ys} nf with f a .from y
+    helper a {y ∷ ys} () | nothing
+    helper a {y ∷ ys} (.x ∷ nf) | just x = y ∷ λ where .force → helper (g a x) (force nf)
+B-input-noFail (delay x) = unshift-input-noFail x
+B-input-noFail (hasten x) = shift-input-noFail x
+B-input-noFail (e ⟫ e') = B-input-noFail e' ∘ B-input-noFail e
+B-input-noFail (e ⊗ e') {yzs} nf = {!   !}
+
+shift-IIST : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
+shift-IIST x {[]} nf = []
+shift-IIST x {y ∷ xs} nf with x ≟ y
+shift-IIST x {y ∷ xs} () | no _
+shift-IIST x {y ∷ xs} nf | yes refl = shift-≺-∷ x (force xs)
+
+unshift-IIST : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf shift x
+unshift-IIST x {[]} nf = []
+unshift-IIST x {fail} nf with x ≟ x
+unshift-IIST x {fail} nf | no contra with () ← contra refl
+unshift-IIST x {fail} nf | yes refl = fail
+unshift-IIST x {y ∷ xs} nf with x ≟ x
+unshift-IIST x {y ∷ xs} nf | no contra with () ← contra refl
+unshift-IIST x {y ∷ xs} nf | yes refl = shift-≺-∷ y (force xs)
+
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (map-fold {A} a f g) = helper a
   where
     helper : (a : A) → F⟦ map-fold a f g ⟧ IsIISTOf B⟦ map-fold a f g ⟧
-    helper a [] = []
-    helper a fail = fail
-    helper a (y ∷ ys) with f a .from y in eq
-    ... | nothing = {!   !}
-    ... | just x rewrite f a .from→to eq =
-          y ∷ λ where .force → helper (g a x) (force ys)
-F-IIST (delay x) [] = []
-F-IIST (delay x) fail = {!   !}
-F-IIST (delay x) (y ∷ ys) with x ≟ y
-... | no _ = {!   !}
-... | yes refl = shift-≺-∷ y (force ys)
-F-IIST (hasten x) [] = []
-F-IIST (hasten x) fail with x ≟ x
-... | no _ = fail
-... | yes _ = fail
-F-IIST (hasten x) (y ∷ ys) with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = shift-≺-∷ y (force ys)
-F-IIST (e ⟫ e') zs =
-  let ih = F-IIST e (B⟦ e' ⟧ zs)
-      ih' = F-IIST e' zs
+    helper a {[]} nf = []
+    helper a {y ∷ ys} nf with f a .from y in eq
+    helper a {y ∷ ys} () | nothing
+    helper a {y ∷ ys} (_ ∷ nf) | just x rewrite f a .from→to eq =
+      y ∷ λ where .force → helper (g a x) (force nf)
+F-IIST (delay x) = shift-IIST x
+F-IIST (hasten x) = unshift-IIST x
+F-IIST (e ⟫ e') nf =
+  let ih = F-IIST e nf
+      ih' = F-IIST e' (B-input-noFail e nf)
    in ≺-trans (F-incremental e' ih) ih'
-F-IIST (e ⊗ e') yws =
-  let ih = F-IIST e (unzipₗ yws)
-      ih' = F-IIST e' (unzipᵣ yws)
-   in {!   !}
+F-IIST (e ⊗ e') = {!   !}
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (map-fold {A} a f g) = helper a
   where
     helper : (a : A) → B⟦ map-fold a f g ⟧ IsIISTOf F⟦ map-fold a f g ⟧
-    helper a [] = []
-    helper a fail = fail
-    helper a (x ∷ xs) with f a .to x in eq
-    ... | nothing = {!   !}
-    ... | just y rewrite f a .to→from eq =
-          x ∷ λ where .force → helper (g a x) (force xs)
-B-IIST (delay x) [] = []
-B-IIST (delay x) fail with x ≟ x
-... | no _ = fail
-... | yes _ = fail
-B-IIST (delay x) (y ∷ ys) with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = shift-≺-∷ y (force ys)
-B-IIST (hasten x) [] = []
-B-IIST (hasten x) fail = {!   !}
-B-IIST (hasten x) (y ∷ ys) with x ≟ y
-... | no _ = {!   !}
-... | yes refl = shift-≺-∷ y (force ys)
-B-IIST (e ⟫ e') zs =
-  let ih = B-IIST e' (F⟦ e ⟧ zs)
-      ih' = B-IIST e zs
+    helper a {[]} nf = []
+    helper a {x ∷ xs} nf with f a .to x in eq
+    helper a {x ∷ xs} () | nothing
+    helper a {x ∷ xs} (_ ∷ nf) | just y rewrite f a .to→from eq =
+      x ∷ λ where .force → helper (g a x) (force nf)
+B-IIST (delay x) = unshift-IIST x
+B-IIST (hasten x) = shift-IIST x
+B-IIST (e ⟫ e') {zs} nf =
+  let ih = B-IIST e' nf
+      ih' = B-IIST e (F-input-noFail e' nf)
    in ≺-trans (B-incremental e ih) ih'
-B-IIST (e ⊗ e') yws =
-  let ih = B-IIST e (unzipₗ yws)
-      ih' = B-IIST e' (unzipᵣ yws)
-   in {!   !}
+B-IIST (e ⊗ e') = {!   !}
 
 {-
 
 delay : failが未来に送られる
 hasten : 失敗する
 map-fold : 失敗する
+_⊕_ : 長い方に失敗があっても短い方とzipすることで失敗しなくなる
 
 ih   : B⟦ e ⟧  (F⟦ e ⟧ (unzipₗ yws)) ≺ unzipₗ yws
 ih'  : B⟦ e' ⟧ (F⟦ e' ⟧ (unzipᵣ yws)) ≺ unzipᵣ yws
@@ -340,25 +374,25 @@ B-d-IST e = record
   ; hasDelay = B-delay e
   }
 
-F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
-F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
+-- F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
+-- F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
 
-B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
-B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
+-- B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
+-- B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
 
-F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
-F-d-d'-IIST e = record
-  { inverse = B⟦ e ⟧
-  ; is-d-IST = F-d-IST e
-  ; inverse-is-d'-IIST = B-d-IIST e
-  }
+-- F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
+-- F-d-d'-IIST e = record
+--   { inverse = B⟦ e ⟧
+--   ; is-d-IST = F-d-IST e
+--   ; inverse-is-d'-IIST = B-d-IIST e
+--   }
 
-B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
-B-d-d'-IIST e = record
-  { inverse = F⟦ e ⟧
-  ; is-d-IST = B-d-IST e
-  ; inverse-is-d'-IIST = F-d-IIST e
-  }
+-- B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
+-- B-d-d'-IIST e = record
+--   { inverse = F⟦ e ⟧
+--   ; is-d-IST = B-d-IST e
+--   ; inverse-is-d'-IIST = F-d-IIST e
+--   }
 
 --------------------------------------------------------------------------------
 -- Properties of I⟦_⟧
