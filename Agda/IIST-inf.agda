@@ -247,49 +247,61 @@ B-delay (e ⊗ e') yws =
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
-zip-input-noFailₗ : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
+map-arg-noFail : ∀ (f : A → B) {xs : Colistˣ A}
+  → NoFail (map f xs)
+  → NoFail xs
+map-arg-noFail f {[]} [] = []
+map-arg-noFail f {x ∷ xs} (.(f x) ∷ nf) = x ∷ λ where .force → map-arg-noFail f (force nf)
+
+unzipₗ-arg-noFail : ∀ {xzs : Colistˣ (A × B)} → NoFail (unzipₗ xzs) → NoFail xzs
+unzipₗ-arg-noFail = map-arg-noFail proj₁
+
+unzipᵣ-arg-noFail : ∀ {xzs : Colistˣ (A × B)} → NoFail (unzipᵣ xzs) → NoFail xzs
+unzipᵣ-arg-noFail = map-arg-noFail proj₂
+
+zip-arg-noFailₗ : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
   → NoFail (zip xs ys)
   → NoFail xs
-zip-input-noFailₗ {xs = []} {ys} nf = []
-zip-input-noFailₗ {xs = x ∷ xs} {[]} nf = {!   !}
-zip-input-noFailₗ {xs = x ∷ xs} {x₁ ∷ x₂} nf = {!   !}
+zip-arg-noFailₗ {xs = []} {ys} nf = []
+zip-arg-noFailₗ {xs = x ∷ xs} {[]} nf = {!   !}
+zip-arg-noFailₗ {xs = x ∷ xs} {x₁ ∷ x₂} nf = {!   !}
 
-shift-input-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (shift x xs) → NoFail xs
-shift-input-noFail x {[]} [] = []
-shift-input-noFail x {fail} (.x ∷ nf) with () ← force nf
-shift-input-noFail x {y ∷ xs} (.x ∷ nf) = y ∷ λ where .force → shift-input-noFail y (force nf)
+shift-arg-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (shift x xs) → NoFail xs
+shift-arg-noFail x {[]} [] = []
+shift-arg-noFail x {fail} (.x ∷ nf) with () ← force nf
+shift-arg-noFail x {y ∷ xs} (.x ∷ nf) = y ∷ λ where .force → shift-arg-noFail y (force nf)
 
-unshift-input-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (unshift x xs) → NoFail xs
-unshift-input-noFail x {[]} [] = []
-unshift-input-noFail x {y ∷ xs} nf with x ≟ y
-unshift-input-noFail x {y ∷ xs} () | no _
-unshift-input-noFail x {y ∷ xs} nf | yes refl = x ∷ λ where .force → nf
+unshift-arg-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (unshift x xs) → NoFail xs
+unshift-arg-noFail x {[]} [] = []
+unshift-arg-noFail x {y ∷ xs} nf with x ≟ y
+unshift-arg-noFail x {y ∷ xs} () | no _
+unshift-arg-noFail x {y ∷ xs} nf | yes refl = x ∷ λ where .force → nf
 
-F-input-noFail : ∀ (e : E X Y) {xs} → NoFail (F⟦ e ⟧ xs) → NoFail xs
-F-input-noFail (map-fold {A} a f g) = helper a
+F-arg-noFail : ∀ (e : E X Y) {xs} → NoFail (F⟦ e ⟧ xs) → NoFail xs
+F-arg-noFail (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) {ys} → NoFail (F⟦ map-fold a f g ⟧ ys) → NoFail ys
     helper a {[]} [] = []
     helper a {x ∷ xs} nf with f a .to x
     helper a {x ∷ xs} () | nothing
     helper a {x ∷ xs} (.y ∷ nf) | just y = x ∷ λ where .force → helper (g a x) (force nf)
-F-input-noFail (delay x) = shift-input-noFail x
-F-input-noFail (hasten x) = unshift-input-noFail x
-F-input-noFail (e ⟫ e') = F-input-noFail e ∘ F-input-noFail e'
-F-input-noFail (e ⊗ e') {yzs} nf = {!   !}
+F-arg-noFail (delay x) = shift-arg-noFail x
+F-arg-noFail (hasten x) = unshift-arg-noFail x
+F-arg-noFail (e ⟫ e') = F-arg-noFail e ∘ F-arg-noFail e'
+F-arg-noFail (e ⊗ e') {yzs} nf = {!   !}
 
-B-input-noFail : ∀ (e : E X Y) {ys} → NoFail (B⟦ e ⟧ ys) → NoFail ys
-B-input-noFail (map-fold {A} a f g) = helper a
+B-arg-noFail : ∀ (e : E X Y) {ys} → NoFail (B⟦ e ⟧ ys) → NoFail ys
+B-arg-noFail (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) {ys} → NoFail (B⟦ map-fold a f g ⟧ ys) → NoFail ys
     helper a {[]} [] = []
     helper a {y ∷ ys} nf with f a .from y
     helper a {y ∷ ys} () | nothing
     helper a {y ∷ ys} (.x ∷ nf) | just x = y ∷ λ where .force → helper (g a x) (force nf)
-B-input-noFail (delay x) = unshift-input-noFail x
-B-input-noFail (hasten x) = shift-input-noFail x
-B-input-noFail (e ⟫ e') = B-input-noFail e' ∘ B-input-noFail e
-B-input-noFail (e ⊗ e') {yzs} nf = {!   !}
+B-arg-noFail (delay x) = unshift-arg-noFail x
+B-arg-noFail (hasten x) = shift-arg-noFail x
+B-arg-noFail (e ⟫ e') = B-arg-noFail e' ∘ B-arg-noFail e
+B-arg-noFail (e ⊗ e') {yzs} nf = {!   !}
 
 shift-IIST : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
 shift-IIST x {[]} nf = []
@@ -319,7 +331,7 @@ F-IIST (delay x) = shift-IIST x
 F-IIST (hasten x) = unshift-IIST x
 F-IIST (e ⟫ e') nf =
   let ih = F-IIST e nf
-      ih' = F-IIST e' (B-input-noFail e nf)
+      ih' = F-IIST e' (B-arg-noFail e nf)
    in ≺-trans (F-incremental e' ih) ih'
 F-IIST (e ⊗ e') = {!   !}
 
@@ -336,7 +348,7 @@ B-IIST (delay x) = unshift-IIST x
 B-IIST (hasten x) = shift-IIST x
 B-IIST (e ⟫ e') {zs} nf =
   let ih = B-IIST e' nf
-      ih' = B-IIST e (F-input-noFail e' nf)
+      ih' = B-IIST e (F-arg-noFail e' nf)
    in ≺-trans (B-incremental e ih) ih'
 B-IIST (e ⊗ e') = {!   !}
 
@@ -374,25 +386,25 @@ B-d-IST e = record
   ; hasDelay = B-delay e
   }
 
--- F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
--- F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
+F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
+F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
 
--- B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
--- B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
+B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
+B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
 
--- F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
--- F-d-d'-IIST e = record
---   { inverse = B⟦ e ⟧
---   ; is-d-IST = F-d-IST e
---   ; inverse-is-d'-IIST = B-d-IIST e
---   }
+F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
+F-d-d'-IIST e = record
+  { inverse = B⟦ e ⟧
+  ; is-d-IST = F-d-IST e
+  ; inverse-is-d'-IIST = B-d-IIST e
+  }
 
--- B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
--- B-d-d'-IIST e = record
---   { inverse = F⟦ e ⟧
---   ; is-d-IST = B-d-IST e
---   ; inverse-is-d'-IIST = F-d-IIST e
---   }
+B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
+B-d-d'-IIST e = record
+  { inverse = F⟦ e ⟧
+  ; is-d-IST = B-d-IST e
+  ; inverse-is-d'-IIST = F-d-IIST e
+  }
 
 --------------------------------------------------------------------------------
 -- Properties of I⟦_⟧
