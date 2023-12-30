@@ -65,7 +65,9 @@ IsIncremental : ST X Y → Set
 IsIncremental st = ∀ {xs xs'} → xs' ≺ xs → st xs' ≺ st xs
 
 HasDelay : ℕ → ST X Y → Set
-HasDelay d st = ∀ xs → colength (st xs) Coℕˣ.≈ (colength xs ∸ℕ d)
+HasDelay d st = ∀ {xs}
+  → Colistˣ.NoFail (st xs)
+  → colength (st xs) Coℕˣ.≈ (colength xs ∸ℕ d)
 
 record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
   field
@@ -170,82 +172,7 @@ B-incremental (e ⊗ e') yws'≺yws =
   ≺-zip (B-incremental e (≺-unzipₗ yws'≺yws)) (B-incremental e' (≺-unzipᵣ yws'≺yws))
 
 --------------------------------------------------------------------------------
--- d-Incrementality of F⟦_⟧ and B⟦_⟧
-
-shift-colength : ∀ (x : A) xs → colength (shift x xs) Coℕˣ.≈ colength xs
-shift-colength x [] = ≈zero
-shift-colength x fail = {!   !}
-shift-colength x (y ∷ xs) = ≈suc λ where .force → shift-colength y (force xs)
-
-unshift-colength : ∀ {{_ : Eq A}} (x : A) xs → colength (unshift x xs) Coℕˣ.≈ (colength xs ∸ℕ 1)
-unshift-colength x [] = ≈zero
-unshift-colength x fail = ≈fail
-unshift-colength x (y ∷ xs) with x ≟ y
-... | no _ = {!   !}
-... | yes _ = Coℕˣ.≈-refl
-
-F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
-F-delay (map-fold {A} a f g) = helper a
-  where
-    helper : ∀ (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
-    helper a [] = ≈zero
-    helper a fail = ≈fail
-    helper a (x ∷ xs) with f a .to x
-    ... | nothing = {!   !}
-    ... | just y = ≈suc λ where .force → helper (g a x) (force xs)
-F-delay (delay x) = shift-colength x
-F-delay (hasten x) = unshift-colength x
-F-delay (e ⟫ e') xs =
-  let ih = F-delay e xs
-      ih' = F-delay e' (F⟦ e ⟧ xs)
-   in Coℕˣ.≈-trans
-        ih'
-        (Coℕˣ.≈-trans
-          (≈-∸ℕ DF⟦ e' ⟧ ih)
-          (∸-+-assoc (colength xs) DF⟦ e ⟧ DF⟦  e' ⟧))
-F-delay (e ⊗ e') xzs =
-  let ih = F-delay e (unzipₗ xzs)
-      ih' = F-delay e' (unzipᵣ xzs)
-   in Coℕˣ.≈-trans
-        (Coℕˣ.≈-trans
-          colength-zip
-          (≈-⊓
-            (Coℕˣ.≈-trans ih (≈-∸ℕ DF⟦ e ⟧ colength-unzipₗ))
-            (Coℕˣ.≈-trans ih' (≈-∸ℕ DF⟦ e' ⟧ colength-unzipᵣ))))
-        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength xzs) DF⟦ e ⟧ DF⟦ e' ⟧))
-
-B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
-B-delay (map-fold {A} a f g) = helper a
-  where
-    helper : ∀ (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
-    helper a [] = ≈zero
-    helper a fail = ≈fail
-    helper a (y ∷ ys) with f a .from y
-    ... | nothing = {!   !}
-    ... | just x = ≈suc λ where .force → helper (g a x) (force ys)
-B-delay (delay x) = unshift-colength x
-B-delay (hasten x) = shift-colength x
-B-delay (e ⟫ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
-  let ih = B-delay e' zs
-      ih' = B-delay e (B⟦ e' ⟧ zs)
-   in Coℕˣ.≈-trans
-        ih'
-        (Coℕˣ.≈-trans
-          (≈-∸ℕ DB⟦ e ⟧ ih)
-          (∸-+-assoc (colength zs) DB⟦ e' ⟧ DB⟦  e ⟧))
-B-delay (e ⊗ e') yws =
-  let ih = B-delay e (unzipₗ yws)
-      ih' = B-delay e' (unzipᵣ yws)
-   in Coℕˣ.≈-trans
-        (Coℕˣ.≈-trans
-          colength-zip
-          (≈-⊓
-            (Coℕˣ.≈-trans ih (≈-∸ℕ DB⟦ e ⟧ colength-unzipₗ))
-            (Coℕˣ.≈-trans ih' (≈-∸ℕ DB⟦ e' ⟧ colength-unzipᵣ))))
-        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength yws) DB⟦ e ⟧ DB⟦ e' ⟧))
-
---------------------------------------------------------------------------------
--- F⟦_⟧ and B⟦_⟧ are inverse of each other
+-- No fail
 
 map-arg-noFail : ∀ (f : A → B) {xs : Colistˣ A}
   → NoFail (map f xs)
@@ -259,12 +186,12 @@ unzipₗ-arg-noFail = map-arg-noFail proj₁
 unzipᵣ-arg-noFail : ∀ {xzs : Colistˣ (A × B)} → NoFail (unzipᵣ xzs) → NoFail xzs
 unzipᵣ-arg-noFail = map-arg-noFail proj₂
 
-zip-arg-noFailₗ : ∀ {xs : Colistˣ A} {ys : Colistˣ B}
-  → NoFail (zip xs ys)
-  → NoFail xs
-zip-arg-noFailₗ {xs = []} {ys} nf = []
-zip-arg-noFailₗ {xs = x ∷ xs} {[]} nf = {!   !}
-zip-arg-noFailₗ {xs = x ∷ xs} {x₁ ∷ x₂} nf = {!   !}
+unzip-zip-arg-noFail : ∀ {xzs : Colistˣ (X × Z)} {st : ST X Y} {st' : ST Z W}
+  → (∀ {xs : Colistˣ X} → NoFail (st xs) → NoFail xs)
+  → (∀ {zs : Colistˣ Z} → NoFail (st' zs) → NoFail zs)
+  → NoFail (zip (st (unzipₗ xzs)) (st' (unzipᵣ xzs)))
+  → NoFail xzs
+unzip-zip-arg-noFail = {!   !}
 
 shift-arg-noFail : ∀ {{_ : Eq X}} (x : X) {xs} → NoFail (shift x xs) → NoFail xs
 shift-arg-noFail x {[]} [] = []
@@ -288,7 +215,7 @@ F-arg-noFail (map-fold {A} a f g) = helper a
 F-arg-noFail (delay x) = shift-arg-noFail x
 F-arg-noFail (hasten x) = unshift-arg-noFail x
 F-arg-noFail (e ⟫ e') = F-arg-noFail e ∘ F-arg-noFail e'
-F-arg-noFail (e ⊗ e') {yzs} nf = {!   !}
+F-arg-noFail (e ⊗ e') = unzip-zip-arg-noFail (F-arg-noFail e) (F-arg-noFail e')
 
 B-arg-noFail : ∀ (e : E X Y) {ys} → NoFail (B⟦ e ⟧ ys) → NoFail ys
 B-arg-noFail (map-fold {A} a f g) = helper a
@@ -301,7 +228,66 @@ B-arg-noFail (map-fold {A} a f g) = helper a
 B-arg-noFail (delay x) = unshift-arg-noFail x
 B-arg-noFail (hasten x) = shift-arg-noFail x
 B-arg-noFail (e ⟫ e') = B-arg-noFail e' ∘ B-arg-noFail e
-B-arg-noFail (e ⊗ e') {yzs} nf = {!   !}
+B-arg-noFail (e ⊗ e') = unzip-zip-arg-noFail (B-arg-noFail e) (B-arg-noFail e')
+
+--------------------------------------------------------------------------------
+-- d-Incrementality of F⟦_⟧ and B⟦_⟧
+
+shift-colength : ∀ (x : A) {xs} (nf : NoFail (shift x xs))
+  → colength (shift x xs) Coℕˣ.≈ colength xs
+shift-colength x {[]} [] = ≈zero
+shift-colength x {fail} (.x ∷ nf) with () ← force nf
+shift-colength x {y ∷ _} (.x ∷ nf) = ≈suc λ where .force → shift-colength y (force nf)
+
+unshift-colength : ∀ {{_ : Eq A}} (x : A) {xs} (nf : NoFail (unshift x xs))
+  → colength (unshift x xs) Coℕˣ.≈ colength xs ∸ℕ 1
+unshift-colength x {[]} nf = ≈zero
+unshift-colength x {y ∷ xs} nf with x ≟ y
+unshift-colength x {y ∷ xs} () | no _
+unshift-colength x {y ∷ xs} nf | yes _ = Coℕˣ.≈-refl
+
+F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
+F-delay (map-fold {A} a f g) = helper a
+  where
+    helper : ∀ (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
+    helper a {[]} nf = ≈zero
+    helper a {x ∷ xs} nf with f a .to x
+    helper a {x ∷ xs} () | nothing
+    helper a {x ∷ xs} (.y ∷ nf) | just y = ≈suc λ where .force → helper (g a x) (force nf)
+F-delay (delay x) = shift-colength x
+F-delay (hasten x) {xs} = unshift-colength x {xs}
+F-delay (e ⟫ e') nf =
+  let ih = F-delay e (F-arg-noFail e' nf)
+      ih' = F-delay e' nf
+  in Coℕˣ.≈-trans
+       ih'
+       (Coℕˣ.≈-trans
+         (≈-∸ℕ DF⟦ e' ⟧ ih)
+         (∸-+-assoc _ DF⟦ e ⟧ DF⟦  e' ⟧))
+F-delay (e ⊗ e') nf = {!   !}
+
+B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
+B-delay (map-fold {A} a f g) = helper a
+  where
+    helper : ∀ (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
+    helper a {[]} nf = ≈zero
+    helper a {y ∷ ys} nf with f a .from y
+    helper a {y ∷ ys} () | nothing
+    helper a {y ∷ ys} (.x ∷ nf) | just x = ≈suc λ where .force → helper (g a x) (force nf)
+B-delay (delay x) {xs} = unshift-colength x {xs}
+B-delay (hasten x) = shift-colength x
+B-delay (e ⟫ e') nf =
+  let ih = B-delay e' (B-arg-noFail e nf)
+      ih' = B-delay e nf
+  in Coℕˣ.≈-trans
+       ih'
+       (Coℕˣ.≈-trans
+         (≈-∸ℕ DB⟦ e ⟧ ih)
+         (∸-+-assoc _ DB⟦ e' ⟧ DB⟦  e ⟧))
+B-delay (e ⊗ e') nf = {!   !}
+
+--------------------------------------------------------------------------------
+-- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
 shift-IIST : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
 shift-IIST x {[]} nf = []
