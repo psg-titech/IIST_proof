@@ -6,7 +6,7 @@ open import Data.Maybe.Base as Maybe using ( Maybe; just; nothing )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_; NonZero )
 open import Data.Nat.Properties using ( +-suc; +-identityʳ; ⊔-identityʳ; +-comm )
 open import Data.List.Base using ( List; []; _∷_ )
-open import Data.Product.Base using ( _×_; _,_ )
+open import Data.Product.Base using ( Σ-syntax; _×_; _,_ )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; cong; subst )
 open import Relation.Nullary using ( yes; no )
 
@@ -81,6 +81,10 @@ _∙_ : ∀ {d d'} → IST d X Y → IST d' Y Z → IST (d + d') X Z
 
 later : ∀ {d} → IST d X Y → IST (suc d) X Y
 later f x = next! λ where .force → shift x ∙ f
+
+laterN : ∀ n {d} → IST d X Y → IST (n + d) X Y
+laterN zero f = f
+laterN (suc n) f = later (laterN n f)
 
 _∥_ : ∀ {d d'} → IST d X Y → IST d' Z W → IST (d ⊔ d') (X × Z) (Y × W)
 (f ∥ g) (x , z) with f x | g z
@@ -213,30 +217,104 @@ F∘I≈B (e ⟫ e') = {!   !} -- ∙-≈ (F∘I≈B e') (F∘I≈B e)
 F∘I≈B (e ⊗ e') = {!   !}
 
 --------------------------------------------------------------------------------
+-- Prefix
 
--- map-fold-lem1 : ∀ a (f : A → X ⇌ Y) g
---   → (F-map-fold a f g ∙ B-map-fold a f g) ≈ id
--- map-fold-lem1 a f g x with f a .to x in eq
--- ... | nothing = {!   !}
--- ... | just y rewrite f a .to→from eq =
---       yield refl λ where .force → map-fold-lem1 (g a x) f g
+mutual
 
--- map-fold-lem2 : ∀ a (f : A → X ⇌ Y) g
---   → (B-map-fold a f g ∙ F-map-fold a f g) ≈ id
--- map-fold-lem2 a f g y with f a .from y in eq
--- ... | nothing = {!   !}
--- ... | just x rewrite f a .from→to eq =
---       yield refl λ where .force → map-fold-lem2 (g a x) f g
+  _≺_ : ∀ {d d'} → IST d X Y → IST d' X Y → Set
+  f ≺ g = ∀ x → f x Step≺ g x
 
--- shift-unshift : {{_ : Eq X}} (x : X) → (shift x ∙ unshift x) ≈ later id
--- shift-unshift x x' with x ≟ x
--- ... | no contra with () ← contra refl
--- ... | yes refl = next λ where .force → ≈-refl
+  data _Step≺_ {X Y d} :  Step d X Y → ∀ {d'} → Step d' X Y → Set where
+    ≺fail : ∀ {s : Step d X Y} → fail Step≺ s
+    ≺next : ∀ {d'} {f : ∞IST d' X Y} {g : ∞IST d' X Y}
+      → (p : d ≡ suc d')
+      → f ∞≺ g
+      → next p f Step≺ next p g
+    ≺yield : ∀ {x y f g}
+      → (p : d ≡ 0)
+      → x ≡ y
+      → f ∞≺ g
+      → yield p x f Step≺ yield p y g
 
--- unshift-shift : {{_ : Eq X}} (x : X) → (unshift x ∙ shift x) ≈ later id
--- unshift-shift x x' with x ≟ x'
--- ... | no _ = {!   !}
--- ... | yes refl = next λ where .force → lem x
---   where
---     lem : (x : X) → (id ∙ shift x) ≈ (shift x ∙ id)
---     lem x x' = yield refl λ where .force → lem x'
+  record _∞≺_ {d d'} (f : ∞IST d X Y) (g : ∞IST d' X Y): Set where
+    coinductive
+    field force : force f ≺ force g
+
+open _∞≺_
+
+pattern ≺next! f≺g = ≺next refl f≺g
+pattern ≺yield! x≡y f≺g = ≺yield refl x≡y f≺g
+
+≺-refl : ∀ {d} {f : IST d X Y} → f ≺ f
+≺-refl {f = f} x with f x
+... | fail = ≺fail
+... | next! f' = ≺next! λ where .force → ≺-refl
+... | yield! y f' = ≺yield! refl λ where .force → ≺-refl
+
+--------------------------------------------------------------------------------
+
+map-fold-lem1 : ∀ a (f : A → X ⇌ Y) g
+  → (F-map-fold a f g ∙ B-map-fold a f g) ≺ id
+map-fold-lem1 a f g x with f a .to x in eq
+... | nothing = ≺fail
+... | just y rewrite f a .to→from eq =
+      ≺yield! refl λ where .force → map-fold-lem1 (g a x) f g
+
+map-fold-lem2 : ∀ a (f : A → X ⇌ Y) g
+  → (B-map-fold a f g ∙ F-map-fold a f g) ≺ id
+map-fold-lem2 a f g y with f a .from y in eq
+... | nothing = ≺fail
+... | just x rewrite f a .from→to eq =
+      ≺yield! refl λ where .force → map-fold-lem2 (g a x) f g
+
+shift-unshift : {{_ : Eq X}} (x : X) → (shift x ∙ unshift x) ≺ later id
+shift-unshift x x' with x ≟ x
+... | no contra with () ← contra refl
+... | yes refl = ≺next! λ where .force → ≺-refl
+
+unshift-shift : {{_ : Eq X}} (x : X) → (unshift x ∙ shift x) ≺ later id
+unshift-shift x x' with x ≟ x'
+... | no _ = ≺fail
+... | yes refl = ≺next! λ where .force → lem x
+  where
+    lem : (x : X) → (id ∙ shift x) ≺ (shift x ∙ id)
+    lem x x' = ≺yield! refl λ where .force → lem x'
+
+∙-≺ : ∀ {d d'} {f f' : IST d X Y} {g g' : IST d' Y Z}
+  → f ≺ f'
+  → g ≺ g'
+  → (f ∙ g) ≺ (f' ∙ g')
+∙-≺ {f = f} {f'} {g} {g'} f≺f' g≺g' x with f x | f' x | f≺f' x
+... | fail | _ | ≺fail = ≺fail
+... | next! _ | next! _ | ≺next! f≺f' = ≺next! λ where .force → ∙-≺ (force f≺f') g≺g'
+... | yield! y _ | yield! _ _ | ≺yield! refl f≺f' with g y | g' y | g≺g' y
+...   | fail | _ | ≺fail = ≺fail
+...   | next! _ | next! _ | ≺next! g≺g' = ≺next! λ where .force → ∙-≺ (force f≺f') (force g≺g')
+...   | yield! _ _ | yield! _ _ | ≺yield! refl g≺g' = ≺yield! refl λ where .force → ∙-≺ (force f≺f') (force g≺g')
+
+∥-≺ : ∀ {d d'} {f f' : IST d X Y} {g g' : IST d' Z W}
+  → f ≺ f'
+  → g ≺ g'
+  → (f ∥ g) ≺ (f' ∥ g')
+∥-≺ {f = f} {f'} {g} {g'} f≺f' g≺g' (x , z) with f x | f' x | g z | g' z | f≺f' x | g≺g' z
+... | fail | _ | _ | _ | ≺fail | _ = ≺fail
+... | next! _ | next! _ | fail | _ | ≺next! _ | ≺fail = ≺fail
+... | yield! _ _ | yield! _ _ | fail | _ | ≺yield! _ _ | ≺fail = ≺fail
+... | next! _ | next! _ | next! _ | next! _ | ≺next! f≺f' | ≺next! g≺g' =
+      ≺next! λ where .force → ∥-≺ (force f≺f') (force g≺g')
+... | next! _ | next! _ | yield! _ _ | yield! _ _ | ≺next! f≺f' | ≺yield! _ _  =
+      ≺next (cong suc (sym (⊔-identityʳ _))) λ where .force → ∥-≺ (force f≺f') (∙-≺ ≺-refl g≺g')
+... | yield! _ _ | yield! _ _ | next! _ | next! _ | ≺yield! _ _ | ≺next! g≺g' =
+      ≺next! λ where .force → ∥-≺ (∙-≺ ≺-refl f≺f') (force g≺g')
+... | yield! _ _ | yield! _ _ | yield! _ _ | yield! _ _ | ≺yield! refl f≺f' | ≺yield! refl g≺g' =
+      ≺yield! refl λ where .force → ∥-≺ (force f≺f') (force g≺g')
+
+B-IIST : ∀ (e : E X Y) → (F⟦ e ⟧ ∙ B⟦ e ⟧) ≺ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
+B-IIST (map-fold a f g) = map-fold-lem1 a f g
+B-IIST (delay x) = shift-unshift x
+B-IIST (hasten x) = unshift-shift x
+B-IIST (e ⟫ e') =
+  let ih = B-IIST e
+      ih' = B-IIST e'
+   in {! ∙-≺ ih ih'  !}
+B-IIST (e ⊗ e') = {!   !}
