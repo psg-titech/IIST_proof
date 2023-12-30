@@ -22,7 +22,7 @@ mutual
     coinductive
     field force : Coℕˣ
 
-open ∞Coℕˣ
+open ∞Coℕˣ public
 
 {-# ETA ∞Coℕˣ #-}
 
@@ -41,7 +41,7 @@ mutual
     coinductive
     field force : force m ⊑ force n
 
-open _∞⊑_
+open _∞⊑_ public
 
 ⊑-refl : ∀ {n} → n ⊑ n
 ⊑-refl {zero} = zero
@@ -71,7 +71,7 @@ mutual
     coinductive
     field force : force m ≈ force n
 
-open _∞≈_
+open _∞≈_ public
 
 failₗ⁻¹ : ∀ {m n} → fail m ≈ n → force m ≈ n
 failₗ⁻¹ (fail p) = failᵣ (force p)
