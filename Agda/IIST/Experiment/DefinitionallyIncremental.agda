@@ -200,6 +200,62 @@ open _≈_
 ≈-cong-subst refl refl p = p
 
 --------------------------------------------------------------------------------
+-- More defined: like _≈_ but the LHS may fail earlier
+
+infix 4 _⊑_ _Step⊑_
+
+mutual
+
+  record _⊑_ {d d'} (f : IST X Y d) (g : IST X Y d') : Set where
+    coinductive
+    field
+      step : ∀ (x : X) → step f x Step⊑ step g x
+
+  data _Step⊑_ {X Y} : ∀ {d d'} → Step X Y d → Step X Y d' → Set where
+    ⊥ₗ : ∀ {d d'} {s : Step X Y d'} → ⊥ {d = d} Step⊑ s
+    next : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
+      → f ⊑ g
+      → next f Step⊑ next g
+    yield : ∀ {x y f g}
+      → x ≡ y
+      → f ⊑ g
+      → yield x f Step⊑ yield y g
+
+open _⊑_
+
+≈-to-⊑ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
+  → f ≈ g
+  → f ⊑ g
+≈-to-⊑ {f = f} {g} f≈g .step x with f .step x | g .step x | f≈g .step x
+... | ⊥ | ⊥ | ⊥ = ⊥ₗ
+... | next _ | next _ | next f'≈g' = next (≈-to-⊑ f'≈g')
+... | yield _ _ | yield _ _ | yield refl f'≈g' = yield refl (≈-to-⊑ f'≈g')
+
+⊑-refl : ∀ {d} {f : IST X Y d} → f ⊑ f
+⊑-refl {f = f} .step x with f .step x
+... | ⊥ = ⊥ₗ
+... | next f' = next ⊑-refl
+... | yield y f' = yield refl ⊑-refl
+
+⊑-trans : ∀ {d₁ d₂ d₃} {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃}
+  → f ⊑ g
+  → g ⊑ h
+  → f ⊑ h
+⊑-trans {f = f} {g} {h} f⊑g g⊑h .step x
+  with f .step x | g .step x | h .step x | f⊑g .step x | g⊑h .step x
+... | ⊥ | _ | _ | _ | _ = ⊥ₗ
+... | next _ | next _ | next _ | next f'⊑g' | next g'⊑h' =
+      next (⊑-trans f'⊑g' g'⊑h')
+... | yield _ _ | yield _ _ | yield _ _ | yield refl f'⊑g' | yield refl g'⊑h' =
+      yield refl (⊑-trans f'⊑g' g'⊑h')
+
+⊑-cong-subst : ∀ {d₁ d₁' d₂ d₂'} {f : IST X Y d₁} {g : IST X Y d₂}
+  → (p : d₁ ≡ d₁') (q : d₂ ≡ d₂')
+  → f ⊑ g
+  → subst (IST X Y) p f ⊑ subst (IST X Y) q g
+⊑-cong-subst refl refl p = p
+
+--------------------------------------------------------------------------------
 
 ∙-identityₗ : ∀ {d} {f : IST X Y d} → id ∙ f ≈ f
 ∙-identityₗ {f = f} .step x with f .step x
@@ -318,62 +374,6 @@ B∘I≈F (e ⟫ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
 B∘I≈F (e ⊗ e') = ≈-cong-∥ (B∘I≈F e) (B∘I≈F e')
 
 --------------------------------------------------------------------------------
--- More defined
-
-infix 4 _⊑_ _Step⊑_
-
-mutual
-
-  record _⊑_ {d d'} (f : IST X Y d) (g : IST X Y d') : Set where
-    coinductive
-    field
-      step : ∀ (x : X) → step f x Step⊑ step g x
-
-  data _Step⊑_ {X Y} : ∀ {d d'} → Step X Y d → Step X Y d' → Set where
-    ⊥ₗ : ∀ {d d'} {s : Step X Y d'} → ⊥ {d = d} Step⊑ s
-    next : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
-      → f ⊑ g
-      → next f Step⊑ next g
-    yield : ∀ {x y f g}
-      → x ≡ y
-      → f ⊑ g
-      → yield x f Step⊑ yield y g
-
-open _⊑_
-
-≈-to-⊑ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
-  → f ≈ g
-  → f ⊑ g
-≈-to-⊑ {f = f} {g} f≈g .step x with f .step x | g .step x | f≈g .step x
-... | ⊥ | ⊥ | ⊥ = ⊥ₗ
-... | next _ | next _ | next f'≈g' = next (≈-to-⊑ f'≈g')
-... | yield _ _ | yield _ _ | yield refl f'≈g' = yield refl (≈-to-⊑ f'≈g')
-
-⊑-refl : ∀ {d} {f : IST X Y d} → f ⊑ f
-⊑-refl {f = f} .step x with f .step x
-... | ⊥ = ⊥ₗ
-... | next f' = next ⊑-refl
-... | yield y f' = yield refl ⊑-refl
-
-⊑-trans : ∀ {d₁ d₂ d₃} {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃}
-  → f ⊑ g
-  → g ⊑ h
-  → f ⊑ h
-⊑-trans {f = f} {g} {h} f⊑g g⊑h .step x
-  with f .step x | g .step x | h .step x | f⊑g .step x | g⊑h .step x
-... | ⊥ | _ | _ | _ | _ = ⊥ₗ
-... | next _ | next _ | next _ | next f'⊑g' | next g'⊑h' =
-      next (⊑-trans f'⊑g' g'⊑h')
-... | yield _ _ | yield _ _ | yield _ _ | yield refl f'⊑g' | yield refl g'⊑h' =
-      yield refl (⊑-trans f'⊑g' g'⊑h')
-
-⊑-cong-subst : ∀ {d₁ d₁' d₂ d₂'} {f : IST X Y d₁} {g : IST X Y d₂}
-  → (p : d₁ ≡ d₁') (q : d₂ ≡ d₂')
-  → f ⊑ g
-  → subst (IST X Y) p f ⊑ subst (IST X Y) q g
-⊑-cong-subst refl refl p = p
-
---------------------------------------------------------------------------------
 
 shift-unshift : {{_ : Eq X}} (x : X) → shift x ∙ unshift x ⊑ later id
 shift-unshift x .step x' with x ≟ x
@@ -466,35 +466,44 @@ later-shift-next {f' = f'} p .step x' rewrite p with f' .step x' in eq
 ⊑-∙-laterN {n = zero} = ⊑-refl
 ⊑-∙-laterN {n = suc n} = ⊑-trans ⊑-∙-later (⊑-cong-later (⊑-∙-laterN {n = n}))
 
-∙-IIST : ∀ {m n d₁ d₁' d₂ d₂'}
-  → {f : IST X Y d₁} {f' : IST Y X d₁'} {g : IST Y Z d₂} {g' : IST Z Y d₂'}
-  → f ∙ f' ⊑ laterN m id
-  → g ∙ g' ⊑ laterN n id
-  → (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (n + m) id
-∙-IIST {m = m} {n} {f = f} {f'} {g} {g'} p q = h9
-  where
-    h1 : (g ∙ g') ∙ f' ⊑ laterN n id ∙ f'
-    h2 : (g ∙ g') ∙ f' ⊑ laterN n (id ∙ f')
-    h3 : (g ∙ g') ∙ f' ⊑ laterN n f'
-    h4 : g ∙ (g' ∙ f') ⊑ laterN n f'
-    h5 : f ∙ (g ∙ (g' ∙ f')) ⊑ f ∙ laterN n f'
-    h6 : (f ∙ g) ∙ (g' ∙ f') ⊑ f ∙ laterN n f'
-    h7 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN n (f ∙ f')
-    h8 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN n (laterN m id)
-    h9 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (n + m) id
-    h1 = ⊑-cong-∙ q ⊑-refl
-    h2 = ⊑-trans h1 (≈-to-⊑ (∙-laterN {n = n}))
-    h3 = ⊑-trans h2 (≈-to-⊑ (≈-cong-laterN {n = n} ∙-identityₗ))
-    h4 = ⊑-trans (≈-to-⊑ ∙-assoc) h3
-    h5 = ⊑-cong-∙ ⊑-refl h4
-    h6 = ⊑-trans (≈-to-⊑ (≈-sym ∙-assoc)) h5
-    h7 = ⊑-trans h6 (⊑-∙-laterN {n = n})
-    h8 = ⊑-trans h7 (⊑-cong-laterN {n = n} p)
-    h9 = ⊑-trans h8 (≈-to-⊑ (laterN-join {m = n} {n = m}))
-
 add-shuffle : ∀ m n o p → (m + n) + (o + p) ≡ (o + m) + (n + p)
 add-shuffle = solve-∀
   where open import Data.Nat.Tactic.RingSolver
+
+∙-IIST : ∀ {d₁ d₁' d₂ d₂'}
+  → {f : IST X Y d₁} {f' : IST Y X d₁'} {g : IST Y Z d₂} {g' : IST Z Y d₂'}
+  → f ∙ f' ⊑ laterN (d₁ + d₁') id
+  → g ∙ g' ⊑ laterN (d₂ + d₂') id
+  → (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₁ + d₂) + (d₂' + d₁')) id
+∙-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} p q = h10
+  where
+    h1 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') id ∙ f'
+    h2 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') (id ∙ f')
+    h3 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') f'
+    h4 : g ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') f'
+    h5 : f ∙ (g ∙ (g' ∙ f')) ⊑ f ∙ laterN (d₂ + d₂') f'
+    h6 : (f ∙ g) ∙ (g' ∙ f') ⊑ f ∙ laterN (d₂ + d₂') f'
+    h7 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') (f ∙ f')
+    h8 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') (laterN (d₁ + d₁') id)
+    h9 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₂ + d₂') + (d₁ + d₁')) id
+    h10 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₁ + d₂) + (d₂' + d₁')) id
+    h1 = ⊑-cong-∙ q ⊑-refl
+    h2 = ⊑-trans h1 (≈-to-⊑ (∙-laterN {n = d₂ + d₂'}))
+    h3 = ⊑-trans h2 (≈-to-⊑ (≈-cong-laterN {n = d₂ + d₂'} ∙-identityₗ))
+    h4 = ⊑-trans (≈-to-⊑ ∙-assoc) h3
+    h5 = ⊑-cong-∙ ⊑-refl h4
+    h6 = ⊑-trans (≈-to-⊑ (≈-sym ∙-assoc)) h5
+    h7 = ⊑-trans h6 (⊑-∙-laterN {n = d₂ + d₂'})
+    h8 = ⊑-trans h7 (⊑-cong-laterN {n = d₂ + d₂'} p)
+    h9 = ⊑-trans h8 (≈-to-⊑ (laterN-join {m = d₂ + d₂'} {n = d₁ + d₁'}))
+    h10 = ⊑-trans h9 (≈-to-⊑ (laterN-subst (add-shuffle d₂ d₂' d₁ d₁')))
+
+∥-IIST : ∀ {d₁ d₁' d₂ d₂'}
+  → {f : IST X Y d₁} {f' : IST Y X d₁'} {g : IST Z W d₂} {g' : IST W Z d₂'}
+  → f ∙ f' ⊑ laterN (d₁ + d₁') id
+  → g ∙ g' ⊑ laterN (d₂ + d₂') id
+  → (f ∥ g) ∙ (f' ∥ g') ⊑ laterN ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) id
+∥-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} p q = {!   !}
 
 F-IIST : ∀ (e : E X Y) → B⟦ e ⟧ ∙ F⟦ e ⟧ ⊑ laterN (DB⟦ e ⟧ + DF⟦ e ⟧) id
 F-IIST (map-fold {A} a f g) = helper a
@@ -505,14 +514,8 @@ F-IIST (map-fold {A} a f g) = helper a
     ... | just x rewrite f a .from→to eq = yield refl (helper (g a x))
 F-IIST (delay x) = unshift-shift x
 F-IIST (hasten x) = shift-unshift x
-F-IIST (e ⟫ e') =
-  let h = ∙-IIST (F-IIST e') (F-IIST e)
-      h' = ⊑-trans h (≈-to-⊑ (laterN-subst (add-shuffle DB⟦ e ⟧ DF⟦ e ⟧ DB⟦ e' ⟧ DF⟦ e' ⟧)))
-   in h'
-F-IIST (e ⊗ e') =
-  let ih = F-IIST e
-      ih' = F-IIST e'
-   in {!   !}
+F-IIST (e ⟫ e') = ∙-IIST (F-IIST e') (F-IIST e)
+F-IIST (e ⊗ e') = ∥-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : ∀ (e : E X Y) → F⟦ e ⟧ ∙ B⟦ e ⟧ ⊑ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
 B-IIST (map-fold {A} a f g) = helper a
@@ -523,11 +526,5 @@ B-IIST (map-fold {A} a f g) = helper a
     ... | just y rewrite f a .to→from eq = yield refl (helper (g a x))
 B-IIST (delay x) = shift-unshift x
 B-IIST (hasten x) = unshift-shift x
-B-IIST (e ⟫ e') =
-  let h = ∙-IIST (B-IIST e) (B-IIST e')
-      h' = ⊑-trans h (≈-to-⊑ (laterN-subst (add-shuffle DF⟦ e' ⟧ DB⟦ e' ⟧ DF⟦ e ⟧ DB⟦ e ⟧)))
-   in h'
-B-IIST (e ⊗ e') =
-  let ih = B-IIST e
-      ih' = B-IIST e'
-   in {!   !}
+B-IIST (e ⟫ e') = ∙-IIST (B-IIST e) (B-IIST e')
+B-IIST (e ⊗ e') = ∥-IIST (B-IIST e) (B-IIST e')
