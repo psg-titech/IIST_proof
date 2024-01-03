@@ -44,22 +44,12 @@ unshift x ⊥ = ⊥
 ... | yes refl = force p
 ≈-cong-unshift x ⊥ = ⊥
 
-shift-⊑-∷ : ∀ (x : A) {xs} → shift x xs ⊑ x ∷ delay xs
-shift-⊑-∷ x {y ∷ xs} = x ∷ λ where .force → shift-⊑-∷ y
-shift-⊑-∷ x {⊥} = x ∷ λ where .force → ⊥ₗ
+shift-≈-∷₁ : ∀ (x : A) {xs} → No⊥ xs → shift x xs ≈ x ∷ delay xs
+shift-≈-∷₁ x (y ∷ p) = x ∷ λ where .force → shift-≈-∷₁ y (force p)
 
-⊑-cong-shift : ∀ (x : A) {xs ys} → xs ⊑ ys → shift x xs ⊑ shift x ys
-⊑-cong-shift x (y ∷ p) = x ∷ λ where .force → ⊑-cong-shift y (force p)
-⊑-cong-shift x {ys = _ ∷ _} ⊥ₗ = x ∷ λ where .force → ⊥ₗ
-⊑-cong-shift x {ys = ⊥} ⊥ₗ = x ∷ λ where .force → ⊥ₗ
-
-⊑-cong-unshift : ∀ {{_ : Eq A}} (x : A) {xs ys}
-  → xs ⊑ ys
-  → unshift x xs ⊑ unshift x ys
-⊑-cong-unshift x (y ∷ p) with x ≟ y
-... | no _ = ⊥ₗ
-... | yes refl = force p
-⊑-cong-unshift x ⊥ₗ = ⊥ₗ
+shift-≈-∷₂ : ∀ (x : A) {xs} → No⊥ (shift x xs) → shift x xs ≈ x ∷ delay xs
+shift-≈-∷₂ x {y ∷ xs} (.x ∷ p) = x ∷ λ where .force → shift-≈-∷₂ y (force p)
+shift-≈-∷₂ x {⊥} (.x ∷ p) with () ← force p
 
 no⊥-shift⁻¹ : ∀ (x : A) {xs} → No⊥ (shift x xs) → No⊥ xs
 no⊥-shift⁻¹ x {y ∷ xs} (_ ∷ p) = y ∷ λ where .force → no⊥-shift⁻¹ y (force p)
@@ -77,7 +67,7 @@ ST : Set → Set → Set
 ST X Y = Stream⊥ X → Stream⊥ Y
 
 _IsIISTOf_ : ST X Y → ST Y X → Set
-st' IsIISTOf st = ∀ {xs} → No⊥ (st xs) → st' (st xs) ⊑ xs
+st' IsIISTOf st = ∀ {xs} → No⊥ (st xs) → st' (st xs) ≈ xs
 
 -------------------------------------------------------------------------------
 -- IIST constructors and semantics
@@ -135,96 +125,6 @@ no⊥-B⁻¹ (hasten x) = no⊥-shift⁻¹ x
 no⊥-B⁻¹ (e ⟫ e') = no⊥-B⁻¹ e' ∘ no⊥-B⁻¹ e
 no⊥-B⁻¹ (e ⊗ e') p = no⊥-map⁻¹ (no⊥-B⁻¹ e (no⊥-zip⁻¹ₗ p))
 
-⊑-cong-F : ∀ (e : E X Y) {xs ys} → xs ⊑ ys → F⟦ e ⟧ xs ⊑ F⟦ e ⟧ ys
-⊑-cong-F (map-fold {A} a f g) = helper a
-  where
-    helper : ∀ (a : A) {xs ys}
-      → xs ⊑ ys
-      → F⟦ map-fold a f g ⟧ xs ⊑ F⟦ map-fold a f g ⟧ ys
-    helper a (x ∷ p) with f a .to x
-    ... | nothing = ⊥ₗ
-    ... | just y = y ∷ λ where .force → helper (g a x) (force p)
-    helper a ⊥ₗ = ⊥ₗ
-⊑-cong-F (delay x) = ⊑-cong-shift x
-⊑-cong-F (hasten x) = ⊑-cong-unshift x
-⊑-cong-F (e ⟫ e') = ⊑-cong-F e' ∘ ⊑-cong-F e
-⊑-cong-F (e ⊗ e') p = ⊑-cong-zip (⊑-cong-F e (⊑-cong-map p)) (⊑-cong-F e' (⊑-cong-map p))
-
-⊑-cong-B : ∀ (e : E X Y) {xs ys} → xs ⊑ ys → B⟦ e ⟧ xs ⊑ B⟦ e ⟧ ys
-⊑-cong-B (map-fold {A} a f g) = helper a
-  where
-    helper : ∀ (a : A) {xs ys}
-      → xs ⊑ ys
-      → B⟦ map-fold a f g ⟧ xs ⊑ B⟦ map-fold a f g ⟧ ys
-    helper a (y ∷ p) with f a .from y
-    ... | nothing = ⊥ₗ
-    ... | just x = x ∷ λ where .force → helper (g a x) (force p)
-    helper a ⊥ₗ = ⊥ₗ
-⊑-cong-B (delay x) = ⊑-cong-unshift x
-⊑-cong-B (hasten x) = ⊑-cong-shift x
-⊑-cong-B (e ⟫ e') = ⊑-cong-B e ∘ ⊑-cong-B e'
-⊑-cong-B (e ⊗ e') p = ⊑-cong-zip (⊑-cong-B e (⊑-cong-map p)) (⊑-cong-B e' (⊑-cong-map p))
-
-shift-IIST : ∀ {{_ : Eq A}} (x : A) → shift x IsIISTOf unshift x
-shift-IIST x {y ∷ xs} p with x ≟ y
-shift-IIST x {y ∷ xs} () | no _
-shift-IIST x {y ∷ xs} p  | yes refl = shift-⊑-∷ x
-
-unshift-IIST : ∀ {{_ : Eq A}} (x : A) → unshift x IsIISTOf shift x
-unshift-IIST x {y ∷ xs} p with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = shift-⊑-∷ y
-unshift-IIST x {⊥} p with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = ⊥ₗ
-
-F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
-F-IIST (map-fold {A} a f g) = helper a
-  where
-    helper : (a : A) → F⟦ map-fold a f g ⟧ IsIISTOf B⟦ map-fold a f g ⟧
-    helper a {y ∷ ys} p with f a .from y in eq
-    helper a {y ∷ ys} () | nothing
-    helper a {y ∷ ys} (_ ∷ p) | just x rewrite f a .from→to eq =
-      y ∷ λ where .force → helper (g a x) (force p)
-F-IIST (delay x) = shift-IIST x
-F-IIST (hasten x) = unshift-IIST x
-F-IIST (e ⟫ e') p =
-  let ih = F-IIST e p
-      ih' = F-IIST e' (no⊥-B⁻¹ e p)
-   in ⊑-trans (⊑-cong-F e' ih) ih'
-F-IIST (e ⊗ e') {yws} p =
-  let lem1 = ⊑-cong-F e (⊑-zip-unzipₗ {xs = B⟦ e ⟧ (map proj₁ yws)} {B⟦ e' ⟧ (map proj₂ yws)})
-      lem2 = ⊑-cong-F e' (⊑-zip-unzipᵣ {xs = B⟦ e ⟧ (map proj₁ yws)} {B⟦ e' ⟧ (map proj₂ yws)})
-      lem3 = ⊑-cong-zip lem1 lem2
-      lem4 = ⊑-cong-zip (F-IIST e (no⊥-zip⁻¹ₗ p)) (F-IIST e' (no⊥-zip⁻¹ᵣ p))
-      lem5 = ⊑-trans lem3 lem4
-   in ⊑-trans lem3 (⊑-trans lem4 ⊑-unzip-zip)
-
-B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (map-fold {A} a f g) = helper a
-  where
-    helper : (a : A) → B⟦ map-fold a f g ⟧ IsIISTOf F⟦ map-fold a f g ⟧
-    helper a {x ∷ xs} p with f a .to x in eq
-    helper a {x ∷ xs} () | nothing
-    helper a {x ∷ xs} (_ ∷ p) | just y rewrite f a .to→from eq =
-      x ∷ λ where .force → helper (g a x) (force p)
-B-IIST (delay x) = unshift-IIST x
-B-IIST (hasten x) = shift-IIST x
-B-IIST (e ⟫ e') p =
-  let ih = B-IIST e' p
-      ih' = B-IIST e (no⊥-F⁻¹ e' p)
-   in ⊑-trans (⊑-cong-B e ih) ih'
-B-IIST (e ⊗ e') {yws} p =
-  let lem1 = ⊑-cong-B e (⊑-zip-unzipₗ {xs = F⟦ e ⟧ (map proj₁ yws)} {F⟦ e' ⟧ (map proj₂ yws)})
-      lem2 = ⊑-cong-B e' (⊑-zip-unzipᵣ {xs = F⟦ e ⟧ (map proj₁ yws)} {F⟦ e' ⟧ (map proj₂ yws)})
-      lem3 = ⊑-cong-zip lem1 lem2
-      lem4 = ⊑-cong-zip (B-IIST e (no⊥-zip⁻¹ₗ p)) (B-IIST e' (no⊥-zip⁻¹ᵣ p))
-      lem5 = ⊑-trans lem3 lem4
-   in ⊑-trans lem3 (⊑-trans lem4 ⊑-unzip-zip)
-
---------------------------------------------------------------------------------
--- Properties of I⟦_⟧
-
 ≈-cong-F : ∀ (e : E X Y) {xs ys}
   → xs ≈ ys
   → F⟦ e ⟧ xs ≈ F⟦ e ⟧ ys
@@ -258,6 +158,70 @@ B-IIST (e ⊗ e') {yws} p =
 ≈-cong-B (hasten x) = ≈-cong-shift x
 ≈-cong-B (e ⟫ e') = ≈-cong-B e ∘ ≈-cong-B e'
 ≈-cong-B (e ⊗ e') p = ≈-cong-zip (≈-cong-B e (≈-cong-map p)) (≈-cong-B e' (≈-cong-map p))
+
+shift-IIST : ∀ {{_ : Eq A}} (x : A) → shift x IsIISTOf unshift x
+shift-IIST x {y ∷ xs} p with x ≟ y
+shift-IIST x {y ∷ xs} () | no _
+shift-IIST x {y ∷ xs} p  | yes refl = shift-≈-∷₁ x p
+
+unshift-IIST : ∀ {{_ : Eq A}} (x : A) → unshift x IsIISTOf shift x
+unshift-IIST x {y ∷ xs} p with x ≟ x
+unshift-IIST x {y ∷ xs} p | no contra with () ← contra refl
+unshift-IIST x {y ∷ xs} (.x ∷ p) | yes refl = shift-≈-∷₂ y (force p)
+unshift-IIST x {⊥} (.x ∷ p) with () ← force p
+
+F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
+F-IIST (map-fold {A} a f g) = helper a
+  where
+    helper : (a : A) → F⟦ map-fold a f g ⟧ IsIISTOf B⟦ map-fold a f g ⟧
+    helper a {y ∷ ys} p with f a .from y in eq
+    helper a {y ∷ ys} () | nothing
+    helper a {y ∷ ys} (_ ∷ p) | just x rewrite f a .from→to eq =
+      y ∷ λ where .force → helper (g a x) (force p)
+F-IIST (delay x) = shift-IIST x
+F-IIST (hasten x) = unshift-IIST x
+F-IIST (e ⟫ e') p =
+  let ih = F-IIST e p
+      ih' = F-IIST e' (no⊥-B⁻¹ e p)
+   in ≈-trans (≈-cong-F e' ih) ih'
+F-IIST (e ⊗ e') {yws} p =
+  let h1 = no⊥-zip⁻¹ₗ p
+      h2 = no⊥-zip⁻¹ᵣ p
+      h3 = ≈-cong-F e (≈-zip-unzipₗ (B⟦ e ⟧ (map proj₁ yws)) h2)
+      h4 = ≈-cong-F e' (≈-zip-unzipᵣ (B⟦ e' ⟧ (map proj₂ yws)) h1)
+      h5 = ≈-cong-zip h3 h4
+      ih1 = F-IIST e h1
+      ih2 = F-IIST e' h2
+      h6 = ≈-cong-zip ih1 ih2
+   in ≈-trans h5 (≈-trans h6 ≈-unzip-zip)
+
+B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
+B-IIST (map-fold {A} a f g) = helper a
+  where
+    helper : (a : A) → B⟦ map-fold a f g ⟧ IsIISTOf F⟦ map-fold a f g ⟧
+    helper a {x ∷ xs} p with f a .to x in eq
+    helper a {x ∷ xs} () | nothing
+    helper a {x ∷ xs} (_ ∷ p) | just y rewrite f a .to→from eq =
+      x ∷ λ where .force → helper (g a x) (force p)
+B-IIST (delay x) = unshift-IIST x
+B-IIST (hasten x) = shift-IIST x
+B-IIST (e ⟫ e') p =
+  let ih = B-IIST e' p
+      ih' = B-IIST e (no⊥-F⁻¹ e' p)
+   in ≈-trans (≈-cong-B e ih) ih'
+B-IIST (e ⊗ e') {yws} p =
+  let h1 = no⊥-zip⁻¹ₗ p
+      h2 = no⊥-zip⁻¹ᵣ p
+      h3 = ≈-cong-B e (≈-zip-unzipₗ (F⟦ e ⟧ (map proj₁ yws)) h2)
+      h4 = ≈-cong-B e' (≈-zip-unzipᵣ (F⟦ e' ⟧ (map proj₂ yws)) h1)
+      h5 = ≈-cong-zip h3 h4
+      ih1 = B-IIST e h1
+      ih2 = B-IIST e' h2
+      h6 = ≈-cong-zip ih1 ih2
+   in ≈-trans h5 (≈-trans h6 ≈-unzip-zip)
+
+--------------------------------------------------------------------------------
+-- Properties of I⟦_⟧
 
 F∘I≈B : ∀ (e : E X Y) ys
   → F⟦ I⟦ e ⟧ ⟧ ys ≈ B⟦ e ⟧ ys

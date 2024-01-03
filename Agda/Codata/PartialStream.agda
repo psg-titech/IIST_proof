@@ -105,57 +105,19 @@ open _∞≈_ public
 ≈-cong-zip (_ ∷ _) ⊥ = ⊥
 ≈-cong-zip ⊥ _ = ⊥
 
---------------------------------------------------------------------------------
--- More defined
+≈-zip-unzipₗ : ∀ (xs : Stream⊥ A) {ys : Stream⊥ B}
+  → No⊥ ys
+  → map proj₁ (zip xs ys) ≈ xs
+≈-zip-unzipₗ (x ∷ xs) (y ∷ p) = x ∷ λ where .force → ≈-zip-unzipₗ (force xs) (force p)
+≈-zip-unzipₗ ⊥ (y ∷ p) = ⊥
 
-infix 4 _⊑_ _∞⊑_
+≈-zip-unzipᵣ : ∀ (ys : Stream⊥ B) {xs : Stream⊥ A}
+  → No⊥ xs
+  → map proj₂ (zip xs ys) ≈ ys
+≈-zip-unzipᵣ (y ∷ ys) (x ∷ p) = y ∷ λ where .force → ≈-zip-unzipᵣ (force ys) (force p)
+≈-zip-unzipᵣ ⊥ (x ∷ p) = ⊥
 
-mutual
-
-  data _⊑_ {A} : Stream⊥ A → Stream⊥ A → Set where
-    _∷_ : ∀ x {xs ys} (p : xs ∞⊑ ys) → x ∷ xs ⊑ x ∷ ys
-    ⊥ₗ : ∀ {xs} → ⊥ ⊑ xs
-
-  record _∞⊑_ {A} (xs ys : ∞Stream⊥ A) : Set where
-    coinductive
-    field force : force xs ⊑ force ys
-
-open _∞⊑_ public
-
-⊑-refl : ∀ {xs : Stream⊥ A} → xs ⊑ xs
-⊑-refl {xs = x ∷ xs} = x ∷ λ where .force → ⊑-refl
-⊑-refl {xs = ⊥} = ⊥ₗ
-
-⊑-trans : ∀ {xs ys zs : Stream⊥ A} → xs ⊑ ys → ys ⊑ zs → xs ⊑ zs
-⊑-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ⊑-trans (force p) (force q)
-⊑-trans ⊥ₗ q = ⊥ₗ
-
-⊑-cong-map : ∀ {f : A → B} {xs ys}
-  → xs ⊑ ys
-  → map f xs ⊑ map f ys
-⊑-cong-map (x ∷ p) = _ ∷ λ where .force → ⊑-cong-map (force p)
-⊑-cong-map ⊥ₗ = ⊥ₗ
-
-⊑-cong-zip : ∀ {xs xs' : Stream⊥ A} {ys ys' : Stream⊥ B}
-  → xs ⊑ xs'
-  → ys ⊑ ys'
-  → zip xs ys ⊑ zip xs' ys'
-⊑-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → ⊑-cong-zip (force p) (force q)
-⊑-cong-zip ⊥ₗ _ = ⊥ₗ
-⊑-cong-zip (_ ∷ _) ⊥ₗ = ⊥ₗ
-
-⊑-zip-unzipₗ : ∀ {xs : Stream⊥ A} {ys : Stream⊥ B}
-  → map proj₁ (zip xs ys) ⊑ xs
-⊑-zip-unzipₗ {xs = x ∷ xs} {y ∷ ys} = x ∷ λ where .force → ⊑-zip-unzipₗ
-⊑-zip-unzipₗ {xs = _ ∷ _} {⊥} = ⊥ₗ
-⊑-zip-unzipₗ {xs = ⊥} = ⊥ₗ
-
-⊑-zip-unzipᵣ : ∀ {xs : Stream⊥ A} {ys : Stream⊥ B}
-  → map proj₂ (zip xs ys) ⊑ ys
-⊑-zip-unzipᵣ {xs = x ∷ xs} {y ∷ ys} = y ∷ λ where .force → ⊑-zip-unzipᵣ
-⊑-zip-unzipᵣ {xs = _ ∷ _} {⊥} = ⊥ₗ
-⊑-zip-unzipᵣ {xs = ⊥} = ⊥ₗ
-
-⊑-unzip-zip : ∀ {xys : Stream⊥ (A × B)} → zip (map proj₁ xys) (map proj₂ xys) ⊑ xys
-⊑-unzip-zip {xys = xy ∷ xys} = xy ∷ λ where .force → ⊑-unzip-zip
-⊑-unzip-zip {xys = ⊥} = ⊥ₗ
+≈-unzip-zip : ∀ {xys : Stream⊥ (A × B)}
+  → zip (map proj₁ xys) (map proj₂ xys) ≈ xys
+≈-unzip-zip {xys = xy ∷ xys} = xy ∷ λ where .force → ≈-unzip-zip
+≈-unzip-zip {xys = ⊥} = ⊥
