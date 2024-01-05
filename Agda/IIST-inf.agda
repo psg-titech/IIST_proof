@@ -245,6 +245,42 @@ B-delay (e ⊗ e') yws =
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
+F-≺ : ∀ (e : E X Y) {xs ys : Colistˣ X}
+  → xs Colistˣ.≺ ys
+  → F⟦ e ⟧ xs Colistˣ.≺ F⟦ e ⟧ ys
+F-≺ {X = X} (map-fold {A} a f g) = helper a
+  where
+    helper : (a : A) {xs ys : Colistˣ X}
+      → xs Colistˣ.≺ ys
+      → F⟦ map-fold a f g ⟧ xs Colistˣ.≺ F⟦ map-fold a f g ⟧ ys
+    helper a [] = []
+    helper a fail = fail
+    helper a (x ∷ xs≺ys) with f a .to x
+    ... | nothing = fail
+    ... | just y = y ∷ λ where .force → helper (g a x) (force xs≺ys)
+F-≺ (delay x) = ≺-shift x
+F-≺ (hasten x) = ≺-unshift x
+F-≺ (e ⟫ e') = F-≺ e' ∘ F-≺ e
+F-≺ (e ⊗ e') xs≺ys = ≺-zip (F-≺ e (≺-unzipₗ xs≺ys)) (F-≺ e' (≺-unzipᵣ xs≺ys))
+
+B-≺ : ∀ (e : E X Y) {xs ys : Colistˣ Y}
+  → xs Colistˣ.≺ ys
+  → B⟦ e ⟧ xs Colistˣ.≺ B⟦ e ⟧ ys
+B-≺ {Y = Y} (map-fold {A} a f g) = helper a
+  where
+    helper : (a : A) {xs ys : Colistˣ Y}
+      → xs Colistˣ.≺ ys
+      → B⟦ map-fold a f g ⟧ xs Colistˣ.≺ B⟦ map-fold a f g ⟧ ys
+    helper a [] = []
+    helper a fail = fail
+    helper a (y ∷ xs≺ys) with f a .from y
+    ... | nothing = fail
+    ... | just x = x ∷ λ where .force → helper (g a x) (force xs≺ys)
+B-≺ (delay x) = ≺-unshift x
+B-≺ (hasten x) = ≺-shift x
+B-≺ (e ⟫ e') = B-≺ e ∘ B-≺ e'
+B-≺ (e ⊗ e') xs≺ys = ≺-zip (B-≺ e (≺-unzipₗ xs≺ys)) (B-≺ e' (≺-unzipᵣ xs≺ys))
+
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (map-fold {A} a f g) = helper a
   where
@@ -272,9 +308,13 @@ F-IIST (e ⟫ e') zs =
       ih' = F-IIST e' zs
    in Colistˣ.≺-trans (F-incremental e' ih) ih'
 F-IIST (e ⊗ e') yws =
-  let ih = F-IIST e (unzipₗ yws)
-      ih' = F-IIST e' (unzipᵣ yws)
-   in {!   !}
+  let h1 = F-≺ e (≺-zip-unzipₗ (B⟦ e ⟧ (unzipₗ yws)) (B⟦ e' ⟧ (unzipᵣ yws)))
+      h2 = F-≺ e' (≺-zip-unzipᵣ (B⟦ e ⟧ (unzipₗ yws)) (B⟦ e' ⟧ (unzipᵣ yws)))
+      h3 = ≺-zip h1 h2
+      ih1 = F-IIST e (unzipₗ yws)
+      ih2 = F-IIST e' (unzipᵣ yws)
+      h4 = ≺-zip ih1 ih2
+   in Colistˣ.≺-trans h3 (Colistˣ.≺-trans h4 ≺-unzip-zip)
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (map-fold {A} a f g) = helper a
@@ -303,9 +343,13 @@ B-IIST (e ⟫ e') zs =
       ih' = B-IIST e zs
    in Colistˣ.≺-trans (B-incremental e ih) ih'
 B-IIST (e ⊗ e') yws =
-  let ih = B-IIST e (unzipₗ yws)
-      ih' = B-IIST e' (unzipᵣ yws)
-   in {!   !}
+  let h1 = B-≺ e (≺-zip-unzipₗ (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))
+      h2 = B-≺ e' (≺-zip-unzipᵣ (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))
+      h3 = ≺-zip h1 h2
+      ih1 = B-IIST e (unzipₗ yws)
+      ih2 = B-IIST e' (unzipᵣ yws)
+      h4 = ≺-zip ih1 ih2
+   in Colistˣ.≺-trans h3 (Colistˣ.≺-trans h4 ≺-unzip-zip)
 
 --------------------------------------------------------------------------------
 -- Bundles

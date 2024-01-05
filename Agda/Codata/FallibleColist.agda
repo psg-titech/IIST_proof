@@ -253,15 +253,30 @@ open _∞≺_ public
 ≺-unzipᵣ fail = fail
 ≺-unzipᵣ ((x , y) ∷ xys'≺xys) = y ∷ λ where .force → ≺-unzipᵣ (force xys'≺xys)
 
--- ≺-zip-unzipₗ : ∀ (xs : Colistˣ A) (ys : Colistˣ B)
---   → unzipₗ (zip xs ys) ≺ xs
--- ≺-zip-unzipₗ [] [] = []
--- ≺-zip-unzipₗ [] fail = {!   !}
--- ≺-zip-unzipₗ [] (x ∷ xs) = []
--- ≺-zip-unzipₗ (fail) ys = fail
--- ≺-zip-unzipₗ (x ∷ xs) [] = []
--- ≺-zip-unzipₗ (x ∷ xs) fail = {!   !}
--- ≺-zip-unzipₗ (x ∷ xs) (y ∷ ys) = x ∷ λ where .force → ≺-zip-unzipₗ (force xs) (force ys)
+≺-zip-unzipₗ : ∀ (xs : Colistˣ A) (ys : Colistˣ B)
+  → unzipₗ (zip xs ys) ≺ xs
+≺-zip-unzipₗ [] [] = []
+≺-zip-unzipₗ [] fail = fail
+≺-zip-unzipₗ [] (x ∷ xs) = []
+≺-zip-unzipₗ (fail) ys = fail
+≺-zip-unzipₗ (x ∷ xs) [] = []
+≺-zip-unzipₗ (x ∷ xs) fail = fail
+≺-zip-unzipₗ (x ∷ xs) (y ∷ ys) = x ∷ λ where .force → ≺-zip-unzipₗ (force xs) (force ys)
+
+≺-zip-unzipᵣ : ∀ (xs : Colistˣ A) (ys : Colistˣ B)
+  → unzipᵣ (zip xs ys) ≺ ys
+≺-zip-unzipᵣ [] [] = []
+≺-zip-unzipᵣ [] fail = fail
+≺-zip-unzipᵣ [] (x ∷ xs) = []
+≺-zip-unzipᵣ (fail) ys = fail
+≺-zip-unzipᵣ (x ∷ xs) [] = []
+≺-zip-unzipᵣ (x ∷ xs) fail = fail
+≺-zip-unzipᵣ (x ∷ xs) (y ∷ ys) = y ∷ λ where .force → ≺-zip-unzipᵣ (force xs) (force ys)
+
+≺-unzip-zip : ∀ {xys : Colistˣ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys) ≺ xys
+≺-unzip-zip {xys = []} = []
+≺-unzip-zip {xys = fail} = fail
+≺-unzip-zip {xys = xy ∷ xys} = xy ∷ λ where .force → ≺-unzip-zip
 
 --------------------------------------------------------------------------------
 -- Properties
