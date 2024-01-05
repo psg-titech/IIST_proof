@@ -156,3 +156,53 @@ open _∞≈_ public
 ∸ℕ-distribˡ-⊔-⊓ zero (suc n) (suc o) = ≈zero
 ∸ℕ-distribˡ-⊔-⊓ fail (suc n) (suc o) = ≈fail
 ∸ℕ-distribˡ-⊔-⊓ (suc m) (suc n) (suc o) = ∸ℕ-distribˡ-⊔-⊓ (force m) n o
+
+--------------------------------------------------------------------------------
+-- Prefix
+
+infix 4 _≺_ _∞≺_
+
+mutual
+
+  data _≺_ : Coℕˣ → Coℕˣ → Set where
+    ≺zero : zero ≺ zero
+    ≺fail : ∀ {n} → fail ≺ n
+    ≺suc : ∀ {m n} → m ∞≺ n → suc m ≺ suc n
+
+  record _∞≺_ (m n : ∞Coℕˣ) : Set where
+    coinductive
+    field force : force m ≺ force n
+
+open _∞≺_ public
+
+≺-refl : ∀ {n} → n ≺ n
+≺-refl {zero} = ≺zero
+≺-refl {fail} = ≺fail
+≺-refl {suc n} = ≺suc λ where .force → ≺-refl
+
+≺-trans : ∀ {m n o} → m ≺ n → n ≺ o → m ≺ o
+≺-trans ≺zero q = q
+≺-trans ≺fail q = ≺fail
+≺-trans (≺suc p) (≺suc q) = ≺suc λ where .force → ≺-trans (force p) (force q)
+
+≈-to-≺ : ∀ {m n} → m ≈ n → m ≺ n
+≈-to-≺ ≈zero = ≺zero
+≈-to-≺ ≈fail = ≺fail
+≈-to-≺ (≈suc p) = ≺suc (λ where .force → ≈-to-≺ (force p))
+
+≺-∸ℕ : ∀ {m n} o → m ≺ n → m ∸ℕ o ≺ n ∸ℕ o
+≺-∸ℕ zero p = p
+≺-∸ℕ (suc o) ≺zero = ≺zero
+≺-∸ℕ (suc o) ≺fail = ≺fail
+≺-∸ℕ (suc o) (≺suc p) = ≺-∸ℕ o (force p)
+
+≺-⊓ : ∀ {m n o p} → m ≺ n → o ≺ p → m ⊓ o ≺ n ⊓ p
+≺-⊓ ≺zero ≺zero = ≺zero
+≺-⊓ ≺zero ≺fail = ≺fail
+≺-⊓ ≺zero (≺suc _) = ≺zero
+≺-⊓ ≺fail ≺zero = ≺fail
+≺-⊓ ≺fail ≺fail = ≺fail
+≺-⊓ ≺fail (≺suc _) = ≺fail
+≺-⊓ (≺suc _) ≺zero = ≺zero
+≺-⊓ (≺suc _) ≺fail = ≺fail
+≺-⊓ (≺suc p) (≺suc q) = ≺suc λ where .force → ≺-⊓ (force p) (force q)

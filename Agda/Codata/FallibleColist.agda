@@ -199,7 +199,7 @@ mutual
 
   data _≺_ {A : Set} : Colistˣ A → Colistˣ A → Set where
     [] : ∀ {xs} → [] ≺ xs
-    fail : fail ≺ fail
+    fail : ∀ {xs} → fail ≺ xs
     _∷_ : ∀ x {xs ys} → xs ∞≺ ys → (x ∷ xs) ≺ (x ∷ ys)
 
   record _∞≺_ (xs ys : ∞Colistˣ A) : Set where
@@ -217,9 +217,9 @@ open _∞≺_ public
   → xs ≺ ys
   → ys ≺ zs
   → xs ≺ zs
-≺-trans [] ys≺zs = []
-≺-trans fail fail = fail
-≺-trans (x ∷ xs≺ys) (.x ∷ ys≺zs) = x ∷ λ where .force → ≺-trans (force xs≺ys) (force ys≺zs)
+≺-trans [] q = []
+≺-trans fail q = fail
+≺-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ≺-trans (force p) (force q)
 
 ≺-zip : ∀ {xs xs' : Colistˣ A} {ys ys' : Colistˣ B}
   → xs' ≺ xs

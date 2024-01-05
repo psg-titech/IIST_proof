@@ -25,7 +25,7 @@ private
 
 shift : A → Colistˣ A → Colistˣ A
 shift x [] = []
-shift x fail = x ∷ λ where .force → fail
+shift x fail = fail
 shift x (y ∷ xs) = x ∷ λ where .force → shift y (force xs)
 
 unshift : {{_ : Eq A}} → A → Colistˣ A → Colistˣ A
@@ -38,17 +38,17 @@ unshift x (y ∷ xs) with x ≟ y
 -------------------------------------------------------------------------------
 -- Prefix
 
-shift-≺-∷ : ∀ (x : A) xs → (shift x xs) ≺ (x ∷ delay xs)
+shift-≺-∷ : ∀ (x : A) xs → (shift x xs) Colistˣ.≺ (x ∷ delay xs)
 shift-≺-∷ x [] = []
-shift-≺-∷ x fail = x ∷ λ where .force → fail
+shift-≺-∷ x fail = fail
 shift-≺-∷ x (y ∷ xs) = x ∷ λ where .force → shift-≺-∷ y (force xs)
 
-≺-shift : ∀ (x : A) {xs ys} → xs ≺ ys → shift x xs ≺ shift x ys
+≺-shift : ∀ (x : A) {xs ys} → xs Colistˣ.≺ ys → shift x xs Colistˣ.≺ shift x ys
 ≺-shift x [] = []
-≺-shift x fail = x ∷ λ where .force → fail
+≺-shift x fail = fail
 ≺-shift x (y ∷ xs≺ys) = x ∷ λ where .force → ≺-shift y (force xs≺ys)
 
-≺-unshift : ∀ {{_ : Eq A}} (x : A) {xs ys} → xs ≺ ys → unshift x xs ≺ unshift x ys
+≺-unshift : ∀ {{_ : Eq A}} (x : A) {xs ys} → xs Colistˣ.≺ ys → unshift x xs Colistˣ.≺ unshift x ys
 ≺-unshift x [] = []
 ≺-unshift x fail = fail
 ≺-unshift x (y ∷ xs≺ys) with x ≟ y
@@ -62,10 +62,10 @@ ST : Set → Set → Set
 ST X Y = Colistˣ X → Colistˣ Y
 
 IsIncremental : ST X Y → Set
-IsIncremental st = ∀ {xs xs'} → xs' ≺ xs → st xs' ≺ st xs
+IsIncremental st = ∀ {xs xs'} → xs' Colistˣ.≺ xs → st xs' Colistˣ.≺ st xs
 
 HasDelay : ℕ → ST X Y → Set
-HasDelay d st = ∀ xs → colength (st xs) Coℕˣ.≈ (colength xs ∸ℕ d)
+HasDelay d st = ∀ xs → colength (st xs) Coℕˣ.≺ (colength xs ∸ℕ d)
 
 record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
   field
@@ -74,7 +74,7 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
     hasDelay : HasDelay d st
 
 _IsIISTOf_ : ST X Y → ST Y X → Set
-st' IsIISTOf st = ∀ xs → st' (st xs) ≺ xs
+st' IsIISTOf st = ∀ xs → st' (st xs) Colistˣ.≺ xs
 
 record _Is_-IISTOf_ (st' : ST X Y) (d : ℕ) (st : ST Y X) : Set where
   field
@@ -170,77 +170,77 @@ B-incremental (e ⊗ e') yws'≺yws =
 --------------------------------------------------------------------------------
 -- d-Incrementality of F⟦_⟧ and B⟦_⟧
 
-shift-colength : ∀ (x : A) xs → colength (shift x xs) Coℕˣ.≈ colength xs
-shift-colength x [] = ≈zero
-shift-colength x fail = {!   !}
-shift-colength x (y ∷ xs) = ≈suc λ where .force → shift-colength y (force xs)
+shift-colength : ∀ (x : A) xs → colength (shift x xs) Coℕˣ.≺ colength xs
+shift-colength x [] = ≺zero
+shift-colength x fail = ≺fail
+shift-colength x (y ∷ xs) = ≺suc λ where .force → shift-colength y (force xs)
 
-unshift-colength : ∀ {{_ : Eq A}} (x : A) xs → colength (unshift x xs) Coℕˣ.≈ (colength xs ∸ℕ 1)
-unshift-colength x [] = ≈zero
-unshift-colength x fail = ≈fail
+unshift-colength : ∀ {{_ : Eq A}} (x : A) xs → colength (unshift x xs) Coℕˣ.≺ (colength xs ∸ℕ 1)
+unshift-colength x [] = ≺zero
+unshift-colength x fail = ≺fail
 unshift-colength x (y ∷ xs) with x ≟ y
-... | no _ = {!   !}
-... | yes _ = Coℕˣ.≈-refl
+... | no _ = ≺fail
+... | yes _ = Coℕˣ.≺-refl
 
 F-delay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
 F-delay (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
-    helper a [] = ≈zero
-    helper a fail = ≈fail
+    helper a [] = ≺zero
+    helper a fail = ≺fail
     helper a (x ∷ xs) with f a .to x
-    ... | nothing = {!   !}
-    ... | just y = ≈suc λ where .force → helper (g a x) (force xs)
+    ... | nothing = ≺fail
+    ... | just y = ≺suc λ where .force → helper (g a x) (force xs)
 F-delay (delay x) = shift-colength x
 F-delay (hasten x) = unshift-colength x
 F-delay (e ⟫ e') xs =
   let ih = F-delay e xs
       ih' = F-delay e' (F⟦ e ⟧ xs)
-   in Coℕˣ.≈-trans
+   in Coℕˣ.≺-trans
         ih'
-        (Coℕˣ.≈-trans
-          (≈-∸ℕ DF⟦ e' ⟧ ih)
-          (∸-+-assoc (colength xs) DF⟦ e ⟧ DF⟦  e' ⟧))
+        (Coℕˣ.≺-trans
+          (≺-∸ℕ DF⟦ e' ⟧ ih)
+          (≈-to-≺ (∸-+-assoc (colength xs) DF⟦ e ⟧ DF⟦  e' ⟧)))
 F-delay (e ⊗ e') xzs =
   let ih = F-delay e (unzipₗ xzs)
       ih' = F-delay e' (unzipᵣ xzs)
-   in Coℕˣ.≈-trans
-        (Coℕˣ.≈-trans
-          colength-zip
-          (≈-⊓
-            (Coℕˣ.≈-trans ih (≈-∸ℕ DF⟦ e ⟧ colength-unzipₗ))
-            (Coℕˣ.≈-trans ih' (≈-∸ℕ DF⟦ e' ⟧ colength-unzipᵣ))))
-        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength xzs) DF⟦ e ⟧ DF⟦ e' ⟧))
+   in Coℕˣ.≺-trans
+        (Coℕˣ.≺-trans
+          (≈-to-≺ colength-zip)
+          (≺-⊓
+            (Coℕˣ.≺-trans ih (≺-∸ℕ DF⟦ e ⟧ (≈-to-≺ colength-unzipₗ)))
+            (Coℕˣ.≺-trans ih' (≺-∸ℕ DF⟦ e' ⟧ (≈-to-≺ colength-unzipᵣ)))))
+        (≈-to-≺ (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength xzs) DF⟦ e ⟧ DF⟦ e' ⟧)))
 
 B-delay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
 B-delay (map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
-    helper a [] = ≈zero
-    helper a fail = ≈fail
+    helper a [] = ≺zero
+    helper a fail = ≺fail
     helper a (y ∷ ys) with f a .from y
-    ... | nothing = {!   !}
-    ... | just x = ≈suc λ where .force → helper (g a x) (force ys)
+    ... | nothing = ≺fail
+    ... | just x = ≺suc λ where .force → helper (g a x) (force ys)
 B-delay (delay x) = unshift-colength x
 B-delay (hasten x) = shift-colength x
 B-delay (e ⟫ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
   let ih = B-delay e' zs
       ih' = B-delay e (B⟦ e' ⟧ zs)
-   in Coℕˣ.≈-trans
+   in Coℕˣ.≺-trans
         ih'
-        (Coℕˣ.≈-trans
-          (≈-∸ℕ DB⟦ e ⟧ ih)
-          (∸-+-assoc (colength zs) DB⟦ e' ⟧ DB⟦  e ⟧))
+        (Coℕˣ.≺-trans
+          (≺-∸ℕ DB⟦ e ⟧ ih)
+          (≈-to-≺ (∸-+-assoc (colength zs) DB⟦ e' ⟧ DB⟦  e ⟧)))
 B-delay (e ⊗ e') yws =
   let ih = B-delay e (unzipₗ yws)
       ih' = B-delay e' (unzipᵣ yws)
-   in Coℕˣ.≈-trans
-        (Coℕˣ.≈-trans
-          colength-zip
-          (≈-⊓
-            (Coℕˣ.≈-trans ih (≈-∸ℕ DB⟦ e ⟧ colength-unzipₗ))
-            (Coℕˣ.≈-trans ih' (≈-∸ℕ DB⟦ e' ⟧ colength-unzipᵣ))))
-        (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength yws) DB⟦ e ⟧ DB⟦ e' ⟧))
+   in Coℕˣ.≺-trans
+        (Coℕˣ.≺-trans
+          (≈-to-≺ colength-zip)
+          (≺-⊓
+            (Coℕˣ.≺-trans ih (≺-∸ℕ DB⟦ e ⟧ (≈-to-≺ colength-unzipₗ)))
+            (Coℕˣ.≺-trans ih' (≺-∸ℕ DB⟦ e' ⟧ (≈-to-≺ colength-unzipᵣ)))))
+        (≈-to-≺ (Coℕˣ.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength yws) DB⟦ e ⟧ DB⟦ e' ⟧)))
 
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
@@ -252,13 +252,13 @@ F-IIST (map-fold {A} a f g) = helper a
     helper a [] = []
     helper a fail = fail
     helper a (y ∷ ys) with f a .from y in eq
-    ... | nothing = {!   !}
+    ... | nothing = fail
     ... | just x rewrite f a .from→to eq =
           y ∷ λ where .force → helper (g a x) (force ys)
 F-IIST (delay x) [] = []
-F-IIST (delay x) fail = {!   !}
+F-IIST (delay x) fail = fail
 F-IIST (delay x) (y ∷ ys) with x ≟ y
-... | no _ = {!   !}
+... | no _ = fail
 ... | yes refl = shift-≺-∷ y (force ys)
 F-IIST (hasten x) [] = []
 F-IIST (hasten x) fail with x ≟ x
@@ -270,7 +270,7 @@ F-IIST (hasten x) (y ∷ ys) with x ≟ x
 F-IIST (e ⟫ e') zs =
   let ih = F-IIST e (B⟦ e' ⟧ zs)
       ih' = F-IIST e' zs
-   in ≺-trans (F-incremental e' ih) ih'
+   in Colistˣ.≺-trans (F-incremental e' ih) ih'
 F-IIST (e ⊗ e') yws =
   let ih = F-IIST e (unzipₗ yws)
       ih' = F-IIST e' (unzipᵣ yws)
@@ -283,7 +283,7 @@ B-IIST (map-fold {A} a f g) = helper a
     helper a [] = []
     helper a fail = fail
     helper a (x ∷ xs) with f a .to x in eq
-    ... | nothing = {!   !}
+    ... | nothing = fail
     ... | just y rewrite f a .to→from eq =
           x ∷ λ where .force → helper (g a x) (force xs)
 B-IIST (delay x) [] = []
@@ -294,78 +294,62 @@ B-IIST (delay x) (y ∷ ys) with x ≟ x
 ... | no contra with () ← contra refl
 ... | yes refl = shift-≺-∷ y (force ys)
 B-IIST (hasten x) [] = []
-B-IIST (hasten x) fail = {!   !}
+B-IIST (hasten x) fail = fail
 B-IIST (hasten x) (y ∷ ys) with x ≟ y
-... | no _ = {!   !}
+... | no _ = fail
 ... | yes refl = shift-≺-∷ y (force ys)
 B-IIST (e ⟫ e') zs =
   let ih = B-IIST e' (F⟦ e ⟧ zs)
       ih' = B-IIST e zs
-   in ≺-trans (B-incremental e ih) ih'
+   in Colistˣ.≺-trans (B-incremental e ih) ih'
 B-IIST (e ⊗ e') yws =
   let ih = B-IIST e (unzipₗ yws)
       ih' = B-IIST e' (unzipᵣ yws)
    in {!   !}
 
-{-
-
-delay : failが未来に送られる
-hasten : 失敗する
-map-fold : 失敗する
-
-ih   : B⟦ e ⟧  (F⟦ e ⟧ (unzipₗ yws)) ≺ unzipₗ yws
-ih'  : B⟦ e' ⟧ (F⟦ e' ⟧ (unzipᵣ yws)) ≺ unzipᵣ yws
-goal :
-  zip
-    (B⟦ e ⟧  (unzipₗ (zip (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))))
-    (B⟦ e' ⟧ (unzipᵣ (zip (F⟦ e ⟧ (unzipₗ yws)) (F⟦ e' ⟧ (unzipᵣ yws)))))
-  ≺ yws
-
--}
-
 --------------------------------------------------------------------------------
 -- Bundles
 
-F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
-F-d-IST e = record
-  { empty = F-empty e
-  ; isIncremental = F-incremental e
-  ; hasDelay = F-delay e
-  }
+-- F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
+-- F-d-IST e = record
+--   { empty = F-empty e
+--   ; isIncremental = F-incremental e
+--   ; hasDelay = F-delay e
+--   }
 
-B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧
-B-d-IST e = record
-  { empty = B-empty e
-  ; isIncremental = B-incremental e
-  ; hasDelay = B-delay e
-  }
+-- B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧
+-- B-d-IST e = record
+--   { empty = B-empty e
+--   ; isIncremental = B-incremental e
+--   ; hasDelay = B-delay e
+--   }
 
-F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
-F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
+-- F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
+-- F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
 
-B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
-B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
+-- B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
+-- B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
 
-F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
-F-d-d'-IIST e = record
-  { inverse = B⟦ e ⟧
-  ; is-d-IST = F-d-IST e
-  ; inverse-is-d'-IIST = B-d-IIST e
-  }
+-- F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
+-- F-d-d'-IIST e = record
+--   { inverse = B⟦ e ⟧
+--   ; is-d-IST = F-d-IST e
+--   ; inverse-is-d'-IIST = B-d-IIST e
+--   }
 
-B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
-B-d-d'-IIST e = record
-  { inverse = F⟦ e ⟧
-  ; is-d-IST = B-d-IST e
-  ; inverse-is-d'-IIST = F-d-IIST e
-  }
+-- B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
+-- B-d-d'-IIST e = record
+--   { inverse = F⟦ e ⟧
+--   ; is-d-IST = B-d-IST e
+--   ; inverse-is-d'-IIST = F-d-IIST e
+--   }
 
 --------------------------------------------------------------------------------
 -- Properties of I⟦_⟧
 
 ≈-shift : ∀ (x : A) {xs ys} → xs Colistˣ.≈ ys → shift x xs Colistˣ.≈ shift x ys
 ≈-shift x ≈[] = ≈[]
-≈-shift x ≈fail = refl ≈∷ λ where .force → ≈fail
+≈-shift x ≈fail = ≈fail
 ≈-shift x (refl ≈∷ xs≈ys) = refl ≈∷ λ where .force → ≈-shift _ (force xs≈ys)
 
 ≈-unshift : ∀ {{_ : Eq A}} (x : A) {xs ys} → xs Colistˣ.≈ ys → unshift x xs Colistˣ.≈ unshift x ys
