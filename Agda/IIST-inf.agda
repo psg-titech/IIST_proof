@@ -310,39 +310,39 @@ B-IIST (e ⊗ e') yws =
 --------------------------------------------------------------------------------
 -- Bundles
 
--- F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
--- F-d-IST e = record
---   { empty = F-empty e
---   ; isIncremental = F-incremental e
---   ; hasDelay = F-delay e
---   }
+F-d-IST : ∀ (e : E X Y) → Is DF⟦ e ⟧ -IST F⟦ e ⟧
+F-d-IST e = record
+  { empty = F-empty e
+  ; isIncremental = F-incremental e
+  ; hasDelay = F-delay e
+  }
 
--- B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧
--- B-d-IST e = record
---   { empty = B-empty e
---   ; isIncremental = B-incremental e
---   ; hasDelay = B-delay e
---   }
+B-d-IST : ∀ (e : E X Y) → Is DB⟦ e ⟧ -IST B⟦ e ⟧
+B-d-IST e = record
+  { empty = B-empty e
+  ; isIncremental = B-incremental e
+  ; hasDelay = B-delay e
+  }
 
--- F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
--- F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
+F-d-IIST : ∀ (e : E X Y) → F⟦ e ⟧ Is DF⟦ e ⟧ -IISTOf B⟦ e ⟧
+F-d-IIST e = record { is-d-IST = F-d-IST e; isIIST = F-IIST e }
 
--- B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
--- B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
+B-d-IIST : ∀ (e : E X Y) → B⟦ e ⟧ Is DB⟦ e ⟧ -IISTOf F⟦ e ⟧
+B-d-IIST e = record { is-d-IST = B-d-IST e; isIIST = B-IIST e }
 
--- F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
--- F-d-d'-IIST e = record
---   { inverse = B⟦ e ⟧
---   ; is-d-IST = F-d-IST e
---   ; inverse-is-d'-IIST = B-d-IIST e
---   }
+F-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
+F-d-d'-IIST e = record
+  { inverse = B⟦ e ⟧
+  ; is-d-IST = F-d-IST e
+  ; inverse-is-d'-IIST = B-d-IIST e
+  }
 
--- B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
--- B-d-d'-IIST e = record
---   { inverse = F⟦ e ⟧
---   ; is-d-IST = B-d-IST e
---   ; inverse-is-d'-IIST = F-d-IIST e
---   }
+B-d-d'-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
+B-d-d'-IIST e = record
+  { inverse = F⟦ e ⟧
+  ; is-d-IST = B-d-IST e
+  ; inverse-is-d'-IIST = F-d-IIST e
+  }
 
 --------------------------------------------------------------------------------
 -- Properties of I⟦_⟧
