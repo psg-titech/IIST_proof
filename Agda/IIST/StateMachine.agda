@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module IIST.Experiment.DefinitionallyIncremental where
+module IIST.StateMachine where
 
 open import Codata.Musical.Notation
 open import Codata.Musical.Colist.Base using ( Colist; []; _∷_ )
@@ -200,7 +200,7 @@ open _≈_
 ≈-cong-subst refl refl p = p
 
 --------------------------------------------------------------------------------
--- More defined: like _≈_ but the LHS may fail earlier
+-- More defined: like _≈_ but the LHS may ⊥ earlier
 
 infix 4 _⊑_ _Step⊑_
 
