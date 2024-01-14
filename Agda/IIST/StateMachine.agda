@@ -108,14 +108,14 @@ F⟦_⟧ : (e : E X Y) → IST X Y DF⟦ e ⟧
 F⟦ map-fold a f g ⟧ = F-map-fold a f g
 F⟦ delay x ⟧ = shift x
 F⟦ hasten x ⟧ = unshift x
-F⟦ e ⟫ e' ⟧ = F⟦ e ⟧ ∙ F⟦ e' ⟧
+F⟦ e ⋙ e' ⟧ = F⟦ e ⟧ ∙ F⟦ e' ⟧
 F⟦ e ⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
 
 B⟦_⟧ : (e : E X Y) → IST Y X DB⟦ e ⟧
 B⟦ map-fold a f g ⟧ = B-map-fold a f g
 B⟦ delay x ⟧ = unshift x
 B⟦ hasten x ⟧ = shift x
-B⟦ e ⟫ e' ⟧ = B⟦ e' ⟧ ∙ B⟦ e ⟧
+B⟦ e ⋙ e' ⟧ = B⟦ e' ⟧ ∙ B⟦ e ⟧
 B⟦ e ⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
 
 _ : eat id (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ≡ just (0 ∷ 1 ∷ 2 ∷ 3 ∷ [])
@@ -358,7 +358,7 @@ F∘I≈B (map-fold {A} a f g) = helper refl
     ... | just x = yield refl (helper (cong (Maybe.maybe (g a) a) eq))
 F∘I≈B (delay x) = ≈-refl
 F∘I≈B (hasten x) = ≈-refl
-F∘I≈B (e ⟫ e') = ≈-cong-∙ (F∘I≈B e') (F∘I≈B e)
+F∘I≈B (e ⋙ e') = ≈-cong-∙ (F∘I≈B e') (F∘I≈B e)
 F∘I≈B (e ⊗ e') = ≈-cong-∥ (F∘I≈B e) (F∘I≈B e')
 
 B∘I≈F : ∀ (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≈ F⟦ e ⟧
@@ -370,7 +370,7 @@ B∘I≈F (map-fold {A} a f g) = helper refl
     ... | just y = yield refl (helper (cong (Maybe.maybe (g a) a) (f a .to→from eq)))
 B∘I≈F (delay x) = ≈-refl
 B∘I≈F (hasten x) = ≈-refl
-B∘I≈F (e ⟫ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
+B∘I≈F (e ⋙ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
 B∘I≈F (e ⊗ e') = ≈-cong-∥ (B∘I≈F e) (B∘I≈F e')
 
 --------------------------------------------------------------------------------
@@ -514,7 +514,7 @@ F-IIST (map-fold {A} a f g) = helper a
     ... | just x rewrite f a .from→to eq = yield refl (helper (g a x))
 F-IIST (delay x) = unshift-shift x
 F-IIST (hasten x) = shift-unshift x
-F-IIST (e ⟫ e') = ∙-IIST (F-IIST e') (F-IIST e)
+F-IIST (e ⋙ e') = ∙-IIST (F-IIST e') (F-IIST e)
 F-IIST (e ⊗ e') = ∥-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : ∀ (e : E X Y) → F⟦ e ⟧ ∙ B⟦ e ⟧ ⊑ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
@@ -526,5 +526,5 @@ B-IIST (map-fold {A} a f g) = helper a
     ... | just y rewrite f a .to→from eq = yield refl (helper (g a x))
 B-IIST (delay x) = shift-unshift x
 B-IIST (hasten x) = unshift-shift x
-B-IIST (e ⟫ e') = ∙-IIST (B-IIST e) (B-IIST e')
+B-IIST (e ⋙ e') = ∙-IIST (B-IIST e) (B-IIST e')
 B-IIST (e ⊗ e') = ∥-IIST (B-IIST e) (B-IIST e')

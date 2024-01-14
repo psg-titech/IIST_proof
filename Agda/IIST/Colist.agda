@@ -78,7 +78,7 @@ F⟦_⟧ : E X Y → ST X Y
 F⟦ map-fold a f g ⟧ = F-map-fold a f g
 F⟦ delay x ⟧ = shift x
 F⟦ hasten x ⟧ = unshift x
-F⟦ e ⟫ e' ⟧ = F⟦ e' ⟧ ∘ F⟦ e ⟧
+F⟦ e ⋙ e' ⟧ = F⟦ e' ⟧ ∘ F⟦ e ⟧
 F⟦ e ⊗ e' ⟧ xzs = zip (F⟦ e ⟧ (unzipₗ xzs)) (F⟦ e' ⟧ (unzipᵣ xzs))
 
 B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST Y X
@@ -92,7 +92,7 @@ B⟦_⟧ : E X Y → ST Y X
 B⟦ map-fold a f g ⟧ = B-map-fold a f g
 B⟦ delay x ⟧ = unshift x
 B⟦ hasten x ⟧ = shift x
-B⟦ e ⟫ e' ⟧ = B⟦ e ⟧ ∘ B⟦ e' ⟧
+B⟦ e ⋙ e' ⟧ = B⟦ e ⟧ ∘ B⟦ e' ⟧
 B⟦ e ⊗ e' ⟧ xzs = zip (B⟦ e ⟧ (unzipₗ xzs)) (B⟦ e' ⟧ (unzipᵣ xzs))
 
 --------------------------------------------------------------------------------
@@ -101,14 +101,14 @@ F-empty : ∀ (e : E X Y) → F⟦ e ⟧ [] ≡ []
 F-empty (map-fold a f g) = refl
 F-empty (delay x) = refl
 F-empty (hasten x) = refl
-F-empty (e ⟫ e') rewrite F-empty e | F-empty e' = refl
+F-empty (e ⋙ e') rewrite F-empty e | F-empty e' = refl
 F-empty (e ⊗ e') rewrite F-empty e | F-empty e' = refl
 
 B-empty : ∀ (e : E X Y) → B⟦ e ⟧ [] ≡ []
 B-empty (map-fold a f g) = refl
 B-empty (delay x) = refl
 B-empty (hasten x) = refl
-B-empty (e ⟫ e') rewrite B-empty e' | B-empty e = refl
+B-empty (e ⋙ e') rewrite B-empty e' | B-empty e = refl
 B-empty (e ⊗ e') rewrite B-empty e | B-empty e' = refl
 
 --------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ F-incremental (map-fold {A} a f g) = helper a
     ... | just y = y ∷ λ where .force → helper (g a x) (force p)
 F-incremental (delay x) = ≺-cong-shift x
 F-incremental (hasten x) = ≺-cong-unshift x
-F-incremental (e ⟫ e') = F-incremental e' ∘ F-incremental e
+F-incremental (e ⋙ e') = F-incremental e' ∘ F-incremental e
 F-incremental (e ⊗ e') p =
   ≺-cong-zip (F-incremental e (≺-cong-unzipₗ p)) (F-incremental e' (≺-cong-unzipᵣ p))
 
@@ -157,7 +157,7 @@ B-incremental (map-fold {A} a f g) = helper a
     ... | just x = x ∷ λ where .force → helper (g a x) (force p)
 B-incremental (delay x) = ≺-cong-unshift x
 B-incremental (hasten x) = ≺-cong-shift x
-B-incremental (e ⟫ e') = B-incremental e ∘ B-incremental e'
+B-incremental (e ⋙ e') = B-incremental e ∘ B-incremental e'
 B-incremental (e ⊗ e') yws'≺yws =
   ≺-cong-zip (B-incremental e (≺-cong-unzipₗ yws'≺yws)) (B-incremental e' (≺-cong-unzipᵣ yws'≺yws))
 
@@ -187,7 +187,7 @@ F-hasDelay (map-fold {A} a f g) = helper a
     ... | just y = suc λ where .force → helper (g a x) (force xs)
 F-hasDelay (delay x) = shift-colength x
 F-hasDelay (hasten x) = unshift-colength x
-F-hasDelay (e ⟫ e') xs =
+F-hasDelay (e ⋙ e') xs =
   let ih = F-hasDelay e xs
       ih' = F-hasDelay e' (F⟦ e ⟧ xs)
    in Coℕ⊥.⊑-trans
@@ -217,7 +217,7 @@ B-hasDelay (map-fold {A} a f g) = helper a
     ... | just x = suc λ where .force → helper (g a x) (force ys)
 B-hasDelay (delay x) = unshift-colength x
 B-hasDelay (hasten x) = shift-colength x
-B-hasDelay (e ⟫ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
+B-hasDelay (e ⋙ e') zs rewrite +-comm DB⟦ e ⟧ DB⟦ e' ⟧ =
   let ih = B-hasDelay e' zs
       ih' = B-hasDelay e (B⟦ e' ⟧ zs)
    in Coℕ⊥.⊑-trans
@@ -268,7 +268,7 @@ unshift-IIST x (y ∷ xs) with x ≟ x
     ... | just y = y ∷ λ where .force → helper (g a x) (force p)
 ≺-cong-F (delay x) = ≺-cong-shift x
 ≺-cong-F (hasten x) = ≺-cong-unshift x
-≺-cong-F (e ⟫ e') = ≺-cong-F e' ∘ ≺-cong-F e
+≺-cong-F (e ⋙ e') = ≺-cong-F e' ∘ ≺-cong-F e
 ≺-cong-F (e ⊗ e') xs≺ys = ≺-cong-zip (≺-cong-F e (≺-cong-unzipₗ xs≺ys)) (≺-cong-F e' (≺-cong-unzipᵣ xs≺ys))
 
 ≺-cong-B : ∀ (e : E X Y) {xs ys : Colist⊥ Y}
@@ -286,7 +286,7 @@ unshift-IIST x (y ∷ xs) with x ≟ x
     ... | just x = x ∷ λ where .force → helper (g a x) (force p)
 ≺-cong-B (delay x) = ≺-cong-unshift x
 ≺-cong-B (hasten x) = ≺-cong-shift x
-≺-cong-B (e ⟫ e') = ≺-cong-B e ∘ ≺-cong-B e'
+≺-cong-B (e ⋙ e') = ≺-cong-B e ∘ ≺-cong-B e'
 ≺-cong-B (e ⊗ e') xs≺ys = ≺-cong-zip (≺-cong-B e (≺-cong-unzipₗ xs≺ys)) (≺-cong-B e' (≺-cong-unzipᵣ xs≺ys))
 
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
@@ -301,7 +301,7 @@ F-IIST (map-fold {A} a f g) = helper a
           y ∷ λ where .force → helper (g a x) (force ys)
 F-IIST (delay x) = shift-IIST x
 F-IIST (hasten x) = unshift-IIST x
-F-IIST (e ⟫ e') zs =
+F-IIST (e ⋙ e') zs =
   let ih = F-IIST e (B⟦ e' ⟧ zs)
       ih' = F-IIST e' zs
    in Colist⊥.≺-trans (F-incremental e' ih) ih'
@@ -326,7 +326,7 @@ B-IIST (map-fold {A} a f g) = helper a
           x ∷ λ where .force → helper (g a x) (force xs)
 B-IIST (delay x) = unshift-IIST x
 B-IIST (hasten x) = shift-IIST x
-B-IIST (e ⟫ e') zs =
+B-IIST (e ⋙ e') zs =
   let ih = B-IIST e' (F⟦ e ⟧ zs)
       ih' = B-IIST e zs
    in Colist⊥.≺-trans (B-incremental e ih) ih'
@@ -406,7 +406,7 @@ B-d-d'-IIST e = record
     ... | just y = y ∷ λ where .force → helper (g a x) (force p)
 ≈-cong-F (delay x) = ≈-cong-shift x
 ≈-cong-F (hasten x) = ≈-cong-unshift x
-≈-cong-F (e ⟫ e') = ≈-cong-F e' ∘ ≈-cong-F e
+≈-cong-F (e ⋙ e') = ≈-cong-F e' ∘ ≈-cong-F e
 ≈-cong-F (e ⊗ e') p = ≈-cong-zip (≈-cong-F e (≈-cong-unzipₗ p)) (≈-cong-F e' (≈-cong-unzipᵣ p))
 
 ≈-cong-B : ∀ (e : E X Y) {xs ys : Colist⊥ Y}
@@ -424,7 +424,7 @@ B-d-d'-IIST e = record
     ... | just x = x ∷ λ where .force → helper (g a x) (force p)
 ≈-cong-B (delay x) = ≈-cong-unshift x
 ≈-cong-B (hasten x) = ≈-cong-shift x
-≈-cong-B (e ⟫ e') = ≈-cong-B e ∘ ≈-cong-B e'
+≈-cong-B (e ⋙ e') = ≈-cong-B e ∘ ≈-cong-B e'
 ≈-cong-B (e ⊗ e') p = ≈-cong-zip (≈-cong-B e (≈-cong-unzipₗ p)) (≈-cong-B e' (≈-cong-unzipᵣ p))
 
 F∘I≡B : ∀ (e : E X Y) (ys : Colist⊥ Y)
@@ -441,7 +441,7 @@ F∘I≡B {Y = Y} (map-fold {A} a f g) = helper refl
           x ∷ λ where .force → helper (cong (maybe (g a) a) eq) (force ys)
 F∘I≡B (delay x) ys = Colist⊥.≈-refl
 F∘I≡B (hasten x) ys = Colist⊥.≈-refl
-F∘I≡B (e ⟫ e') ys =
+F∘I≡B (e ⋙ e') ys =
   let ih = F∘I≡B e' ys
       ih' = F∘I≡B e (F⟦ I⟦ e' ⟧ ⟧ ys)
    in Colist⊥.≈-trans ih' (≈-cong-B e ih)
@@ -464,7 +464,7 @@ B∘I≡F {X = X} (map-fold {A} a f g) = helper refl
           y ∷ λ where .force → helper (cong (maybe (g a) a) (f a .to→from eq)) (force xs)
 B∘I≡F (delay x) xs = Colist⊥.≈-refl
 B∘I≡F (hasten x) xs = Colist⊥.≈-refl
-B∘I≡F (e ⟫ e') xs =
+B∘I≡F (e ⋙ e') xs =
   let ih = B∘I≡F e xs
       ih' = B∘I≡F e' (B⟦ I⟦ e ⟧ ⟧ xs)
    in Colist⊥.≈-trans ih' (≈-cong-F e' ih)
