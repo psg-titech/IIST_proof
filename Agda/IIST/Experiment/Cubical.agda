@@ -2,18 +2,9 @@
 
 module IIST.Experiment.Cubical where
 
-open import Cubical.Codata.Stream.Base using ( Stream )
-open import Cubical.Data.List.Base using ( List; []; _∷_ )
 open import Cubical.Data.Nat.Base using ( ℕ; zero; suc; _+_ )
 open import Cubical.Data.Nat.Properties using ( +-zero; +-assoc )
-open import Cubical.Data.Sigma.Base using ( _×_; _,_; fst )
-open import Cubical.Foundations.Equiv
-open import Cubical.Foundations.Function using ( idfun; _∘_ )
 open import Cubical.Foundations.Prelude
-open import Cubical.Foundations.Isomorphism
-open import Cubical.Foundations.Univalence
-
-open Stream
 
 private
   variable
