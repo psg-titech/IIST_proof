@@ -172,11 +172,11 @@ F-map-fold a f g (x ∷ xs) = do
   return (y ∷ ys)
 
 F⟦_⟧ : E X Y → ST X Y
-F⟦ map-fold a f g ⟧ = F-map-fold a f g
-F⟦ delay x ⟧ = return ∘ shift x
-F⟦ hasten x ⟧ = unshift x
-F⟦ e ⋙ e' ⟧ = F⟦ e ⟧ >=> F⟦ e' ⟧
-F⟦ e ⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
+F⟦ `map-fold a f g ⟧ = F-map-fold a f g
+F⟦ `delay x ⟧ = return ∘ shift x
+F⟦ `hasten x ⟧ = unshift x
+F⟦ e `⋙ e' ⟧ = F⟦ e ⟧ >=> F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
 
 
 -- Backward semantics
@@ -188,41 +188,41 @@ B-map-fold a f g (y ∷ ys) = do
   just (x ∷ xs)
 
 B⟦_⟧ : E X Y → ST Y X
-B⟦ map-fold a f g ⟧ = B-map-fold a f g
-B⟦ delay x ⟧ = unshift x
-B⟦ hasten x ⟧ = return ∘ shift x
-B⟦ e ⋙ e' ⟧ = B⟦ e' ⟧ >=> B⟦ e ⟧
-B⟦ e ⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
+B⟦ `map-fold a f g ⟧ = B-map-fold a f g
+B⟦ `delay x ⟧ = unshift x
+B⟦ `hasten x ⟧ = return ∘ shift x
+B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ >=> B⟦ e ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
 
 
-_ : F⟦ delay 0 ⋙ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
+_ : F⟦ `delay 0 `⋙ `hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
 _ = refl
 
-_ : B⟦ delay 0 ⋙ hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
+_ : B⟦ `delay 0 `⋙ `hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
 _ = refl
 
-_ : F⟦ delay 0 ⋙ hasten 1 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ nothing
+_ : F⟦ `delay 0 `⋙ `hasten 1 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ nothing
 _ = refl
 
-_ : F⟦ delay 0 ⊗ hasten 0 ⟧ ((1 , 0) ∷ (2 , 1) ∷ (3 , 2) ∷ (4 , 3) ∷ [])
+_ : F⟦ `delay 0 `⊗ `hasten 0 ⟧ ((1 , 0) ∷ (2 , 1) ∷ (3 , 2) ∷ (4 , 3) ∷ [])
     ≡ just ((0 , 1) ∷ (1 , 2) ∷ (2 , 3) ∷ [])
 _ = refl
 
 -------------------------------------------------------------------------------
 
 F-empty : ∀ (e : E X Y) → F⟦ e ⟧ [] ≡ just []
-F-empty (map-fold a f g) = refl
-F-empty (delay x) = refl
-F-empty (hasten x) = refl
-F-empty (e ⋙ e') rewrite F-empty e | F-empty e' = refl
-F-empty (e ⊗ e') rewrite F-empty e | F-empty e' = refl
+F-empty (`map-fold a f g) = refl
+F-empty (`delay x) = refl
+F-empty (`hasten x) = refl
+F-empty (e `⋙ e') rewrite F-empty e | F-empty e' = refl
+F-empty (e `⊗ e') rewrite F-empty e | F-empty e' = refl
 
 B-empty : ∀ (e : E X Y) → B⟦ e ⟧ [] ≡ just []
-B-empty (map-fold a f g) = refl
-B-empty (delay x) = refl
-B-empty (hasten x) = refl
-B-empty (e ⋙ e') rewrite B-empty e' | B-empty e = refl
-B-empty (e ⊗ e') rewrite B-empty e | B-empty e' = refl
+B-empty (`map-fold a f g) = refl
+B-empty (`delay x) = refl
+B-empty (`hasten x) = refl
+B-empty (e `⋙ e') rewrite B-empty e' | B-empty e = refl
+B-empty (e `⊗ e') rewrite B-empty e | B-empty e' = refl
 
 -------------------------------------------------------------------------------
 -- Incrementality of F and B
@@ -265,9 +265,9 @@ unshift-incremental x eq (y ∷ p)
     zip ys' ws' , ≺-cong-zip pfy pfw , refl
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
-F-incremental (map-fold {A} a f g) = helper a
+F-incremental (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → IsIncremental F⟦ map-fold a f g ⟧
+    helper : (a : A) → IsIncremental F⟦ `map-fold a f g ⟧
     helper a eq [] = [] , [] , refl
     helper a eq (_∷_ x {xs = xs} pf)
       with just y ← f a .to x
@@ -275,15 +275,15 @@ F-incremental (map-fold {A} a f g) = helper a
       with ys' , pf' , eq₂ ← helper (g a x) eq₁ pf
       rewrite sym (just-injective eq) | eq₂ =
         y ∷ ys' , y ∷ pf' , refl
-F-incremental (delay x) = shift-incremental x
-F-incremental (hasten x) = unshift-incremental x
-F-incremental (e ⋙ e') = >=>-incremental (F-incremental e) (F-incremental e')
-F-incremental (e ⊗ e') = ∥-incremental (F-incremental e) (F-incremental e')
+F-incremental (`delay x) = shift-incremental x
+F-incremental (`hasten x) = unshift-incremental x
+F-incremental (e `⋙ e') = >=>-incremental (F-incremental e) (F-incremental e')
+F-incremental (e `⊗ e') = ∥-incremental (F-incremental e) (F-incremental e')
 
 B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧
-B-incremental (map-fold {A} a f g) = helper a
+B-incremental (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → IsIncremental B⟦ map-fold a f g ⟧
+    helper : (a : A) → IsIncremental B⟦ `map-fold a f g ⟧
     helper a eq [] = [] , [] , refl
     helper a eq (_∷_ y {xs = ys} pf)
       with just x ← f a .from y
@@ -291,10 +291,10 @@ B-incremental (map-fold {A} a f g) = helper a
       with xs' , pf' , eq₂ ← helper (g a x) eq₁ pf
       rewrite sym (just-injective eq) | eq₂ =
         x ∷ xs' , x ∷ pf' , refl
-B-incremental (delay x) = unshift-incremental x
-B-incremental (hasten x) = shift-incremental x
-B-incremental (e ⋙ e') = >=>-incremental (B-incremental e') (B-incremental e)
-B-incremental (e ⊗ e') = ∥-incremental (B-incremental e) (B-incremental e')
+B-incremental (`delay x) = unshift-incremental x
+B-incremental (`hasten x) = shift-incremental x
+B-incremental (e `⋙ e') = >=>-incremental (B-incremental e') (B-incremental e)
+B-incremental (e `⊗ e') = ∥-incremental (B-incremental e) (B-incremental e')
 
 --------------------------------------------------------------------------------
 -- d-incrementality of F and B
@@ -338,9 +338,9 @@ unshift-hasDelay x (y ∷ xs) eq
     sym (∸-distribˡ-⊔-⊓ (length xzs) d d')
 
 F-hasDelay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
-F-hasDelay (map-fold {A} a f g) = helper a
+F-hasDelay (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → HasDelay 0 F⟦ map-fold a f g ⟧
+    helper : (a : A) → HasDelay 0 F⟦ `map-fold a f g ⟧
     helper a [] refl = refl
     helper a (x ∷ xs) eq
       with just y ← f a .to x
@@ -348,15 +348,15 @@ F-hasDelay (map-fold {A} a f g) = helper a
       with ih ← helper (g a x) xs eq₁
       rewrite sym (just-injective eq) =
         cong suc ih
-F-hasDelay (delay x) = shift-hasDelay x
-F-hasDelay (hasten x) = unshift-hasDelay x
-F-hasDelay (e ⋙ e') = >=>-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
-F-hasDelay (e ⊗ e') = ∥-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
+F-hasDelay (`delay x) = shift-hasDelay x
+F-hasDelay (`hasten x) = unshift-hasDelay x
+F-hasDelay (e `⋙ e') = >=>-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
+F-hasDelay (e `⊗ e') = ∥-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
 
 B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
-B-hasDelay (map-fold {A} a f g) = helper a
+B-hasDelay (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → HasDelay 0 B⟦ map-fold a f g ⟧
+    helper : (a : A) → HasDelay 0 B⟦ `map-fold a f g ⟧
     helper a [] refl = refl
     helper a (y ∷ ys) eq
       with just x ← f a .from y
@@ -364,10 +364,10 @@ B-hasDelay (map-fold {A} a f g) = helper a
       with ih ← helper (g a x) ys eq₁
       rewrite sym (just-injective eq) =
         cong suc ih
-B-hasDelay (delay x) = unshift-hasDelay x
-B-hasDelay (hasten x) = shift-hasDelay x
-B-hasDelay (e ⋙ e') = >=>-hasDelay {d = DB⟦ e' ⟧} {d' = DB⟦ e ⟧} (B-hasDelay e') (B-hasDelay e)
-B-hasDelay (e ⊗ e') = ∥-hasDelay {d = DB⟦ e ⟧} {d' = DB⟦ e' ⟧} (B-hasDelay e) (B-hasDelay e')
+B-hasDelay (`delay x) = unshift-hasDelay x
+B-hasDelay (`hasten x) = shift-hasDelay x
+B-hasDelay (e `⋙ e') = >=>-hasDelay {d = DB⟦ e' ⟧} {d' = DB⟦ e ⟧} (B-hasDelay e') (B-hasDelay e)
+B-hasDelay (e `⊗ e') = ∥-hasDelay {d = DB⟦ e ⟧} {d' = DB⟦ e' ⟧} (B-hasDelay e) (B-hasDelay e')
 
 --------------------------------------------------------------------------------
 -- F and B are inverse of each other
@@ -420,9 +420,9 @@ unshift-IIST x {y ∷ xs} refl with x ≟ x
     zip ys'' ws'' , ≺-cong-zip (≺-trans pfy' pfy) (≺-trans pfw' pfw) , refl
 
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
-F-IIST (map-fold {A = A} a f g) = helper a
+F-IIST (`map-fold {A = A} a f g) = helper a
   where
-    helper : (a : A) → F⟦ map-fold a f g ⟧ IsIISTOf B⟦ map-fold a f g ⟧
+    helper : (a : A) → F⟦ `map-fold a f g ⟧ IsIISTOf B⟦ `map-fold a f g ⟧
     helper a {[]} refl = [] , [] , refl
     helper a {y ∷ ys} eq
       with just x ← f a .from y in eq₁
@@ -431,15 +431,15 @@ F-IIST (map-fold {A = A} a f g) = helper a
       with ys' , pf , eq₃ ← helper (g a x) {ys} eq₂
       rewrite eq₃ =
         y ∷ ys' , y ∷ pf , refl
-F-IIST (delay x) = shift-IIST x
-F-IIST (hasten x) = unshift-IIST x
-F-IIST (e ⋙ e') = >=>-IIST (F-IIST e) (F-IIST e') (F-incremental e')
-F-IIST (e ⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
+F-IIST (`delay x) = shift-IIST x
+F-IIST (`hasten x) = unshift-IIST x
+F-IIST (e `⋙ e') = >=>-IIST (F-IIST e) (F-IIST e') (F-incremental e')
+F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (map-fold {A = A} a f g) = helper a
+B-IIST (`map-fold {A = A} a f g) = helper a
   where
-    helper : (a : A) → B⟦ map-fold a f g ⟧ IsIISTOf F⟦ map-fold a f g ⟧
+    helper : (a : A) → B⟦ `map-fold a f g ⟧ IsIISTOf F⟦ `map-fold a f g ⟧
     helper a {[]} refl = [] , [] , refl
     helper a {x ∷ xs} eq
       with just y ← f a .to x in eq₁
@@ -448,10 +448,10 @@ B-IIST (map-fold {A = A} a f g) = helper a
       with xs' , pf , eq₃ ← helper (g a x) {xs} eq₂
       rewrite eq₃ =
         x ∷ xs' , x ∷ pf , refl
-B-IIST (delay x) = unshift-IIST x
-B-IIST (hasten x) = shift-IIST x
-B-IIST (e ⋙ e') = >=>-IIST (B-IIST e') (B-IIST e) (B-incremental e)
-B-IIST (e ⊗ e') = ∥-IIST (B-IIST e) (B-IIST e') (B-incremental e) (B-incremental e')
+B-IIST (`delay x) = unshift-IIST x
+B-IIST (`hasten x) = shift-IIST x
+B-IIST (e `⋙ e') = >=>-IIST (B-IIST e') (B-IIST e) (B-incremental e)
+B-IIST (e `⊗ e') = ∥-IIST (B-IIST e) (B-IIST e') (B-incremental e) (B-incremental e')
 
 --------------------------------------------------------------------------------
 -- Bundles
@@ -494,39 +494,39 @@ B-d-d'-IIST e = record
 -- I invertes the semantics
 
 F∘I≡B : ∀ (e : E X Y) (ys : List Y) → F⟦ I⟦ e ⟧ ⟧ ys ≡ B⟦ e ⟧ ys
-F∘I≡B {Y = Y} (map-fold {A} a f g) = helper a
+F∘I≡B {Y = Y} (`map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) (ys : List Y)
-      → F⟦ I⟦ map-fold a f g ⟧ ⟧ ys ≡ B⟦ map-fold a f g ⟧ ys
+      → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ys ≡ B⟦ `map-fold a f g ⟧ ys
     helper a [] = refl
     helper a (y ∷ ys) with f a .from y in eq
     ... | nothing = refl
     ... | just x rewrite f a .from→to eq | helper (g a x) ys = refl
-F∘I≡B (delay x) xs = refl
-F∘I≡B (hasten x) xs = refl
-F∘I≡B (e ⋙ e') zs rewrite F∘I≡B e' zs with B⟦ e' ⟧ zs
+F∘I≡B (`delay x) xs = refl
+F∘I≡B (`hasten x) xs = refl
+F∘I≡B (e `⋙ e') zs rewrite F∘I≡B e' zs with B⟦ e' ⟧ zs
 ... | nothing = refl
 ... | just ys = F∘I≡B e ys
-F∘I≡B (e ⊗ e') xzs
+F∘I≡B (e `⊗ e') xzs
   with xs , zs ← unzip xzs
   rewrite F∘I≡B e xs | F∘I≡B e' zs =
     refl
 
 B∘I≡F : ∀ (e : E X Y) (xs : List X) → B⟦ I⟦ e ⟧ ⟧ xs ≡ F⟦ e ⟧ xs
-B∘I≡F {X} (map-fold {A} a f g) = helper a
+B∘I≡F {X} (`map-fold {A} a f g) = helper a
   where
     helper : ∀ (a : A) (xs : List X)
-      → B⟦ I⟦ map-fold a f g ⟧ ⟧ xs ≡ F⟦ map-fold a f g ⟧ xs
+      → B⟦ I⟦ `map-fold a f g ⟧ ⟧ xs ≡ F⟦ `map-fold a f g ⟧ xs
     helper a [] = refl
     helper a (x ∷ xs) with f a .to x in eq
     ... | nothing = refl
     ... | just y rewrite f a .to→from eq | helper (g a x) xs = refl
-B∘I≡F (delay x) xs = refl
-B∘I≡F (hasten x) xs = refl
-B∘I≡F (e ⋙ e') xs rewrite B∘I≡F e xs with F⟦ e ⟧ xs
+B∘I≡F (`delay x) xs = refl
+B∘I≡F (`hasten x) xs = refl
+B∘I≡F (e `⋙ e') xs rewrite B∘I≡F e xs with F⟦ e ⟧ xs
 ... | nothing = refl
 ... | just ys = B∘I≡F e' ys
-B∘I≡F (e ⊗ e') xzs
+B∘I≡F (e `⊗ e') xzs
   with xs , zs ← unzip xzs
   rewrite B∘I≡F e xs | B∘I≡F e' zs =
     refl

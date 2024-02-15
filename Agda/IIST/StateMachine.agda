@@ -105,18 +105,18 @@ _∥_ : ∀ {d d'} → IST X Y d → IST Z W d' → IST (X × Z) (Y × W) (d ⊔
 ... | yield y f' | yield w g' = yield (y , w) (f' ∥ g')
 
 F⟦_⟧ : (e : E X Y) → IST X Y DF⟦ e ⟧
-F⟦ map-fold a f g ⟧ = F-map-fold a f g
-F⟦ delay x ⟧ = shift x
-F⟦ hasten x ⟧ = unshift x
-F⟦ e ⋙ e' ⟧ = F⟦ e ⟧ ∙ F⟦ e' ⟧
-F⟦ e ⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
+F⟦ `map-fold a f g ⟧ = F-map-fold a f g
+F⟦ `delay x ⟧ = shift x
+F⟦ `hasten x ⟧ = unshift x
+F⟦ e `⋙ e' ⟧ = F⟦ e ⟧ ∙ F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
 
 B⟦_⟧ : (e : E X Y) → IST Y X DB⟦ e ⟧
-B⟦ map-fold a f g ⟧ = B-map-fold a f g
-B⟦ delay x ⟧ = unshift x
-B⟦ hasten x ⟧ = shift x
-B⟦ e ⋙ e' ⟧ = B⟦ e' ⟧ ∙ B⟦ e ⟧
-B⟦ e ⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
+B⟦ `map-fold a f g ⟧ = B-map-fold a f g
+B⟦ `delay x ⟧ = unshift x
+B⟦ `hasten x ⟧ = shift x
+B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ ∙ B⟦ e ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
 
 _ : eat id (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ≡ just (0 ∷ 1 ∷ 2 ∷ 3 ∷ [])
 _ = refl
@@ -124,7 +124,7 @@ _ = refl
 _ : eat (later id) (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ≡ just (0 ∷ 1 ∷ 2 ∷ [])
 _ = refl
 
-_ : eat F⟦ delay 0 ⊗ hasten 0 ⟧ ((0 , 0) ∷ (1 , 1) ∷ (2 , 2) ∷ (3 , 3) ∷ [])
+_ : eat F⟦ `delay 0 `⊗ `hasten 0 ⟧ ((0 , 0) ∷ (1 , 1) ∷ (2 , 2) ∷ (3 , 3) ∷ [])
   ≡ just ((0 , 1) ∷ (0 , 2) ∷ (1 , 3) ∷ [])
 _ = refl
 
@@ -350,28 +350,28 @@ laterN-subst : ∀ {m n d} {f : IST X Y d}
 laterN-subst refl = ≈-refl
 
 F∘I≈B : ∀ (e : E X Y) → F⟦ I⟦ e ⟧ ⟧ ≈ B⟦ e ⟧
-F∘I≈B (map-fold {A} a f g) = helper refl
+F∘I≈B (`map-fold {A} a f g) = helper refl
   where
-    helper : ∀ {a a' : A} → a ≡ a' → F⟦ I⟦ map-fold a f g ⟧ ⟧ ≈ B⟦ map-fold a' f g ⟧
+    helper : ∀ {a a' : A} → a ≡ a' → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ B⟦ `map-fold a' f g ⟧
     helper {a} refl .step y with f a .from y in eq
     ... | nothing = ⊥
     ... | just x = yield refl (helper (cong (Maybe.maybe (g a) a) eq))
-F∘I≈B (delay x) = ≈-refl
-F∘I≈B (hasten x) = ≈-refl
-F∘I≈B (e ⋙ e') = ≈-cong-∙ (F∘I≈B e') (F∘I≈B e)
-F∘I≈B (e ⊗ e') = ≈-cong-∥ (F∘I≈B e) (F∘I≈B e')
+F∘I≈B (`delay x) = ≈-refl
+F∘I≈B (`hasten x) = ≈-refl
+F∘I≈B (e `⋙ e') = ≈-cong-∙ (F∘I≈B e') (F∘I≈B e)
+F∘I≈B (e `⊗ e') = ≈-cong-∥ (F∘I≈B e) (F∘I≈B e')
 
 B∘I≈F : ∀ (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≈ F⟦ e ⟧
-B∘I≈F (map-fold {A} a f g) = helper refl
+B∘I≈F (`map-fold {A} a f g) = helper refl
   where
-    helper : ∀ {a a' : A} → a ≡ a' → B⟦ I⟦ map-fold a f g ⟧ ⟧ ≈ F⟦ map-fold a' f g ⟧
+    helper : ∀ {a a' : A} → a ≡ a' → B⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ F⟦ `map-fold a' f g ⟧
     helper {a} refl .step x with f a .to x in eq
     ... | nothing = ⊥
     ... | just y = yield refl (helper (cong (Maybe.maybe (g a) a) (f a .to→from eq)))
-B∘I≈F (delay x) = ≈-refl
-B∘I≈F (hasten x) = ≈-refl
-B∘I≈F (e ⋙ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
-B∘I≈F (e ⊗ e') = ≈-cong-∥ (B∘I≈F e) (B∘I≈F e')
+B∘I≈F (`delay x) = ≈-refl
+B∘I≈F (`hasten x) = ≈-refl
+B∘I≈F (e `⋙ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
+B∘I≈F (e `⊗ e') = ≈-cong-∥ (B∘I≈F e) (B∘I≈F e')
 
 --------------------------------------------------------------------------------
 
@@ -506,25 +506,25 @@ add-shuffle = solve-∀
 ∥-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} p q = {!   !}
 
 F-IIST : ∀ (e : E X Y) → B⟦ e ⟧ ∙ F⟦ e ⟧ ⊑ laterN (DB⟦ e ⟧ + DF⟦ e ⟧) id
-F-IIST (map-fold {A} a f g) = helper a
+F-IIST (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → (B⟦ map-fold a f g ⟧ ∙ F⟦ map-fold a f g ⟧) ⊑ id
+    helper : (a : A) → (B⟦ `map-fold a f g ⟧ ∙ F⟦ `map-fold a f g ⟧) ⊑ id
     helper a .step y with f a .from y in eq
     ... | nothing = ⊥ₗ
     ... | just x rewrite f a .from→to eq = yield refl (helper (g a x))
-F-IIST (delay x) = unshift-shift x
-F-IIST (hasten x) = shift-unshift x
-F-IIST (e ⋙ e') = ∙-IIST (F-IIST e') (F-IIST e)
-F-IIST (e ⊗ e') = ∥-IIST (F-IIST e) (F-IIST e')
+F-IIST (`delay x) = unshift-shift x
+F-IIST (`hasten x) = shift-unshift x
+F-IIST (e `⋙ e') = ∙-IIST (F-IIST e') (F-IIST e)
+F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : ∀ (e : E X Y) → F⟦ e ⟧ ∙ B⟦ e ⟧ ⊑ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
-B-IIST (map-fold {A} a f g) = helper a
+B-IIST (`map-fold {A} a f g) = helper a
   where
-    helper : (a : A) → (F⟦ map-fold a f g ⟧ ∙ B⟦ map-fold a f g ⟧) ⊑ id
+    helper : (a : A) → (F⟦ `map-fold a f g ⟧ ∙ B⟦ `map-fold a f g ⟧) ⊑ id
     helper a .step x with f a .to x in eq
     ... | nothing = ⊥ₗ
     ... | just y rewrite f a .to→from eq = yield refl (helper (g a x))
-B-IIST (delay x) = shift-unshift x
-B-IIST (hasten x) = unshift-shift x
-B-IIST (e ⋙ e') = ∙-IIST (B-IIST e) (B-IIST e')
-B-IIST (e ⊗ e') = ∥-IIST (B-IIST e) (B-IIST e')
+B-IIST (`delay x) = shift-unshift x
+B-IIST (`hasten x) = unshift-shift x
+B-IIST (e `⋙ e') = ∙-IIST (B-IIST e) (B-IIST e')
+B-IIST (e `⊗ e') = ∥-IIST (B-IIST e) (B-IIST e')
