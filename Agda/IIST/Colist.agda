@@ -5,11 +5,11 @@ module IIST.Colist where
 open import Data.Maybe.Base using ( Maybe; just; nothing; maybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_ )
 open import Data.Nat.Properties using ( +-identityʳ; +-comm )
-open import Data.Product.Base as Prod using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
+open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Unit.Base using ( ⊤; tt )
 open import Function using ( _∘_ )
 open import Relation.Binary.Core using ( _=[_]⇒_ )
-open import Relation.Binary.PropositionalEquality using ( _≡_; _≢_; refl; sym; trans; cong; erefl )
+open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans; cong )
 open import Relation.Nullary using ( ¬_; yes; no )
 
 open import Codata.PartialColist as Colist⊥
@@ -40,7 +40,7 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
     hasDelay : HasDelay d st
 
 _IsIISTOf_ : ST X Y → ST Y X → Set
-st' IsIISTOf st = ∀ xs → st' (st xs) ≺ xs
+st' IsIISTOf st = ∀ xs → st' (st xs) ≺≺ xs
 
 record _Is_-IISTOf_ (st' : ST X Y) (d : ℕ) (st : ST Y X) : Set where
   field
@@ -118,11 +118,6 @@ B-empty (e `⊗ e') rewrite B-empty e | B-empty e' = refl
 
 --------------------------------------------------------------------------------
 -- Incrementality of F and B
-
-shift-≺-∷ : ∀ (x : A) xs → shift x xs ≺ x ∷ delay xs
-shift-≺-∷ x [] = []
-shift-≺-∷ x ⊥ = ⊥
-shift-≺-∷ x (y ∷ xs) = x ∷ λ where .force → shift-≺-∷ y (force xs)
 
 shift-incremental : ∀ (x : A) → IsIncremental (shift x)
 shift-incremental x [] = []
@@ -252,49 +247,114 @@ module _ where
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
 
+-- Like IsIncremental, but _≺≺_ instead of _≺_
+-- TODO: How to avoid code duplication?
+
+≺≺-cong-shift : ∀ (x : A) → _≺≺_ =[ shift x ]⇒ _≺≺_
+≺≺-cong-shift x [] = []
+≺≺-cong-shift x ⊥ = ⊥
+≺≺-cong-shift x (y ∷ p) = x ∷ λ where .force → ≺≺-cong-shift y (force p)
+
+≺≺-cong-unshift : ∀ {{_ : Eq A}} (x : A) → _≺≺_ =[ unshift x ]⇒ _≺≺_
+≺≺-cong-unshift x [] = []
+≺≺-cong-unshift x ⊥ = ⊥
+≺≺-cong-unshift x (y ∷ p) with x ≟ y
+... | no _ = ⊥
+... | yes _ = force p
+
+≺≺-cong-∥ : ∀ {f : ST X Y} {g : ST Z W}
+  → _≺≺_ =[ f ]⇒ _≺≺_
+  → _≺≺_ =[ g ]⇒ _≺≺_
+  → _≺≺_ =[ f ∥ g ]⇒ _≺≺_
+≺≺-cong-∥ f-inc g-inc pf =
+  ≺≺-cong-zip (f-inc (≺≺-cong-unzipₗ pf)) (g-inc (≺≺-cong-unzipᵣ pf))
+
+≺≺-cong-F : ∀ (e : E X Y) → _≺≺_ =[ F⟦ e ⟧ ]⇒ _≺≺_
+≺≺-cong-F (`map-fold a f g) = helper a
+  where
+    helper : ∀ a → _≺≺_ =[ F⟦ `map-fold a f g ⟧ ]⇒ _≺≺_
+    helper a [] = []
+    helper a ⊥ = ⊥
+    helper a (x ∷ p) with f a .to x
+    ... | nothing = ⊥
+    ... | just y = y ∷ λ where .force → helper (g a x) (force p)
+≺≺-cong-F (`delay x) = ≺≺-cong-shift x
+≺≺-cong-F (`hasten x) = ≺≺-cong-unshift x
+≺≺-cong-F (e `⋙ e') = ≺≺-cong-F e' ∘ ≺≺-cong-F e
+≺≺-cong-F (e `⊗ e') = ≺≺-cong-∥ (≺≺-cong-F e) (≺≺-cong-F e')
+
+≺≺-cong-B : ∀ (e : E X Y) → _≺≺_ =[ B⟦ e ⟧ ]⇒ _≺≺_
+≺≺-cong-B (`map-fold a f g) = helper a
+  where
+    helper : ∀ a → _≺≺_ =[ B⟦ `map-fold a f g ⟧ ]⇒ _≺≺_
+    helper a [] = []
+    helper a ⊥ = ⊥
+    helper a (y ∷ p) with f a .from y
+    ... | nothing = ⊥
+    ... | just x = x ∷ λ where .force → helper (g a x) (force p)
+≺≺-cong-B (`delay x) = ≺≺-cong-unshift x
+≺≺-cong-B (`hasten x) = ≺≺-cong-shift x
+≺≺-cong-B (e `⋙ e') = ≺≺-cong-B e ∘ ≺≺-cong-B e'
+≺≺-cong-B (e `⊗ e') = ≺≺-cong-∥ (≺≺-cong-B e) (≺≺-cong-B e')
+
+shift-≺≺-∷ : ∀ (x : A) xs → shift x xs ≺≺ x ∷ delay xs
+shift-≺≺-∷ x [] = []
+shift-≺≺-∷ x ⊥ = ⊥
+shift-≺≺-∷ x (y ∷ xs) = x ∷ λ where .force → shift-≺≺-∷ y (force xs)
+
 shift-IIST : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
 shift-IIST x [] = []
 shift-IIST x ⊥ = ⊥
 shift-IIST x (y ∷ xs) with x ≟ y
 ... | no _ = ⊥
-... | yes refl = shift-≺-∷ x (force xs)
+... | yes refl = shift-≺≺-∷ x (force xs)
 
 unshift-IIST : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf shift x
 unshift-IIST x [] = []
 unshift-IIST x ⊥ = ⊥
 unshift-IIST x (y ∷ xs) with x ≟ x
 ... | no ¬refl with () ← ¬refl refl
-... | yes refl = shift-≺-∷ y (force xs)
+... | yes refl = shift-≺≺-∷ y (force xs)
 
 ∘-IIST : ∀ {f : ST Y Z} {f' : ST Z Y} {g : ST X Y} {g' : ST Y X}
   → f IsIISTOf f'
   → g IsIISTOf g'
-  → IsIncremental f
+  → _≺≺_ =[ f ]⇒ _≺≺_
   → (f ∘ g) IsIISTOf (g' ∘ f')
-∘-IIST {f' = f'} p q r zs = ≺-trans (r (q (f' zs))) (p zs)
+∘-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc zs =
+  begin
+    f (g (g' (f' zs)))
+  ≲⟨ f-inc (g-inv-g' (f' zs)) ⟩
+    f (f' zs)
+  ≲⟨ f-inv-f' zs ⟩
+    zs
+  ∎
+  where open import Relation.Binary.Reasoning.Preorder ≺≺-preorder
 
 ∥-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
   → f IsIISTOf f'
   → g IsIISTOf g'
-  → IsIncremental f
-  → IsIncremental g
+  → _≺≺_ =[ f ]⇒ _≺≺_
+  → _≺≺_ =[ g ]⇒ _≺≺_
   → (f ∥ g) IsIISTOf (f' ∥ g')
-∥-IIST {f = f} {f'} {g} {g'} p q r s yws =
+∥-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
   begin
     (f ∥ g) ((f' ∥ g') yws)
   ≡⟨⟩
-    zip (f (unzipₗ ((f' ∥ g') yws))) (g (unzipᵣ ((f' ∥ g') yws)))
-  ≲⟨ ≺-cong-zip {!   !} {!   !} ⟩
+    zip
+      (f (unzipₗ (zip (f' (unzipₗ yws)) (g' (unzipᵣ yws)))))
+      (g (unzipᵣ (zip (f' (unzipₗ yws)) (g' (unzipᵣ yws)))))
+  ≲⟨ ≺≺-cong-zip
+      (f-inc (zip-unzipₗ (f' (unzipₗ yws)) (g' (unzipᵣ yws))))
+      (g-inc (zip-unzipᵣ (f' (unzipₗ yws)) (g' (unzipᵣ yws))))
+   ⟩
+    zip (f (f' (unzipₗ yws))) (g (g' (unzipᵣ yws)))
+  ≲⟨ ≺≺-cong-zip (f-inv-f' (unzipₗ yws)) (g-inv-g' (unzipᵣ yws)) ⟩
     zip (unzipₗ yws) (unzipᵣ yws)
-  ≲⟨ unzip-zip ⟩
+  ≈⟨ unzip-zip ⟩
     yws
   ∎
-  where open import Relation.Binary.Reasoning.Preorder ≺-preorder
-  -- let h1 = r (zip-unzipₗ (f' (unzipₗ yws)) (g' (unzipᵣ yws)))
-  --     h2 = s (zip-unzipᵣ (f' (unzipₗ yws)) (g' (unzipᵣ yws)))
-  --     h3 = ≺-cong-zip h1 h2
-  --     h4 = ≺-cong-zip (p (unzipₗ yws)) (q (unzipᵣ yws))
-  --  in ≺-trans h3 (≺-trans h4 unzip-zip)
+  where open import Relation.Binary.Reasoning.Preorder ≺≺-preorder
 
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (`map-fold a f g) = helper a
@@ -308,8 +368,8 @@ F-IIST (`map-fold a f g) = helper a
           y ∷ λ where .force → helper (g a x) (force ys)
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
-F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (F-incremental e')
-F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
+F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (≺≺-cong-F e')
+F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (≺≺-cong-F e) (≺≺-cong-F e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
@@ -323,8 +383,8 @@ B-IIST (`map-fold a f g) = helper a
           x ∷ λ where .force → helper (g a x) (force xs)
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
-B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (B-incremental e)
-B-IIST (e `⊗ e') = ∥-IIST (B-IIST e) (B-IIST e') (B-incremental e) (B-incremental e')
+B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (≺≺-cong-B e)
+B-IIST (e `⊗ e') = ∥-IIST (B-IIST e) (B-IIST e') (≺≺-cong-B e) (≺≺-cong-B e')
 
 --------------------------------------------------------------------------------
 -- Bundles
@@ -379,7 +439,7 @@ B-d-d'-IIST e = record
 ... | yes _ = force p
 
 ≈-cong-F : ∀ (e : E X Y) → Colist⊥._≈_ =[ F⟦ e ⟧ ]⇒ Colist⊥._≈_
-≈-cong-F {X = X} (`map-fold {A} a f g) = helper a
+≈-cong-F (`map-fold a f g) = helper a
   where
     helper : ∀ a → Colist⊥._≈_ =[ F⟦ `map-fold a f g ⟧ ]⇒ Colist⊥._≈_
     helper a [] = []
@@ -393,7 +453,7 @@ B-d-d'-IIST e = record
 ≈-cong-F (e `⊗ e') p = ≈-cong-zip (≈-cong-F e (≈-cong-unzipₗ p)) (≈-cong-F e' (≈-cong-unzipᵣ p))
 
 ≈-cong-B : ∀ (e : E X Y) → Colist⊥._≈_ =[ B⟦ e ⟧ ]⇒ Colist⊥._≈_
-≈-cong-B {Y = Y} (`map-fold {A} a f g) = helper a
+≈-cong-B (`map-fold a f g) = helper a
   where
     helper : ∀ a → Colist⊥._≈_ =[ B⟦ `map-fold a f g ⟧ ]⇒ Colist⊥._≈_
     helper a [] = []

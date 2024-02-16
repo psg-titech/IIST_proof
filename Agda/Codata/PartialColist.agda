@@ -89,7 +89,7 @@ infix 4 _≈_ _∞≈_
 
 mutual
 
-  data _≈_ {A : Set} : Colist⊥ A → Colist⊥ A → Set where
+  data _≈_ {A} : (xs ys : Colist⊥ A) → Set where
     [] : [] ≈ []
     ⊥ : ⊥ ≈ ⊥
     _∷_ : ∀ x {xs ys} (p : xs ∞≈ ys) → x ∷ xs ≈ x ∷ ys
@@ -150,8 +150,13 @@ open _∞≈_ public
 ≈-cong-unzipᵣ : ∀ {xs xs' : Colist⊥ (A × B)} → xs ≈ xs' → unzipᵣ xs ≈ unzipᵣ xs'
 ≈-cong-unzipᵣ = ≈-cong-map _
 
+unzip-zip : ∀ {xys : Colist⊥ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys) ≈ xys
+unzip-zip {xys = []} = []
+unzip-zip {xys = ⊥} = ⊥
+unzip-zip {xys = xy ∷ xs} = xy ∷ λ where .force → unzip-zip
+
 -------------------------------------------------------------------------------
--- Prefix + Less defined
+-- Prefix + Same definedness
 
 infix 4 _≺_ _∞≺_
 
@@ -159,7 +164,7 @@ mutual
 
   data _≺_ {A} : Colist⊥ A → Colist⊥ A → Set where
     [] : ∀ {xs} → [] ≺ xs
-    ⊥ : ∀ {xs} → ⊥ ≺ xs
+    ⊥ : ⊥ ≺ ⊥
     _∷_ : ∀ x {xs ys} (p : xs ∞≺ ys) → x ∷ xs ≺ x ∷ ys
 
   record _∞≺_ (xs ys : ∞Colist⊥ A) : Set where
@@ -168,17 +173,12 @@ mutual
 
 open _∞≺_ public
 
-≺-refl : ∀ {xs : Colist⊥ A} → xs ≺ xs
-≺-refl {xs = []} = []
-≺-refl {xs = ⊥} = ⊥
-≺-refl {xs = x ∷ xs} = x ∷ λ where .force → ≺-refl
-
 ≺-trans : ∀ {xs ys zs : Colist⊥ A}
   → xs ≺ ys
   → ys ≺ zs
   → xs ≺ zs
 ≺-trans [] q = []
-≺-trans ⊥ q = ⊥
+≺-trans ⊥ ⊥ = ⊥
 ≺-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ≺-trans (force p) (force q)
 
 ≈-to-≺ : ∀ {xs ys : Colist⊥ A} → xs ≈ ys → xs ≺ ys
@@ -200,18 +200,16 @@ open _∞≺_ public
   → xs' ≺ xs
   → ys' ≺ ys
   → zip xs' ys' ≺ zip xs ys
+≺-cong-zip [] [] = []
 ≺-cong-zip {xs = []} [] ⊥ = ⊥
 ≺-cong-zip {xs = ⊥} [] ⊥ = ⊥
-≺-cong-zip {xs = _ ∷ _} [] ⊥ = ⊥
-≺-cong-zip [] [] = []
+≺-cong-zip {xs = x ∷ xs} [] ⊥ = ⊥
 ≺-cong-zip [] (_ ∷ _) = []
-≺-cong-zip {ys = []} ⊥ [] = ⊥
-≺-cong-zip {ys = ⊥} ⊥ [] = ⊥
-≺-cong-zip {ys = _ ∷ _} ⊥ [] = ⊥
+≺-cong-zip ⊥ [] = ⊥
 ≺-cong-zip ⊥ ⊥ = ⊥
 ≺-cong-zip ⊥ (_ ∷ _) = ⊥
-≺-cong-zip (x ∷ _) [] = []
-≺-cong-zip (x ∷ _) ⊥ = ⊥
+≺-cong-zip (_ ∷ _) [] = []
+≺-cong-zip (_ ∷ _) ⊥ = ⊥
 ≺-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → ≺-cong-zip (force p) (force q)
 
 ≺-cong-unzipₗ : ∀ {xys' xys : Colist⊥ (A × B)}
@@ -228,7 +226,78 @@ open _∞≺_ public
 ≺-cong-unzipᵣ ⊥ = ⊥
 ≺-cong-unzipᵣ ((x , y) ∷ q) = y ∷ λ where .force → ≺-cong-unzipᵣ (force q)
 
-zip-unzipₗ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipₗ (zip xs ys) ≺ xs
+-------------------------------------------------------------------------------
+-- Prefix + Less defined
+
+infix 4 _≺≺_ _∞≺≺_
+
+mutual
+
+  data _≺≺_ {A} : (xs ys : Colist⊥ A) → Set where
+    [] : ∀ {xs} → [] ≺≺ xs
+    ⊥ : ∀ {xs} → ⊥ ≺≺ xs
+    _∷_ : ∀ x {xs ys} (p : xs ∞≺≺ ys) → x ∷ xs ≺≺ x ∷ ys
+
+  record _∞≺≺_ (xs ys : ∞Colist⊥ A) : Set where
+    coinductive
+    field force : force xs ≺≺ force ys
+
+open _∞≺≺_ public
+
+≺≺-trans : ∀ {xs ys zs : Colist⊥ A}
+  → xs ≺≺ ys
+  → ys ≺≺ zs
+  → xs ≺≺ zs
+≺≺-trans [] _ = []
+≺≺-trans ⊥ _ = ⊥
+≺≺-trans (x ∷ p) (.x ∷ q) =  x ∷ λ where .force → ≺≺-trans (force p) (force q)
+
+≈-to-≺≺ : ∀ {xs ys : Colist⊥ A} → xs ≈ ys → xs ≺≺ ys
+≈-to-≺≺ [] = []
+≈-to-≺≺ ⊥ = ⊥
+≈-to-≺≺ (x ∷ p) = x ∷ λ where .force → ≈-to-≺≺ (force p)
+
+≺≺-isPreorder : ∀ {A} → IsPreorder {A = Colist⊥ A} _≈_ _≺≺_
+≺≺-isPreorder = record
+  { isEquivalence = ≈-isEquivalence
+  ; reflexive = ≈-to-≺≺
+  ; trans = ≺≺-trans
+  }
+
+≺≺-preorder : ∀ {A} → Preorder _ _ _
+≺≺-preorder {A} = record { isPreorder = ≺≺-isPreorder {A} }
+
+≺≺-cong-zip : ∀ {xs xs' : Colist⊥ A} {ys ys' : Colist⊥ B}
+  → xs' ≺≺ xs
+  → ys' ≺≺ ys
+  → zip xs' ys' ≺≺ zip xs ys
+≺≺-cong-zip [] [] = []
+≺≺-cong-zip {xs = []} [] ⊥ = ⊥
+≺≺-cong-zip {xs = ⊥} [] ⊥ = ⊥
+≺≺-cong-zip {xs = x ∷ xs} [] ⊥ = ⊥
+≺≺-cong-zip [] (_ ∷ _) = []
+≺≺-cong-zip ⊥ [] = ⊥
+≺≺-cong-zip ⊥ ⊥ = ⊥
+≺≺-cong-zip ⊥ (_ ∷ _) = ⊥
+≺≺-cong-zip (_ ∷ _) [] = []
+≺≺-cong-zip (_ ∷ _) ⊥ = ⊥
+≺≺-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → ≺≺-cong-zip (force p) (force q)
+
+≺≺-cong-unzipₗ : ∀ {xys' xys : Colist⊥ (A × B)}
+  → xys' ≺≺ xys
+  → unzipₗ xys' ≺≺ unzipₗ xys
+≺≺-cong-unzipₗ [] = []
+≺≺-cong-unzipₗ ⊥ = ⊥
+≺≺-cong-unzipₗ ((x , y) ∷ p) = x ∷ λ where .force → ≺≺-cong-unzipₗ (force p)
+
+≺≺-cong-unzipᵣ : ∀ {xys' xys : Colist⊥ (A × B)}
+  → xys' ≺≺ xys
+  → unzipᵣ xys' ≺≺ unzipᵣ xys
+≺≺-cong-unzipᵣ [] = []
+≺≺-cong-unzipᵣ ⊥ = ⊥
+≺≺-cong-unzipᵣ ((x , y) ∷ q) = y ∷ λ where .force → ≺≺-cong-unzipᵣ (force q)
+
+zip-unzipₗ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipₗ (zip xs ys) ≺≺ xs
 zip-unzipₗ [] [] = []
 zip-unzipₗ [] ⊥ = ⊥
 zip-unzipₗ [] (x ∷ xs) = []
@@ -237,7 +306,7 @@ zip-unzipₗ (x ∷ xs) [] = []
 zip-unzipₗ (x ∷ xs) ⊥ = ⊥
 zip-unzipₗ (x ∷ xs) (y ∷ ys) = x ∷ λ where .force → zip-unzipₗ (force xs) (force ys)
 
-zip-unzipᵣ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipᵣ (zip xs ys) ≺ ys
+zip-unzipᵣ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipᵣ (zip xs ys) ≺≺ ys
 zip-unzipᵣ [] [] = []
 zip-unzipᵣ [] ⊥ = ⊥
 zip-unzipᵣ [] (x ∷ xs) = []
@@ -245,8 +314,3 @@ zip-unzipᵣ (⊥) ys = ⊥
 zip-unzipᵣ (x ∷ xs) [] = []
 zip-unzipᵣ (x ∷ xs) ⊥ = ⊥
 zip-unzipᵣ (x ∷ xs) (y ∷ ys) = y ∷ λ where .force → zip-unzipᵣ (force xs) (force ys)
-
-unzip-zip : ∀ {xys : Colist⊥ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys) ≺ xys
-unzip-zip {xys = []} = []
-unzip-zip {xys = ⊥} = ⊥
-unzip-zip {xys = xy ∷ xys} = xy ∷ λ where .force → unzip-zip
