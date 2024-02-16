@@ -3,6 +3,7 @@ module IIST.Syntax where
 open import Data.Maybe.Base using ( maybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_ )
 open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
+open import Data.Unit.Base using ( ⊤; tt )
 open import Function using ( _∘_ )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl )
 
@@ -25,6 +26,9 @@ data E : Set → Set → Set₁ where
   _`⋙_ : E X Y → E Y Z → E X Z
   _`⊗_ : E X Y → E Z W → E (X × Z) (Y × W)
 
+`map : X ⇌ Y → E X Y
+`map f = `map-fold tt (λ _ → f) (λ _ _ → tt)
+
 --------------------------------------------------------------------------------
 
 D⟦_⟧ : E X Y → ℕ × ℕ
@@ -45,7 +49,7 @@ DF⟦ e ⟧ = proj₁ D⟦ e ⟧
 DB⟦ e ⟧ = proj₂ D⟦ e ⟧
 
 I⟦_⟧ : E X Y → E Y X
-I⟦ `map-fold a f g ⟧ = `map-fold a (inv⇌ ∘ f) (λ a → maybe (g a) a ∘ f a .from)
+I⟦ `map-fold a f g ⟧ = `map-fold a (_⇌_.inverse ∘ f) (λ a → maybe (g a) a ∘ f a .from)
 I⟦ `delay x ⟧ = `hasten x
 I⟦ `hasten x ⟧ = `delay x
 I⟦ e `⋙ e' ⟧ = I⟦ e' ⟧ `⋙ I⟦ e ⟧

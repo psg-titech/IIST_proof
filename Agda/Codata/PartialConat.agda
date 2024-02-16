@@ -4,8 +4,8 @@ module Codata.PartialConat where
 
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_ )
 open import Data.Nat.Properties using ( +-identityʳ; +-suc )
-open import Relation.Binary.Bundles using ( Setoid )
-open import Relation.Binary.Structures using ( IsEquivalence )
+open import Relation.Binary.Bundles using ( Setoid; Preorder )
+open import Relation.Binary.Structures using ( IsEquivalence; IsPreorder )
 
 --------------------------------------------------------------------------------
 -- Partial Conatural
@@ -155,7 +155,7 @@ m⊓[m∸ℕn]≈m∸ℕn (suc m) (suc n) = lem (m⊓[m∸ℕn]≈m∸ℕn (forc
 ∸ℕ-distribˡ-⊔-⊓ (suc m) (suc n) (suc o) = ∸ℕ-distribˡ-⊔-⊓ (force m) n o
 
 --------------------------------------------------------------------------------
--- More defined
+-- Less defined
 
 infix 4 _⊑_ _∞⊑_
 
@@ -186,6 +186,16 @@ open _∞⊑_ public
 ≈-to-⊑ zero = zero
 ≈-to-⊑ ⊥ = ⊥ₗ
 ≈-to-⊑ (suc p) = suc λ where .force → ≈-to-⊑ (force p)
+
+⊑-isPreorder : IsPreorder _≈_ _⊑_
+⊑-isPreorder = record
+  { isEquivalence = ≈-isEquivalence
+  ; reflexive = ≈-to-⊑
+  ; trans = ⊑-trans
+  }
+
+⊑-preorder : Preorder _ _ _
+⊑-preorder = record { isPreorder = ⊑-isPreorder }
 
 ⊑-cong-∸ℕ : ∀ {m n} o → m ⊑ n → m ∸ℕ o ⊑ n ∸ℕ o
 ⊑-cong-∸ℕ zero p = p

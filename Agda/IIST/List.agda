@@ -2,18 +2,19 @@ module IIST.List where
 
 open import Level using ( 0ℓ )
 open import Data.List.Base using ( List; []; _∷_; zip; unzip; length )
-open import Data.List.Properties using ( length-zipWith; length-unzipWith₁; length-unzipWith₂; zipWith-unzipWith; length-++ )
+open import Data.List.Properties using ( length-zipWith; length-unzipWith₁; length-unzipWith₂; zipWith-unzipWith )
 open import Data.Maybe.Base using ( Maybe; just; nothing; maybe; _>>=_ )
 open import Data.Maybe.Properties using ( just-injective )
 open import Data.Maybe.Effectful using () renaming ( monad to monadMaybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _∸_; _⊔_ )
 open import Data.Nat.Instances
 open import Data.Nat.Properties using ( +-comm; ∸-+-assoc; ∸-distribˡ-⊔-⊓; suc-injective )
-open import Data.Product.Base using ( Σ-syntax; _×_; _,_; proj₁; proj₂ )
+open import Data.Product.Base using ( Σ-syntax; ∃-syntax; _×_; _,_; proj₁; proj₂ )
 open import Effect.Monad using ( RawMonad )
-open import Function using ( id; _∘_; case_of_ )
+open import Function using ( id; _∘_ )
 open import Relation.Nullary using ( yes; no )
-open import Relation.Binary.PropositionalEquality using ( _≡_; refl; cong; sym; trans )
+open import Relation.Binary.Core using ( _=[_]⇒_; _Preserves₂_⟶_⟶_ )
+open import Relation.Binary.PropositionalEquality
 
 open import IIST.Common
 open import IIST.Syntax
@@ -33,30 +34,14 @@ shift : X → List X → List X
 shift _ [] = []
 shift x (y ∷ xs) = x ∷ shift y xs
 
-_ : shift 0 (1 ∷ 2 ∷ 3 ∷ []) ≡ 0 ∷ 1 ∷ 2 ∷ []
-_ = refl
-
 unshift : {{_ : Eq X}} → X → List X ⇀ List X
 unshift x [] = just []
-unshift x (y ∷ xs) = case x ≟ y of λ
-  { (no _) → nothing
-  ; (yes _) → just xs
-  }
+unshift x (x' ∷ xs) with x ≟ x'
+... | yes _ = just xs
+... | no _ = nothing
 
-length-unzip : ∀ {xzs : List (X × Z)} {xs zs}
-  → unzip xzs ≡ (xs , zs)
-  → length xzs ≡ length xs × length xzs ≡ length zs
-length-unzip {xzs = []} refl = refl , refl
-length-unzip {xzs = (x , z) ∷ xzs} refl
-  with xs , zs ← unzip xzs in eq
-  with ih₁ , ih₂ ← length-unzip eq =
-    cong suc ih₁ , cong suc ih₂
-
-unzip-zip : ∀ {xzs : List (X × Z)} {xs zs}
-  → unzip xzs ≡ (xs , zs)
-  → zip xs zs ≡ xzs
-unzip-zip {xzs = xzs} refl = zipWith-unzipWith id _,_ (λ _ → refl) xzs
-
+zip-unzip : ∀ (xys : List (X × Y)) → zip (proj₁ (unzip xys)) (proj₂ (unzip xys)) ≡ xys
+zip-unzip  = zipWith-unzipWith id _,_ (λ _ → refl)
 
 -- xs' ≺ xs : xs' is a prefix of xs
 data _≺_ {X} : List X → List X → Set where
@@ -75,39 +60,32 @@ shift-≺-∷ : ∀ (x : X) xs → shift x xs ≺ (x ∷ xs)
 shift-≺-∷ x [] = []
 shift-≺-∷ x (x' ∷ xs) = x ∷ shift-≺-∷ x' xs
 
-≺-cong-shift : ∀ (x : X) {xs' xs} → xs' ≺ xs → shift x xs' ≺ shift x xs
+≺-cong-shift : ∀ (x : X) → _≺_ =[ shift x ]⇒ _≺_
 ≺-cong-shift x [] = []
 ≺-cong-shift x (x' ∷ pf) = x ∷ ≺-cong-shift x' pf
 
-≺-cong-zip : ∀ {xs' xs : List X} {ys' ys : List Y}
-  → xs' ≺ xs
-  → ys' ≺ ys
-  → zip xs' ys' ≺ zip xs ys
+≺-cong-zip : zip {A = X} {B = Y} Preserves₂ _≺_ ⟶ _≺_ ⟶ _≺_
 ≺-cong-zip [] _ = []
 ≺-cong-zip (_ ∷ _) [] = []
 ≺-cong-zip (x ∷ pf) (y ∷ pf') = (x , y) ∷ ≺-cong-zip pf pf'
 
-≺-unzip : ∀ {xys' xys : List (X × Y)} {xs' ys' xs ys}
-  → xys' ≺ xys
-  → unzip xys' ≡ (xs' , ys')
-  → unzip xys ≡ (xs , ys)
-  → (xs' ≺ xs) × (ys' ≺ ys)
-≺-unzip [] refl refl = [] , []
-≺-unzip (_∷_ (x , y) {xs' = xys'} {xs = xys} pfxy) refl refl
-  with xs' , ys' ← unzip xys' in eq'
-  with xs , ys ← unzip xys in eq
-  with pfx , pfy ← ≺-unzip pfxy eq' eq =
-    x ∷ pfx , y ∷ pfy
+≺-unzip₁ : _≺_ =[ proj₁ ∘ unzip {A = X} {B = Y} ]⇒ _≺_
+≺-unzip₁ [] = []
+≺-unzip₁ (xy ∷ p) = proj₁ xy ∷ ≺-unzip₁ p
 
-zip-unzip : ∀ {xs : List X} {ys : List Y} {xs' ys'}
-  → unzip (zip xs ys) ≡ (xs' , ys')
-  → (xs' ≺ xs) × (ys' ≺ ys)
-zip-unzip {xs = []} refl = [] , []
-zip-unzip {xs = x ∷ xs} {[]} refl = [] , []
-zip-unzip {xs = x ∷ xs} {y ∷ ys} refl
-  with xs' , ys' ← unzip (zip xs ys) in eq
-  with pfx , pfy ← zip-unzip eq =
-    x ∷ pfx , y ∷ pfy
+≺-unzip₂ : _≺_ =[ proj₂ ∘ unzip {A = X} {B = Y} ]⇒ _≺_
+≺-unzip₂ [] = []
+≺-unzip₂ (xy ∷ p) = proj₂ xy ∷ ≺-unzip₂ p
+
+unzip-zip₁ : ∀ (xs : List X) (ys : List Y) → proj₁ (unzip (zip xs ys)) ≺ xs
+unzip-zip₁ [] _ = []
+unzip-zip₁ (x ∷ xs) [] = []
+unzip-zip₁ (x ∷ xs) (y ∷ ys) = x ∷ unzip-zip₁ xs ys
+
+unzip-zip₂ : ∀ (xs : List X) (ys : List Y) → proj₂ (unzip (zip xs ys)) ≺ ys
+unzip-zip₂ [] _ = []
+unzip-zip₂ (x ∷ xs) [] = []
+unzip-zip₂ (x ∷ xs) (y ∷ ys) = y ∷ unzip-zip₂ xs ys
 
 -------------------------------------------------------------------------------
 -- Sequence transformation
@@ -116,10 +94,10 @@ ST : Set → Set → Set
 ST X Y = List X ⇀ List Y
 
 IsIncremental : ST X Y → Set
-IsIncremental st = ∀ {xs ys}
+IsIncremental st = ∀ {xs' xs ys}
+  → xs' ≺ xs
   → st xs ≡ just ys
-  → ∀ {xs'} → xs' ≺ xs
-  → Σ[ ys' ∈ _ ] (ys' ≺ ys) × (st xs' ≡ just ys')
+  → ∃[ ys' ] (ys' ≺ ys) × (st xs' ≡ just ys')
 
 HasDelay : ℕ → ST X Y → Set
 HasDelay d st = ∀ xs {ys}
@@ -137,7 +115,7 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
 _IsIISTOf_ : ST X Y → ST Y X → Set
 st' IsIISTOf st = ∀ {xs ys}
   → st xs ≡ just ys
-  → Σ[ xs' ∈ _ ] (xs' ≺ xs) × (st' ys ≡ just xs')
+  → ∃[ xs' ] (xs' ≺ xs) × (st' ys ≡ just xs')
 
 -- st' Is d -IISTOf st : st' is a d-inverse sequence transformation of st
 record _Is_-IISTOf_ (st' : ST X Y) (d : ℕ) (st : ST Y X) : Set where
@@ -178,14 +156,13 @@ F⟦ `hasten x ⟧ = unshift x
 F⟦ e `⋙ e' ⟧ = F⟦ e ⟧ >=> F⟦ e' ⟧
 F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
 
-
 -- Backward semantics
 B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST Y X
 B-map-fold a f g [] = just []
 B-map-fold a f g (y ∷ ys) = do
   x ← f a .from y
   xs ← B-map-fold (g a x) f g ys
-  just (x ∷ xs)
+  return (x ∷ xs)
 
 B⟦_⟧ : E X Y → ST Y X
 B⟦ `map-fold a f g ⟧ = B-map-fold a f g
@@ -228,69 +205,64 @@ B-empty (e `⊗ e') rewrite B-empty e | B-empty e' = refl
 -- Incrementality of F and B
 
 shift-incremental : ∀ (x : X) → IsIncremental (return ∘ shift x)
-shift-incremental x refl {xs'} p = shift x xs' , ≺-cong-shift x p , refl
+shift-incremental x pfx refl = _ , ≺-cong-shift x pfx , refl
 
 unshift-incremental : ∀ {{_ : Eq X}} (x : X) → IsIncremental (unshift x)
-unshift-incremental x eq [] = [] , [] , refl
-unshift-incremental x eq (y ∷ p)
-  with yes refl ← x ≟ y
-  rewrite just-injective eq =
-    _ , p , refl
+unshift-incremental x [] eq = [] , [] , refl
+unshift-incremental x (x' ∷ pfx) eq
+  with yes refl ← x ≟ x'
+  rewrite sym (just-injective eq) =
+    _ , pfx , refl
 
 >=>-incremental : ∀ {f : ST X Y} {g : ST Y Z}
   → IsIncremental f
   → IsIncremental g
   → IsIncremental (f >=> g)
->=>-incremental {f = f} {g} p q {xs} eq {xs'} pfx
+>=>-incremental {f = f} {g} f-inc g-inc {xs'} {xs} xs'≺xs eq
   with just ys ← f xs in eq₁
-  with ys' , pfy , eq₂ ← p eq₁ pfx
-  with just zs ← g ys in eq₃
-  with zs' , pfz , eq₄ ← q eq₃ pfy
-  rewrite sym (just-injective eq) | eq₂ | eq₄ =
-    zs' , pfz , refl
+  with just ys' ← f xs' | _ , ys'≺ys , refl ← f-inc xs'≺xs eq₁
+  with just zs' ← g ys' | _ , zs'≺zs , refl ← g-inc ys'≺ys eq =
+    zs' , zs'≺zs , refl
 
 ∥-incremental : ∀ {f : ST X Y} {g : ST Z W}
   → IsIncremental f
   → IsIncremental g
   → IsIncremental (f ∥ g)
-∥-incremental {f = f} {g} p q {xzs} eq {xzs'} pfxz
-  with xs' , zs' ← unzip xzs' in eq₁
-  with xs , zs ← unzip xzs in eq₂
-  with pfx , pfz ← ≺-unzip pfxz eq₁ eq₂
-  with just ys ← f xs in eq₃
-  with just ws ← g zs in eq₄
-  with ys' , pfy , eq₅ ← p eq₃ pfx
-  with ws' , pfw , eq₆ ← q eq₄ pfz
-  rewrite sym (just-injective eq) | eq₅ | eq₆ =
-    zip ys' ws' , ≺-cong-zip pfy pfw , refl
+∥-incremental {f = f} {g} f-inc g-inc {xzs'} {xzs} xzs'≺xzs eq
+  with just ys ← f (unzip xzs .proj₁) in eq₁
+  with just ys' ← f (unzip xzs' .proj₁) | _ , ys'≺ys , refl ← f-inc (≺-unzip₁ xzs'≺xzs) eq₁
+  with just ws ← g (unzip xzs .proj₂) in eq₂
+  with just ws' ← g (unzip xzs' .proj₂) | _ , ws'≺ws , refl ← g-inc (≺-unzip₂ xzs'≺xzs) eq₂
+  rewrite sym (just-injective eq) =
+    zip ys' ws' , ≺-cong-zip ys'≺ys ws'≺ws , refl
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
-F-incremental (`map-fold {A} a f g) = helper a
+F-incremental (`map-fold a f g) = helper a
   where
-    helper : (a : A) → IsIncremental F⟦ `map-fold a f g ⟧
-    helper a eq [] = [] , [] , refl
-    helper a eq (_∷_ x {xs = xs} pf)
+    helper : ∀ a → IsIncremental F⟦ `map-fold a f g ⟧
+    helper a [] eq = [] , [] , refl
+    helper a (_∷_ x {xs'} {xs} xs'≺xs) eq
       with just y ← f a .to x
       with just ys ← F-map-fold (g a x) f g xs in eq₁
-      with ys' , pf' , eq₂ ← helper (g a x) eq₁ pf
-      rewrite sym (just-injective eq) | eq₂ =
-        y ∷ ys' , y ∷ pf' , refl
+      with just ys' ← F-map-fold (g a x) f g xs' | _ , ys'≺ys , refl ← helper (g a x) xs'≺xs eq₁
+      rewrite sym (just-injective eq) =
+        y ∷ ys' , y ∷ ys'≺ys , refl
 F-incremental (`delay x) = shift-incremental x
 F-incremental (`hasten x) = unshift-incremental x
 F-incremental (e `⋙ e') = >=>-incremental (F-incremental e) (F-incremental e')
 F-incremental (e `⊗ e') = ∥-incremental (F-incremental e) (F-incremental e')
 
 B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧
-B-incremental (`map-fold {A} a f g) = helper a
+B-incremental (`map-fold a f g) = helper a
   where
-    helper : (a : A) → IsIncremental B⟦ `map-fold a f g ⟧
-    helper a eq [] = [] , [] , refl
-    helper a eq (_∷_ y {xs = ys} pf)
+    helper : ∀ a → IsIncremental B⟦ `map-fold a f g ⟧
+    helper a [] eq = [] , [] , refl
+    helper a (_∷_ y {ys'} {ys} ys'≺ys) eq
       with just x ← f a .from y
       with just xs ← B-map-fold (g a x) f g ys in eq₁
-      with xs' , pf' , eq₂ ← helper (g a x) eq₁ pf
-      rewrite sym (just-injective eq) | eq₂ =
-        x ∷ xs' , x ∷ pf' , refl
+      with just xs' ← B-map-fold (g a x) f g ys' | _ , xs'≺xs , refl ← helper (g a x) ys'≺ys eq₁
+      rewrite sym (just-injective eq) =
+        x ∷ xs' , x ∷ xs'≺xs , refl
 B-incremental (`delay x) = unshift-incremental x
 B-incremental (`hasten x) = shift-incremental x
 B-incremental (e `⋙ e') = >=>-incremental (B-incremental e') (B-incremental e)
@@ -305,10 +277,8 @@ shift-hasDelay x (y ∷ xs) refl = cong suc (shift-hasDelay y xs refl)
 
 unshift-hasDelay : ∀ {{_ : Eq X}} (x : X) → HasDelay 1 (unshift x)
 unshift-hasDelay x [] refl = refl
-unshift-hasDelay x (y ∷ xs) eq
-  with yes refl ← x ≟ y
-  rewrite sym (just-injective eq) =
-    refl
+unshift-hasDelay x (y ∷ xs) eq with yes refl ← x ≟ y =
+  sym (cong length (just-injective eq))
 
 >=>-hasDelay : ∀ {d d'} {f : ST X Y} {g : ST Y Z}
   → HasDelay d f
@@ -316,54 +286,49 @@ unshift-hasDelay x (y ∷ xs) eq
   → HasDelay (d + d') (f >=> g)
 >=>-hasDelay {d = d} {d'} {f} {g} p q xs eq
   with just ys ← f xs in eq₁
-  with ih₁ ← p xs eq₁
-  with just zs ← g ys in eq₂
-  with ih₂ ← q ys eq₂
-  rewrite sym (just-injective eq) | ih₁ | ih₂ =
+  rewrite q ys eq | p xs eq₁ =
     ∸-+-assoc (length xs) d d'
 
 ∥-hasDelay : ∀ {d d'} {f : ST X Y} {g : ST Z W}
   → HasDelay d f
   → HasDelay d' g
   → HasDelay (d ⊔ d') (f ∥ g)
-∥-hasDelay {d = d} {d'} {f} {g} p q xzs eq
-  with xs , zs ← unzip xzs in eq₁
-  with just ys ← f xs in eq₂
-  with just ws ← g zs in eq₃
-  with ih₁ ← p xs eq₂
-  with ih₂ ← q zs eq₃
-  rewrite sym (just-injective eq) | length-zipWith _,_ ys ws | ih₁ | ih₂
-  with eq₄ , eq₅ ← length-unzip eq₁
-  rewrite sym eq₄ | sym eq₅ =
+∥-hasDelay {d = d} {d'} {f} {g} f-delay g-delay xzs eq
+  with just ys ← f (unzip xzs .proj₁) in eq₁
+  with just ws ← g (unzip xzs .proj₂) in eq₂
+  rewrite sym (just-injective eq)
+        | length-zipWith _,_ ys ws
+        | f-delay (unzip xzs .proj₁) eq₁
+        | g-delay (unzip xzs .proj₂) eq₂
+        | length-unzipWith₁ id xzs
+        | length-unzipWith₂ id xzs =
     sym (∸-distribˡ-⊔-⊓ (length xzs) d d')
 
 F-hasDelay : ∀ (e : E X Y) → HasDelay DF⟦ e ⟧ F⟦ e ⟧
-F-hasDelay (`map-fold {A} a f g) = helper a
+F-hasDelay (`map-fold a f g) = helper a
   where
-    helper : (a : A) → HasDelay 0 F⟦ `map-fold a f g ⟧
+    helper : ∀ a → HasDelay 0 F⟦ `map-fold a f g ⟧
     helper a [] refl = refl
     helper a (x ∷ xs) eq
       with just y ← f a .to x
       with just ys ← F-map-fold (g a x) f g xs in eq₁
-      with ih ← helper (g a x) xs eq₁
       rewrite sym (just-injective eq) =
-        cong suc ih
+        cong suc (helper (g a x) xs eq₁)
 F-hasDelay (`delay x) = shift-hasDelay x
 F-hasDelay (`hasten x) = unshift-hasDelay x
 F-hasDelay (e `⋙ e') = >=>-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
 F-hasDelay (e `⊗ e') = ∥-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
 
 B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
-B-hasDelay (`map-fold {A} a f g) = helper a
+B-hasDelay (`map-fold a f g) = helper a
   where
-    helper : (a : A) → HasDelay 0 B⟦ `map-fold a f g ⟧
+    helper : ∀ a → HasDelay 0 B⟦ `map-fold a f g ⟧
     helper a [] refl = refl
     helper a (y ∷ ys) eq
       with just x ← f a .from y
       with just xs ← B-map-fold (g a x) f g ys in eq₁
-      with ih ← helper (g a x) ys eq₁
       rewrite sym (just-injective eq) =
-        cong suc ih
+        cong suc (helper (g a x) ys eq₁)
 B-hasDelay (`delay x) = unshift-hasDelay x
 B-hasDelay (`hasten x) = shift-hasDelay x
 B-hasDelay (e `⋙ e') = >=>-hasDelay {d = DB⟦ e' ⟧} {d' = DB⟦ e ⟧} (B-hasDelay e') (B-hasDelay e)
@@ -372,14 +337,14 @@ B-hasDelay (e `⊗ e') = ∥-hasDelay {d = DB⟦ e ⟧} {d' = DB⟦ e' ⟧} (B-h
 --------------------------------------------------------------------------------
 -- F and B are inverse of each other
 
-shift-IIST : ∀ {{_ : Eq X}} (x : X) → (return ∘ shift x) IsIISTOf (unshift x)
+shift-IIST : ∀ {{_ : Eq X}} (x : X) → (return ∘ shift x) IsIISTOf unshift x
 shift-IIST x {[]} refl = [] , [] , refl
 shift-IIST x {y ∷ xs} eq
   with yes refl ← x ≟ y
   rewrite sym (just-injective eq) =
     shift y xs , shift-≺-∷ x xs , refl
 
-unshift-IIST : ∀ {{_ : Eq X}} (x : X) → (unshift x) IsIISTOf (return ∘ shift x)
+unshift-IIST : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf (return ∘ shift x)
 unshift-IIST x {[]} refl = [] , [] , refl
 unshift-IIST x {y ∷ xs} refl with x ≟ x
 ... | no contra with () ← contra refl
@@ -390,14 +355,12 @@ unshift-IIST x {y ∷ xs} refl with x ≟ x
   → g IsIISTOf g'
   → IsIncremental g
   → (f >=> g) IsIISTOf (g' >=> f')
->=>-IIST {f = f} {f'} {g} {g'} p q r {zs} {xs} eq
+>=>-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' g-inc {zs} {xs} eq
   with just ys ← g' zs in eq₁
-  with zs' , pfz , eq₁ ← q eq₁
-  with just xs ← f' ys in eq₂
-  with ys' , pfy , eq₂ ← p eq₂
-  with zs'' , pfz' , eq₃ ← r eq₁ pfy
-  rewrite sym (just-injective eq) | eq₁ | eq₂ =
-    zs'' , ≺-trans pfz' pfz , eq₃
+  with just zs' ← g ys in eq₂ | _ , zs'≺zs , refl ← g-inv-g' eq₁
+  with just ys' ← f xs | _ , ys'≺ys , refl ← f-inv-f' eq
+  with zs'' , zs''≺zs' , eq₃ ← g-inc ys'≺ys eq₂ =
+    zs'' , ≺-trans zs''≺zs' zs'≺zs , eq₃
 
 ∥-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
   → f IsIISTOf f'
@@ -405,49 +368,45 @@ unshift-IIST x {y ∷ xs} refl with x ≟ x
   → IsIncremental f
   → IsIncremental g
   → (f ∥ g) IsIISTOf (f' ∥ g')
-∥-IIST {f = f} {f'} {g} {g'} p q r s {yws} eq
-  with ys , ws ← unzip yws in eq₁
-  with just xs ← f' ys in eq₂
-  with just zs ← g' ws in eq₃
-  with ys' , pfy , eq₂ ← p eq₂
-  with ws' , pfw , eq₃ ← q eq₃
+∥-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc {yws} eq
+  with just xs ← f' (unzip yws .proj₁) in eq₁
+  with just ys' ← f xs in eq₁ | _ , ys'≺ys , refl ← f-inv-f' eq₁
+  with just zs ← g' (unzip yws .proj₂) in eq₂
+  with just ws' ← g zs in eq₂ | _ , ws'≺ws , refl ← g-inv-g' eq₂
   rewrite sym (just-injective eq)
-  with xs' , zs' ← unzip (zip xs zs) in eq₄
-  with pfx , pfz ← zip-unzip eq₄
-  with ys'' , pfy' , eq₅ ← r eq₂ pfx
-  with ws'' , pfw' , eq₆ ← s eq₃ pfz
-  rewrite sym (unzip-zip eq₁) | eq₅ | eq₆ =
-    zip ys'' ws'' , ≺-cong-zip (≺-trans pfy' pfy) (≺-trans pfw' pfw) , refl
+  with just ys'' ← f (unzip (zip xs zs) .proj₁) | _ , ys''≺ys' , refl ← f-inc (unzip-zip₁ xs zs) eq₁
+  with just ws'' ← g (unzip (zip xs zs) .proj₂) | _ , ws''≺ws' , refl ← g-inc (unzip-zip₂ xs zs) eq₂ =
+    zip ys'' ws'' ,
+    ≺-trans (≺-cong-zip ys''≺ys' ws''≺ws') (subst (zip ys' ws' ≺_) (zip-unzip yws) (≺-cong-zip ys'≺ys ws'≺ws)) ,
+    refl
 
 F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
-F-IIST (`map-fold {A = A} a f g) = helper a
+F-IIST (`map-fold a f g) = helper a
   where
-    helper : (a : A) → F⟦ `map-fold a f g ⟧ IsIISTOf B⟦ `map-fold a f g ⟧
+    helper : ∀ a → F⟦ `map-fold a f g ⟧ IsIISTOf B⟦ `map-fold a f g ⟧
     helper a {[]} refl = [] , [] , refl
     helper a {y ∷ ys} eq
       with just x ← f a .from y in eq₁
       with just xs ← B-map-fold (g a x) f g ys in eq₂
       rewrite sym (just-injective eq) | f a .from→to eq₁
-      with ys' , pf , eq₃ ← helper (g a x) {ys} eq₂
-      rewrite eq₃ =
-        y ∷ ys' , y ∷ pf , refl
+      with just ys' ← F-map-fold (g a x) f g xs | _ , ys'≺ys , refl ← helper (g a x) {ys} eq₂ =
+        y ∷ ys' , y ∷ ys'≺ys , refl
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = >=>-IIST (F-IIST e) (F-IIST e') (F-incremental e')
 F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (`map-fold {A = A} a f g) = helper a
+B-IIST (`map-fold a f g) = helper a
   where
-    helper : (a : A) → B⟦ `map-fold a f g ⟧ IsIISTOf F⟦ `map-fold a f g ⟧
+    helper : ∀ a → B⟦ `map-fold a f g ⟧ IsIISTOf F⟦ `map-fold a f g ⟧
     helper a {[]} refl = [] , [] , refl
     helper a {x ∷ xs} eq
       with just y ← f a .to x in eq₁
       with just ys ← F-map-fold (g a x) f g xs in eq₂
       rewrite sym (just-injective eq) | f a .to→from eq₁
-      with xs' , pf , eq₃ ← helper (g a x) {xs} eq₂
-      rewrite eq₃ =
-        x ∷ xs' , x ∷ pf , refl
+      with just xs' ← B-map-fold (g a x) f g ys | _ , xs'≺xs , refl ← helper (g a x) {xs} eq₂ =
+        x ∷ xs' , x ∷ xs'≺xs , refl
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = >=>-IIST (B-IIST e') (B-IIST e) (B-incremental e)
@@ -494,10 +453,9 @@ B-d-d'-IIST e = record
 -- I invertes the semantics
 
 F∘I≡B : ∀ (e : E X Y) (ys : List Y) → F⟦ I⟦ e ⟧ ⟧ ys ≡ B⟦ e ⟧ ys
-F∘I≡B {Y = Y} (`map-fold {A} a f g) = helper a
+F∘I≡B (`map-fold a f g) = helper a
   where
-    helper : ∀ (a : A) (ys : List Y)
-      → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ys ≡ B⟦ `map-fold a f g ⟧ ys
+    helper : ∀ a ys → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ys ≡ B⟦ `map-fold a f g ⟧ ys
     helper a [] = refl
     helper a (y ∷ ys) with f a .from y in eq
     ... | nothing = refl
@@ -507,16 +465,13 @@ F∘I≡B (`hasten x) xs = refl
 F∘I≡B (e `⋙ e') zs rewrite F∘I≡B e' zs with B⟦ e' ⟧ zs
 ... | nothing = refl
 ... | just ys = F∘I≡B e ys
-F∘I≡B (e `⊗ e') xzs
-  with xs , zs ← unzip xzs
-  rewrite F∘I≡B e xs | F∘I≡B e' zs =
-    refl
+F∘I≡B (e `⊗ e') xzs rewrite F∘I≡B e (unzip xzs .proj₁) | F∘I≡B e' (unzip xzs .proj₂) =
+  refl
 
 B∘I≡F : ∀ (e : E X Y) (xs : List X) → B⟦ I⟦ e ⟧ ⟧ xs ≡ F⟦ e ⟧ xs
-B∘I≡F {X} (`map-fold {A} a f g) = helper a
+B∘I≡F (`map-fold a f g) = helper a
   where
-    helper : ∀ (a : A) (xs : List X)
-      → B⟦ I⟦ `map-fold a f g ⟧ ⟧ xs ≡ F⟦ `map-fold a f g ⟧ xs
+    helper : ∀ a xs → B⟦ I⟦ `map-fold a f g ⟧ ⟧ xs ≡ F⟦ `map-fold a f g ⟧ xs
     helper a [] = refl
     helper a (x ∷ xs) with f a .to x in eq
     ... | nothing = refl
@@ -526,7 +481,5 @@ B∘I≡F (`hasten x) xs = refl
 B∘I≡F (e `⋙ e') xs rewrite B∘I≡F e xs with F⟦ e ⟧ xs
 ... | nothing = refl
 ... | just ys = B∘I≡F e' ys
-B∘I≡F (e `⊗ e') xzs
-  with xs , zs ← unzip xzs
-  rewrite B∘I≡F e xs | B∘I≡F e' zs =
-    refl
+B∘I≡F (e `⊗ e') xzs rewrite B∘I≡F e (unzip xzs .proj₁) | B∘I≡F e' (unzip xzs .proj₂) =
+  refl

@@ -4,9 +4,9 @@ module Codata.PartialColist where
 
 open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Nat.Base using ( ℕ; zero; suc )
-open import Relation.Binary.Bundles using ( Setoid )
+open import Relation.Binary.Bundles using ( Setoid; Preorder )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans )
-open import Relation.Binary.Structures using ( IsEquivalence )
+open import Relation.Binary.Structures using ( IsEquivalence; IsPreorder )
 
 open import Codata.PartialConat as Coℕ⊥ using ( Coℕ⊥; zero; ⊥; suc; force; _⊓_ )
 
@@ -151,7 +151,7 @@ open _∞≈_ public
 ≈-cong-unzipᵣ = ≈-cong-map _
 
 -------------------------------------------------------------------------------
--- Prefix
+-- Prefix + Less defined
 
 infix 4 _≺_ _∞≺_
 
@@ -180,6 +180,21 @@ open _∞≺_ public
 ≺-trans [] q = []
 ≺-trans ⊥ q = ⊥
 ≺-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ≺-trans (force p) (force q)
+
+≈-to-≺ : ∀ {xs ys : Colist⊥ A} → xs ≈ ys → xs ≺ ys
+≈-to-≺ [] = []
+≈-to-≺ ⊥ = ⊥
+≈-to-≺ (x ∷ p) = x ∷ λ where .force → ≈-to-≺ (force p)
+
+≺-isPreorder : ∀ {A} → IsPreorder {A = Colist⊥ A} _≈_ _≺_
+≺-isPreorder = record
+  { isEquivalence = ≈-isEquivalence
+  ; reflexive = ≈-to-≺
+  ; trans = ≺-trans
+  }
+
+≺-preorder : ∀ {A} → Preorder _ _ _
+≺-preorder {A} = record { isPreorder = ≺-isPreorder {A} }
 
 ≺-cong-zip : ∀ {xs xs' : Colist⊥ A} {ys ys' : Colist⊥ B}
   → xs' ≺ xs

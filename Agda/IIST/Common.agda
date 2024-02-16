@@ -31,16 +31,10 @@ record _⇌_ (A B : Set) : Set where
     to→from : ∀ {x y} → to x ≡ just y → from y ≡ just x
     from→to : ∀ {x y} → from y ≡ just x → to x ≡ just y
 
-  ¬dom[to]→¬cod[from] : ∀ {x} → to x ≡ nothing → ∀ {y} → from y ≢ just x
-  ¬dom[to]→¬cod[from] p q with () ← trans (sym p) (from→to q)
+  inverse : B ⇌ A
+  to inverse = from
+  from inverse = to
+  to→from inverse = from→to
+  from→to inverse = to→from
 
-  ¬dom[from]→¬cod[to] : ∀ {y} → from y ≡ nothing → ∀ {x} → to x ≢ just y
-  ¬dom[from]→¬cod[to] p q with () ← trans (sym p) (to→from q)
-
-open _⇌_ public
-
-inv⇌ : A ⇌ B → B ⇌ A
-inv⇌ f .to = f .from
-inv⇌ f .from = f .to
-inv⇌ f .to→from = f .from→to
-inv⇌ f .from→to = f .to→from
+open _⇌_ hiding ( inverse ) public
