@@ -6,13 +6,14 @@ open import Codata.Musical.Notation
 open import Codata.Musical.Colist.Base using ( Colist; []; _∷_ )
 open import Codata.Musical.Colist.Bisimilarity using ( []; _∷_ ) renaming ( _≈_ to Bisim )
 open import Codata.Musical.Stream using ( Stream; _∷_ )
+open import Data.Bool.Base using ( Bool; true; false )
 open import Data.Maybe.Base as Maybe using ( Maybe; just; nothing )
-open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_; NonZero )
-open import Data.Nat.Properties using ( +-suc; +-identityʳ; ⊔-identityʳ; +-comm )
+open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _∸_; _⊔_; _<ᵇ_ )
+open import Data.Nat.Properties using ( +-suc; +-identityʳ; ⊔-identityʳ; +-comm; +-assoc; ⊔-comm )
 open import Data.Nat.Instances
 open import Data.List.Base using ( List; []; _∷_ )
 open import Data.Product.Base using ( Σ-syntax; _×_; _,_ )
-open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans; cong; subst )
+open import Relation.Binary.PropositionalEquality.Core using ( _≡_; refl; sym; trans; cong; cong₂; subst )
 open import Relation.Nullary using ( yes; no )
 
 open import IIST.Common
@@ -95,14 +96,24 @@ laterN : ∀ n {d} → IST X Y d → IST X Y (n + d)
 laterN zero f = f
 laterN (suc n) f = later (laterN n f)
 
-_∥_ : ∀ {d d'} → IST X Y d → IST Z W d' → IST (X × Z) (Y × W) (d ⊔ d')
-(f ∥ g) .step (x , z) with f .step x | g .step z
+-- s for synchronized
+_∥ₛ_ : ∀ {d} → IST X Y d → IST Z W d → IST (X × Z) (Y × W) d
+(f ∥ₛ g) .step (x , z) with f .step x | g .step z
 ... | ⊥ | _ = ⊥
 ... | _ | ⊥ = ⊥
-... | next f' | next g' = next (f' ∥ g')
-... | next {d} f' | yield _ _ = next (subst (IST _ _) (⊔-identityʳ d) (f' ∥ (shift z ∙ g)))
-... | yield _ _  | next g' = next ((shift x ∙ f) ∥ g')
-... | yield y f' | yield w g' = yield (y , w) (f' ∥ g')
+... | next f' | next g' = next (f' ∥ₛ g')
+... | yield y f' | yield w g' = yield (y , w) (f' ∥ₛ g')
+
+m∸n+n≡m⊔n : ∀ m n → m ∸ n + n ≡ m ⊔ n
+m∸n+n≡m⊔n zero zero = refl
+m∸n+n≡m⊔n zero (suc n) = refl
+m∸n+n≡m⊔n (suc m) zero = cong suc (+-identityʳ m)
+m∸n+n≡m⊔n (suc m) (suc n) = trans (+-suc (m ∸ n) n) (cong suc (m∸n+n≡m⊔n m n))
+
+_∥_ : ∀ {d d'} → IST X Y d → IST Z W d' → IST (X × Z) (Y × W) (d ⊔ d')
+_∥_ {d = d} {d'} f g =
+  subst (IST _ _) (trans (m∸n+n≡m⊔n d' d) (⊔-comm d' d)) (laterN (d' ∸ d) f) ∥ₛ
+  subst (IST _ _) (m∸n+n≡m⊔n d d') (laterN (d ∸ d') g)
 
 F⟦_⟧ : (e : E X Y) → IST X Y DF⟦ e ⟧
 F⟦ `map-fold a f g ⟧ = F-map-fold a f g
@@ -138,43 +149,46 @@ mutual
   record _≈_ {d d'} (f : IST X Y d) (g : IST X Y d') : Set where
     coinductive
     field
+      same-d : d ≡ d'
       step : ∀ (x : X) → step f x Step≈ step g x
 
   data _Step≈_ {X Y} : ∀ {d d'} → Step X Y d → Step X Y d' → Set where
     ⊥ : ∀ {d d'} → ⊥ {d = d} Step≈ ⊥ {d = d'}
     next : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
-      → f ≈ g
+      → (p : f ≈ g)
       → next f Step≈ next g
-    yield : ∀ {x y f g}
-      → x ≡ y
-      → f ≈ g
-      → yield x f Step≈ yield y g
+    yield : ∀ x {f g}
+      → (p : f ≈ g)
+      → yield x f Step≈ yield x g
 
 open _≈_
 
 ≈-refl : ∀ {d} {f : IST X Y d} → f ≈ f
+≈-refl .same-d = refl
 ≈-refl {f = f} .step x with f .step x
 ... | ⊥ = ⊥
 ... | next f' = next ≈-refl
-... | yield y f' = yield refl ≈-refl
+... | yield y f' = yield y ≈-refl
 
 ≈-sym : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'} → f ≈ g → g ≈ f
+≈-sym f≈g .same-d = sym (f≈g .same-d)
 ≈-sym {f = f} {g} f≈g .step x with f .step x | g .step x | f≈g .step x
 ... | ⊥ | ⊥ | ⊥ = ⊥
 ... | next _ | next _ | next f'≈g' = next (≈-sym f'≈g')
-... | yield _ _ | yield _ _ | yield refl f'≈g' = yield refl (≈-sym f'≈g')
+... | yield _ _ | yield _ _ | yield y f'≈g' = yield y (≈-sym f'≈g')
 
 ≈-trans : ∀ {d₁ d₂ d₃} {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃}
   → f ≈ g
   → g ≈ h
   → f ≈ h
+≈-trans f≈g g≈h .same-d = trans (f≈g .same-d) (g≈h .same-d)
 ≈-trans {f = f} {g} {h} f≈g g≈h .step x
   with f .step x | g .step x | h .step x | f≈g .step x | g≈h .step x
 ... | ⊥ | ⊥ | ⊥ | ⊥ | ⊥ = ⊥
 ... | next _ | next _ | next _ | next f'≈g' | next g'≈h' =
       next (≈-trans f'≈g' g'≈h')
-... | yield _ _ | yield _ _ | yield _ _ | yield refl f'≈g' | yield refl g'≈h' =
-      yield refl (≈-trans f'≈g' g'≈h')
+... | yield _ _ | yield _ _ | yield _ _ | yield y f'≈g' | yield .y g'≈h' =
+      yield y (≈-trans f'≈g' g'≈h')
 
 ≈-eat : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ≈ g
@@ -183,7 +197,7 @@ open _≈_
 ≈-eat {f = f} {g} f≈g (x ∷ xs) with f .step x | g .step x | f≈g .step x
 ... | ⊥ | ⊥ | ⊥ = refl
 ... | next _ | next _ | next f'≈g' = ≈-eat f'≈g' xs
-... | yield _ _ | yield _ _ | yield refl f'≈g' = cong (Maybe.map _) (≈-eat f'≈g' xs)
+... | yield _ _ | yield _ _ | yield _ f'≈g' = cong (Maybe.map _) (≈-eat f'≈g' xs)
 
 ≈-eat∞ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ≈ g
@@ -191,7 +205,7 @@ open _≈_
 ≈-eat∞ {f = f} {g} f≈g (x ∷ xs) with f .step x | g .step x | f≈g .step x
 ... | ⊥ | ⊥ | ⊥ = []
 ... | next _ | next _ | next f'≈g' = ≈-eat∞ f'≈g' (♭ xs)
-... | yield y _ | yield _ _ | yield refl f'≈g' = y ∷ ♯ ≈-eat∞ f'≈g' (♭ xs)
+... | yield y _ | yield _ _ | yield _ f'≈g' = y ∷ ♯ ≈-eat∞ f'≈g' (♭ xs)
 
 ≈-cong-subst : ∀ {d₁ d₁' d₂ d₂'} {f : IST X Y d₁} {g : IST X Y d₂}
   → (p : d₁ ≡ d₁') (q : d₂ ≡ d₂')
@@ -200,7 +214,7 @@ open _≈_
 ≈-cong-subst refl refl p = p
 
 --------------------------------------------------------------------------------
--- More defined: like _≈_ but the LHS may ⊥ earlier
+-- Less defined: like _≈_ but the LHS may ⊥ earlier
 
 infix 4 _⊑_ _Step⊑_
 
@@ -209,6 +223,7 @@ mutual
   record _⊑_ {d d'} (f : IST X Y d) (g : IST X Y d') : Set where
     coinductive
     field
+      same-d : d ≡ d'
       step : ∀ (x : X) → step f x Step⊑ step g x
 
   data _Step⊑_ {X Y} : ∀ {d d'} → Step X Y d → Step X Y d' → Set where
@@ -216,38 +231,34 @@ mutual
     next : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
       → f ⊑ g
       → next f Step⊑ next g
-    yield : ∀ {x y f g}
-      → x ≡ y
+    yield : ∀ x {f g}
       → f ⊑ g
-      → yield x f Step⊑ yield y g
+      → yield x f Step⊑ yield x g
 
 open _⊑_
 
-≈-to-⊑ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
-  → f ≈ g
-  → f ⊑ g
+≈-to-⊑ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'} → f ≈ g → f ⊑ g
+≈-to-⊑ f≈g .same-d = f≈g .same-d
 ≈-to-⊑ {f = f} {g} f≈g .step x with f .step x | g .step x | f≈g .step x
 ... | ⊥ | ⊥ | ⊥ = ⊥ₗ
 ... | next _ | next _ | next f'≈g' = next (≈-to-⊑ f'≈g')
-... | yield _ _ | yield _ _ | yield refl f'≈g' = yield refl (≈-to-⊑ f'≈g')
+... | yield _ _ | yield _ _ | yield y f'≈g' = yield y (≈-to-⊑ f'≈g')
 
 ⊑-refl : ∀ {d} {f : IST X Y d} → f ⊑ f
-⊑-refl {f = f} .step x with f .step x
-... | ⊥ = ⊥ₗ
-... | next f' = next ⊑-refl
-... | yield y f' = yield refl ⊑-refl
+⊑-refl = ≈-to-⊑ ≈-refl
 
 ⊑-trans : ∀ {d₁ d₂ d₃} {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃}
   → f ⊑ g
   → g ⊑ h
   → f ⊑ h
+⊑-trans f⊑g g⊑h .same-d = trans (f⊑g .same-d) (g⊑h .same-d)
 ⊑-trans {f = f} {g} {h} f⊑g g⊑h .step x
   with f .step x | g .step x | h .step x | f⊑g .step x | g⊑h .step x
 ... | ⊥ | _ | _ | _ | _ = ⊥ₗ
 ... | next _ | next _ | next _ | next f'⊑g' | next g'⊑h' =
       next (⊑-trans f'⊑g' g'⊑h')
-... | yield _ _ | yield _ _ | yield _ _ | yield refl f'⊑g' | yield refl g'⊑h' =
-      yield refl (⊑-trans f'⊑g' g'⊑h')
+... | yield _ _ | yield _ _ | yield _ _ | yield y f'⊑g' | yield .y g'⊑h' =
+      yield y (⊑-trans f'⊑g' g'⊑h')
 
 ⊑-cong-subst : ∀ {d₁ d₁' d₂ d₂'} {f : IST X Y d₁} {g : IST X Y d₂}
   → (p : d₁ ≡ d₁') (q : d₂ ≡ d₂')
@@ -255,23 +266,43 @@ open _⊑_
   → subst (IST X Y) p f ⊑ subst (IST X Y) q g
 ⊑-cong-subst refl refl p = p
 
+module ⊑-Reasoning where
+
+  infix 1 begin_
+  infixr 2 _≈⟨_⟩_ _⊑⟨_⟩_
+  infix 3 _∎
+
+  begin_ : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'} → f ⊑ g → f ⊑ g
+  begin p = p
+
+  _≈⟨_⟩_ : ∀ {d₁ d₂ d₃} (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃}
+    → f ≈ g
+    → g ⊑ h
+    → f ⊑ h
+  f ≈⟨ p ⟩ q = ⊑-trans (≈-to-⊑ p) q
+
+  _⊑⟨_⟩_ : ∀ {d₁ d₂ d₃} (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃}
+    → f ⊑ g
+    → g ⊑ h
+    → f ⊑ h
+  f ⊑⟨ p ⟩ q = ⊑-trans p q
+
+  _∎ : ∀ {d} (f : IST X Y d) → f ⊑ f
+  f ∎ = ⊑-refl
+
 --------------------------------------------------------------------------------
 
 ∙-identityₗ : ∀ {d} {f : IST X Y d} → id ∙ f ≈ f
+∙-identityₗ .same-d = refl
 ∙-identityₗ {f = f} .step x with f .step x
 ... | ⊥ = ⊥
 ... | next f' = next ∙-identityₗ
-... | yield y f' = yield refl ∙-identityₗ
-
-∙-identityᵣ : ∀ {d} {f : IST X Y d} → f ∙ id ≈ f
-∙-identityᵣ {f = f} .step x with f .step x
-... | ⊥ = ⊥
-... | next f' = next ∙-identityᵣ
-... | yield y f' = yield refl ∙-identityᵣ
+... | yield y f' = yield y ∙-identityₗ
 
 ∙-assoc : ∀ {d₁ d₂ d₃}
   → {f : IST X Y d₁} {g : IST Y Z d₂} {h : IST Z W d₃}
   → f ∙ (g ∙ h) ≈ (f ∙ g) ∙ h
+∙-assoc {d₁ = d₁} .same-d = sym (+-assoc d₁ _ _)
 ∙-assoc {f = f} {g} {h} .step x with f .step x
 ... | ⊥ = ⊥
 ... | next f' = next ∙-assoc
@@ -281,68 +312,86 @@ open _⊑_
 ...   | yield z g' with h .step z
 ...     | ⊥ = ⊥
 ...     | next h' = next ∙-assoc
-...     | yield w h' = yield refl ∙-assoc
+...     | yield w h' = yield w ∙-assoc
 
 ≈-cong-∙ : ∀ {d₁ d₁' d₂ d₂'}
   → {f : IST X Y d₁} {f' : IST X Y d₁'} {g : IST Y Z d₂} {g' : IST Y Z d₂'}
   → f ≈ f'
   → g ≈ g'
   → f ∙ g ≈ f' ∙ g'
+≈-cong-∙ f≈f' g≈g' .same-d = cong₂ _+_ (f≈f' .same-d) (g≈g' .same-d)
 ≈-cong-∙ {f = f} {f'} {g} {g'} f≈f' g≈g' .step x
   with f .step x | f' .step x | f≈f' .step x
 ... | ⊥ | ⊥ | ⊥ = ⊥
 ... | next _ | next _ | next f≈f' = next (≈-cong-∙ f≈f' g≈g')
-... | yield y _ | yield _ _ | yield refl f≈f' with g .step y | g' .step y | g≈g' .step y
+... | yield y _ | yield _ _ | yield _ f≈f' with g .step y | g' .step y | g≈g' .step y
 ...   | ⊥ | ⊥ | ⊥ = ⊥
 ...   | next _ | next _ | next g≈g' = next (≈-cong-∙ f≈f' g≈g')
-...   | yield _ _ | yield _ _ | yield refl g≈g' = yield refl (≈-cong-∙ f≈f' g≈g')
+...   | yield _ _ | yield _ _ | yield z g≈g' = yield z (≈-cong-∙ f≈f' g≈g')
+
+≈-cong-∥ₛ : ∀ {d d'}
+  → {f : IST X Y d} {f' : IST X Y d'} {g : IST Z W d} {g' : IST Z W d'}
+  → f ≈ f'
+  → g ≈ g'
+  → f ∥ₛ g ≈ f' ∥ₛ g'
+≈-cong-∥ₛ f≈f' g≈g' .same-d = f≈f' .same-d
+≈-cong-∥ₛ {f = f} {f'} {g} {g'} f≈f' g≈g' .step (x , z)
+  with f .step x | f' .step x | g .step z | g' .step z | f≈f' .step x | g≈g' .step z
+... | ⊥ | ⊥ | _ | _ | ⊥ | _ = ⊥
+... | next f | next f' | ⊥ | ⊥ | next f≈f' | ⊥ = ⊥
+... | next f | next f' | next g | next g' | next f≈f' | next g≈g' = next (≈-cong-∥ₛ f≈f' g≈g')
+... | yield y f | yield _ f' | ⊥ | ⊥ | yield _ f≈f' | ⊥ = ⊥
+... | yield y f | yield _ f' | yield w g | yield _ g' | yield _ f≈f' | yield _ g≈g' = yield (y , w) (≈-cong-∥ₛ f≈f' g≈g')
 
 ≈-cong-∥ : ∀ {d₁ d₁' d₂ d₂'}
   → {f : IST X Y d₁} {f' : IST X Y d₁'} {g : IST Z W d₂} {g' : IST Z W d₂'}
   → f ≈ f'
   → g ≈ g'
   → f ∥ g ≈ f' ∥ g'
-≈-cong-∥ {f = f} {f'} {g} {g'} f≈f' g≈g' .step (x , z)
-  with f .step x | f' .step x | g .step z | g' .step z | f≈f' .step x | g≈g' .step z
-... | ⊥ | ⊥ | _ | _ | ⊥ | _ = ⊥
-... | next _ | next _ | ⊥ | ⊥ | _ | ⊥ = ⊥
-... | yield _ _ | yield _ _ | ⊥ | ⊥ | _ | ⊥ = ⊥
-... | next _ | next _ | next _ | next _ | next f≈f' | next g≈g' =
-      next (≈-cong-∥ f≈f' g≈g')
-... | next f | next f' | yield _ _ | yield _ _ | next {d} {d'} f≈f' | yield refl _ =
-      next (≈-cong-subst (⊔-identityʳ d) (⊔-identityʳ d') (≈-cong-∥ f≈f' (≈-cong-∙ ≈-refl g≈g')))
-... | yield _ _ | yield _ _ | next _ | next _ | yield refl _ | next g≈g' =
-      next (≈-cong-∥ (≈-cong-∙ ≈-refl f≈f') g≈g')
-... | yield _ _ | yield _ _ | yield _ _ | yield _ _ | yield refl f≈f' | yield refl g≈g' =
-      yield refl (≈-cong-∥ f≈f' g≈g')
+≈-cong-∥ f≈f' g≈g' = {!   !}
+-- ≈-cong-∥ {f = f} {f'} {g} {g'} f≈f' g≈g' ) = {!   !}
+--   with f .step x | f' .step x | g .step z | g' .step z | f≈f' .step x | g≈g' .step z
+-- ... | ⊥ | ⊥ | _ | _ | ⊥ | _ = ⊥
+-- ... | next _ | next _ | ⊥ | ⊥ | _ | ⊥ = ⊥
+-- ... | yield _ _ | yield _ _ | ⊥ | ⊥ | _ | ⊥ = ⊥
+-- ... | next _ | next _ | next _ | next _ | next f≈f' | next g≈g' =
+--       next (≈-cong-∥ f≈f' g≈g')
+-- ... | next f | next f' | yield _ _ | yield _ _ | next {d} {d'} f≈f' | yield refl _ =
+--       next (≈-cong-subst (⊔-identityʳ d) (⊔-identityʳ d') (≈-cong-∥ f≈f' (≈-cong-∙ ≈-refl g≈g')))
+-- ... | yield _ _ | yield _ _ | next _ | next _ | yield refl _ | next g≈g' =
+--       next (≈-cong-∥ (≈-cong-∙ ≈-refl f≈f') g≈g')
+-- ... | yield _ _ | yield _ _ | yield _ _ | yield _ _ | yield refl f≈f' | yield refl g≈g' =
+--       yield refl (≈-cong-∥ f≈f' g≈g')
 
 ≈-cong-later : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ≈ g
   → later f ≈ later g
+≈-cong-later f≈g .same-d = cong suc (f≈g .same-d)
 ≈-cong-later {f = f} {g} f≈g .step x with f .step x | g .step x | f≈g .step x
 ... | ⊥ | ⊥ | ⊥ = next (≈-cong-∙ ≈-refl f≈g)
 ... | next _ | next _ | next _ = next (≈-cong-∙ ≈-refl f≈g)
 ... | yield _ _ | yield _ _ | yield _ _ = next (≈-cong-∙ ≈-refl f≈g)
 
-≈-cong-laterN : ∀ {n d d'} {f : IST X Y d} {g : IST X Y d'}
+≈-cong-laterN : ∀ n {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ≈ g
   → laterN n f ≈ laterN n g
-≈-cong-laterN {n = zero} f≈g = f≈g
-≈-cong-laterN {n = suc n} f≈g = ≈-cong-later (≈-cong-laterN {n = n} f≈g)
+≈-cong-laterN zero f≈g = f≈g
+≈-cong-laterN (suc n) f≈g = ≈-cong-later (≈-cong-laterN n f≈g)
 
 ∙-later : ∀ {d d'} {f : IST X Y d} {g : IST Y Z d'}
   → later f ∙ g ≈ later (f ∙ g)
+∙-later .same-d = refl
 ∙-later .step x = next (≈-sym ∙-assoc)
 
-∙-laterN : ∀ {n d d'} {f : IST X Y d} {g : IST Y Z d'}
+∙-laterN : ∀ n {d d'} {f : IST X Y d} {g : IST Y Z d'}
   → laterN n f ∙ g ≈ laterN n (f ∙ g)
-∙-laterN {n = zero} = ≈-refl
-∙-laterN {n = suc n} = ≈-trans ∙-later (≈-cong-later (∙-laterN {n = n}))
+∙-laterN zero = ≈-refl
+∙-laterN (suc n) = ≈-trans ∙-later (≈-cong-later (∙-laterN n))
 
-laterN-join : ∀ {d m n} {f : IST X Y d}
+laterN-join : ∀ m n {d} {f : IST X Y d}
   → laterN m (laterN n f) ≈ laterN (m + n) f
-laterN-join {m = zero} = ≈-refl
-laterN-join {m = suc m} = ≈-cong-later (laterN-join {m = m})
+laterN-join zero _ = ≈-refl
+laterN-join (suc m) n = ≈-cong-later (laterN-join m n)
 
 laterN-subst : ∀ {m n d} {f : IST X Y d}
   → m ≡ n
@@ -350,24 +399,26 @@ laterN-subst : ∀ {m n d} {f : IST X Y d}
 laterN-subst refl = ≈-refl
 
 F∘I≈B : ∀ (e : E X Y) → F⟦ I⟦ e ⟧ ⟧ ≈ B⟦ e ⟧
-F∘I≈B (`map-fold {A} a f g) = helper refl
+F∘I≈B (`map-fold a f g) = helper refl
   where
-    helper : ∀ {a a' : A} → a ≡ a' → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ B⟦ `map-fold a' f g ⟧
+    helper : ∀ {a a'} → a ≡ a' → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ B⟦ `map-fold a' f g ⟧
+    helper _ .same-d = refl
     helper {a} refl .step y with f a .from y in eq
     ... | nothing = ⊥
-    ... | just x = yield refl (helper (cong (Maybe.maybe (g a) a) eq))
+    ... | just x = yield x (helper (cong (Maybe.maybe (g a) a) eq))
 F∘I≈B (`delay x) = ≈-refl
 F∘I≈B (`hasten x) = ≈-refl
 F∘I≈B (e `⋙ e') = ≈-cong-∙ (F∘I≈B e') (F∘I≈B e)
 F∘I≈B (e `⊗ e') = ≈-cong-∥ (F∘I≈B e) (F∘I≈B e')
 
 B∘I≈F : ∀ (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≈ F⟦ e ⟧
-B∘I≈F (`map-fold {A} a f g) = helper refl
+B∘I≈F (`map-fold a f g) = helper refl
   where
-    helper : ∀ {a a' : A} → a ≡ a' → B⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ F⟦ `map-fold a' f g ⟧
+    helper : ∀ {a a'} → a ≡ a' → B⟦ I⟦ `map-fold a f g ⟧ ⟧ ≈ F⟦ `map-fold a' f g ⟧
+    helper _ .same-d = refl
     helper {a} refl .step x with f a .to x in eq
     ... | nothing = ⊥
-    ... | just y = yield refl (helper (cong (Maybe.maybe (g a) a) (f a .to→from eq)))
+    ... | just y = yield y (helper (cong (Maybe.maybe (g a) a) (f a .to→from eq)))
 B∘I≈F (`delay x) = ≈-refl
 B∘I≈F (`hasten x) = ≈-refl
 B∘I≈F (e `⋙ e') = ≈-cong-∙ (B∘I≈F e) (B∘I≈F e')
@@ -376,79 +427,101 @@ B∘I≈F (e `⊗ e') = ≈-cong-∥ (B∘I≈F e) (B∘I≈F e')
 --------------------------------------------------------------------------------
 
 shift-unshift : {{_ : Eq X}} (x : X) → shift x ∙ unshift x ⊑ later id
+shift-unshift x .same-d = refl
 shift-unshift x .step x' with x ≟ x
 ... | no contra with () ← contra refl
 ... | yes refl = next ⊑-refl
 
 unshift-shift : {{_ : Eq X}} (x : X) → unshift x ∙ shift x ⊑ later id
+unshift-shift x .same-d = refl
 unshift-shift x .step x' with x ≟ x'
 ... | no _ = ⊥ₗ
 ... | yes refl = next (lem x)
   where
     lem : (x : X) → (id ∙ shift x) ⊑ (shift x ∙ id)
-    lem x .step x' = yield refl (lem x')
+    lem _ .same-d = refl
+    lem x .step x' = yield x (lem x')
 
 ⊑-cong-∙ : ∀ {d₁ d₁' d₂ d₂'}
   → {f : IST X Y d₁} {f' : IST X Y d₁'} {g : IST Y Z d₂} {g' : IST Y Z d₂'}
   → f ⊑ f'
   → g ⊑ g'
   → f ∙ g ⊑ f' ∙ g'
+⊑-cong-∙ f⊑f' g⊑g' .same-d = cong₂ _+_ (f⊑f' .same-d) (g⊑g' .same-d)
 ⊑-cong-∙ {f = f} {f'} {g} {g'} f⊑f' g⊑g' .step x
   with f .step x | f' .step x | f⊑f' .step x
 ... | ⊥ | _ | ⊥ₗ = ⊥ₗ
 ... | next _ | next _ | next f⊑f' = next (⊑-cong-∙ f⊑f' g⊑g')
-... | yield y _ | yield _ _ | yield refl f⊑f' with g .step y | g' .step y | g⊑g' .step y
+... | yield y _ | yield _ _ | yield _ f⊑f' with g .step y | g' .step y | g⊑g' .step y
 ...   | ⊥ | _ | ⊥ₗ = ⊥ₗ
 ...   | next _ | next _ | next g⊑g' = next (⊑-cong-∙ f⊑f' g⊑g')
-...   | yield _ _ | yield _ _ | yield refl g⊑g' = yield refl (⊑-cong-∙ f⊑f' g⊑g')
+...   | yield z _ | yield _ _ | yield _ g⊑g' = yield z (⊑-cong-∙ f⊑f' g⊑g')
+
+⊑-cong-∥ₛ : ∀ {d d'}
+  → {f : IST X Y d} {f' : IST X Y d'} {g : IST Z W d} {g' : IST Z W d'}
+  → f ⊑ f'
+  → g ⊑ g'
+  → f ∥ₛ g ⊑ f' ∥ₛ g'
+⊑-cong-∥ₛ f⊑f' g⊑g' .same-d = f⊑f' .same-d
+⊑-cong-∥ₛ {f = f} {f'} {g} {g'} f⊑f' g⊑g' .step (x , z)
+  with f .step x | f' .step x | g .step z | g' .step z | f⊑f' .step x | g⊑g' .step z
+... | ⊥ | _ | _ | _ | ⊥ₗ | _ = ⊥ₗ
+... | next f | next f' | ⊥ | _ | next f≈f' | ⊥ₗ = ⊥ₗ
+... | next f | next f' | next g | next g' | next f≈f' | next g≈g' = next (⊑-cong-∥ₛ f≈f' g≈g')
+... | yield y f | yield _ f' | ⊥ | _ | yield _ f≈f' | ⊥ₗ = ⊥ₗ
+... | yield y f | yield _ f' | yield w g | yield _ g' | yield _ f≈f' | yield _ g≈g' = yield (y , w) (⊑-cong-∥ₛ f≈f' g≈g')
 
 ⊑-cong-∥ : ∀ {d₁ d₁' d₂ d₂'}
   → {f : IST X Y d₁} {f' : IST X Y d₁'} {g : IST Z W d₂} {g' : IST Z W d₂'}
   → f ⊑ f'
   → g ⊑ g'
   → f ∥ g ⊑ f' ∥ g'
-⊑-cong-∥ {f = f} {f'} {g} {g'} f⊑f' g⊑g' .step (x , z)
-  with f .step x | f' .step x | g .step z | g' .step z | f⊑f' .step x | g⊑g' .step z
-... | ⊥ | _ | _ | _ | ⊥ₗ | _ = ⊥ₗ
-... | next _ | next _ | ⊥ | _ | _ | ⊥ₗ = ⊥ₗ
-... | yield _ _ | yield _ _ | ⊥ | _ | _ | ⊥ₗ = ⊥ₗ
-... | next _ | next _ | next _ | next _ | next f⊑f' | next g⊑g' =
-      next (⊑-cong-∥ f⊑f' g⊑g')
-... | next f | next f' | yield _ _ | yield _ _ | next {d} {d'} f⊑f' | yield refl _ =
-      next (⊑-cong-subst (⊔-identityʳ d) (⊔-identityʳ d') (⊑-cong-∥ f⊑f' (⊑-cong-∙ ⊑-refl g⊑g')))
-... | yield _ _ | yield _ _ | next _ | next _ | yield refl _ | next g⊑g' =
-      next (⊑-cong-∥ (⊑-cong-∙ ⊑-refl f⊑f') g⊑g')
-... | yield _ _ | yield _ _ | yield _ _ | yield _ _ | yield refl f⊑f' | yield refl g⊑g' =
-      yield refl (⊑-cong-∥ f⊑f' g⊑g')
+⊑-cong-∥ f⊑f' g⊑g' = {!   !}
+-- ⊑-cong-∥ {f = f} {f'} {g} {g'} f⊑f' g⊑g' .step (x , z)
+--   with f .step x | f' .step x | g .step z | g' .step z | f⊑f' .step x | g⊑g' .step z
+-- ... | ⊥ | _ | _ | _ | ⊥ₗ | _ = ⊥ₗ
+-- ... | next _ | next _ | ⊥ | _ | _ | ⊥ₗ = ⊥ₗ
+-- ... | yield _ _ | yield _ _ | ⊥ | _ | _ | ⊥ₗ = ⊥ₗ
+-- ... | next _ | next _ | next _ | next _ | next f⊑f' | next g⊑g' =
+--       next (⊑-cong-∥ f⊑f' g⊑g')
+-- ... | next f | next f' | yield _ _ | yield _ _ | next {d} {d'} f⊑f' | yield refl _ =
+--       next (⊑-cong-subst (⊔-identityʳ d) (⊔-identityʳ d') (⊑-cong-∥ f⊑f' (⊑-cong-∙ ⊑-refl g⊑g')))
+-- ... | yield _ _ | yield _ _ | next _ | next _ | yield refl _ | next g⊑g' =
+--       next (⊑-cong-∥ (⊑-cong-∙ ⊑-refl f⊑f') g⊑g')
+-- ... | yield _ _ | yield _ _ | yield _ _ | yield _ _ | yield refl f⊑f' | yield refl g⊑g' =
+--       yield refl (⊑-cong-∥ f⊑f' g⊑g')
 
 ⊑-cong-later : ∀ {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ⊑ g
   → later f ⊑ later g
+⊑-cong-later f⊑g .same-d = cong suc (f⊑g .same-d)
 ⊑-cong-later {f = f} {g} f⊑g .step x with f .step x | g .step x | f⊑g .step x
 ... | ⊥ | _ | ⊥ₗ = next (⊑-cong-∙ ⊑-refl f⊑g)
 ... | next _ | next _ | next _ = next (⊑-cong-∙ ⊑-refl f⊑g)
 ... | yield _ _ | yield _ _ | yield _ _ = next (⊑-cong-∙ ⊑-refl f⊑g)
 
-⊑-cong-laterN : ∀ {n d d'} {f : IST X Y d} {g : IST X Y d'}
+⊑-cong-laterN : ∀ n {d d'} {f : IST X Y d} {g : IST X Y d'}
   → f ⊑ g
   → laterN n f ⊑ laterN n g
-⊑-cong-laterN {n = zero} f⊑g = f⊑g
-⊑-cong-laterN {n = suc n} f⊑g = ⊑-cong-later (⊑-cong-laterN {n = n} f⊑g)
+⊑-cong-laterN zero f⊑g = f⊑g
+⊑-cong-laterN (suc n) f⊑g = ⊑-cong-later (⊑-cong-laterN n f⊑g)
 
 later-shift-yield : ∀ {d} {f f' : IST X Y 0} {g : IST Y Z d} {x : X} {y : Y}
   → f .step x ≡ yield y f'
   → f' ∙ (shift y ∙ g) ⊑ shift x ∙ (f ∙ g)
+later-shift-yield p .same-d = refl
 later-shift-yield {f' = f'} {g} {y = y} p .step x' rewrite p
   with f' .step x' in eq | g .step y in eq'
 ... | ⊥ | _ = ⊥ₗ
 ... | yield y' f'' | ⊥ rewrite eq' = ⊥ₗ
 ... | yield y' f'' | next g' rewrite eq' = next (later-shift-yield eq)
-... | yield y' f'' | yield z g' rewrite eq' = yield refl (later-shift-yield eq)
+... | yield y' f'' | yield z g' rewrite eq' = yield _ (later-shift-yield eq)
 
 later-shift-next : ∀ {d d'}
   → {f : IST X Y (suc d)} {f' : IST X Y d} {g : IST Y Z d'} {x : X}
   → f .step x ≡ next f'
   → f' ∙ later g ⊑ shift x ∙ (f ∙ g)
+later-shift-next p .same-d = +-suc _ _
 later-shift-next {f' = f'} p .step x' rewrite p with f' .step x' in eq
 ... | ⊥ = ⊥ₗ
 ... | next f'' = next (later-shift-next eq)
@@ -456,15 +529,16 @@ later-shift-next {f' = f'} p .step x' rewrite p with f' .step x' in eq
 
 ⊑-∙-later : ∀ {d d'} {f : IST X Y d} {g : IST Y Z d'}
   → f ∙ later g ⊑ later (f ∙ g)
+⊑-∙-later .same-d = +-suc _ _
 ⊑-∙-later {f = f} {g} .step x with f .step x in eq
 ... | ⊥ = ⊥ₗ
 ... | next f' = next (later-shift-next eq)
 ... | yield y f' = next (later-shift-yield eq)
 
-⊑-∙-laterN : ∀ {n d d'} {f : IST X Y d} {g : IST Y Z d'}
+⊑-∙-laterN : ∀ n {d d'} {f : IST X Y d} {g : IST Y Z d'}
   → f ∙ laterN n g ⊑ laterN n (f ∙ g)
-⊑-∙-laterN {n = zero} = ⊑-refl
-⊑-∙-laterN {n = suc n} = ⊑-trans ⊑-∙-later (⊑-cong-later (⊑-∙-laterN {n = n}))
+⊑-∙-laterN zero = ⊑-refl
+⊑-∙-laterN (suc n) = ⊑-trans ⊑-∙-later (⊑-cong-later (⊑-∙-laterN n))
 
 add-shuffle : ∀ m n o p → (m + n) + (o + p) ≡ (o + m) + (n + p)
 add-shuffle = solve-∀
@@ -475,55 +549,47 @@ add-shuffle = solve-∀
   → f ∙ f' ⊑ laterN (d₁ + d₁') id
   → g ∙ g' ⊑ laterN (d₂ + d₂') id
   → (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₁ + d₂) + (d₂' + d₁')) id
-∙-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} p q = h10
-  where
-    h1 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') id ∙ f'
-    h2 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') (id ∙ f')
-    h3 : (g ∙ g') ∙ f' ⊑ laterN (d₂ + d₂') f'
-    h4 : g ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') f'
-    h5 : f ∙ (g ∙ (g' ∙ f')) ⊑ f ∙ laterN (d₂ + d₂') f'
-    h6 : (f ∙ g) ∙ (g' ∙ f') ⊑ f ∙ laterN (d₂ + d₂') f'
-    h7 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') (f ∙ f')
-    h8 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN (d₂ + d₂') (laterN (d₁ + d₁') id)
-    h9 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₂ + d₂') + (d₁ + d₁')) id
-    h10 : (f ∙ g) ∙ (g' ∙ f') ⊑ laterN ((d₁ + d₂) + (d₂' + d₁')) id
-    h1 = ⊑-cong-∙ q ⊑-refl
-    h2 = ⊑-trans h1 (≈-to-⊑ (∙-laterN {n = d₂ + d₂'}))
-    h3 = ⊑-trans h2 (≈-to-⊑ (≈-cong-laterN {n = d₂ + d₂'} ∙-identityₗ))
-    h4 = ⊑-trans (≈-to-⊑ ∙-assoc) h3
-    h5 = ⊑-cong-∙ ⊑-refl h4
-    h6 = ⊑-trans (≈-to-⊑ (≈-sym ∙-assoc)) h5
-    h7 = ⊑-trans h6 (⊑-∙-laterN {n = d₂ + d₂'})
-    h8 = ⊑-trans h7 (⊑-cong-laterN {n = d₂ + d₂'} p)
-    h9 = ⊑-trans h8 (≈-to-⊑ (laterN-join {m = d₂ + d₂'} {n = d₁ + d₁'}))
-    h10 = ⊑-trans h9 (≈-to-⊑ (laterN-subst (add-shuffle d₂ d₂' d₁ d₁')))
+∙-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} f-inv-f' g-inv-g' = begin
+  (f ∙ g) ∙ (g' ∙ f')                       ≈⟨ ≈-sym ∙-assoc ⟩
+  f ∙ (g ∙ (g' ∙ f'))                       ≈⟨ ≈-cong-∙ ≈-refl ∙-assoc ⟩
+  f ∙ ((g ∙ g') ∙ f')                       ⊑⟨ ⊑-cong-∙ ⊑-refl (⊑-cong-∙ g-inv-g' ⊑-refl) ⟩
+  f ∙ (laterN (d₂ + d₂') id ∙ f')           ≈⟨ ≈-cong-∙ ≈-refl (∙-laterN (d₂ + d₂')) ⟩
+  f ∙ (laterN (d₂ + d₂') (id ∙ f'))         ≈⟨ ≈-cong-∙ ≈-refl (≈-cong-laterN (d₂ + d₂') ∙-identityₗ) ⟩
+  f ∙ (laterN (d₂ + d₂') f')                ⊑⟨ ⊑-∙-laterN (d₂ + d₂') ⟩
+  laterN (d₂ + d₂') (f ∙ f')                ⊑⟨ ⊑-cong-laterN (d₂ + d₂') f-inv-f' ⟩
+  laterN (d₂ + d₂') (laterN (d₁ + d₁') id)  ≈⟨ laterN-join (d₂ + d₂') (d₁ + d₁') ⟩
+  laterN ((d₂ + d₂') + (d₁ + d₁')) id       ≈⟨ laterN-subst (add-shuffle d₂ d₂' d₁ d₁') ⟩
+  laterN ((d₁ + d₂) + (d₂' + d₁')) id       ∎
+  where open ⊑-Reasoning
 
 ∥-IIST : ∀ {d₁ d₁' d₂ d₂'}
   → {f : IST X Y d₁} {f' : IST Y X d₁'} {g : IST Z W d₂} {g' : IST W Z d₂'}
   → f ∙ f' ⊑ laterN (d₁ + d₁') id
   → g ∙ g' ⊑ laterN (d₂ + d₂') id
   → (f ∥ g) ∙ (f' ∥ g') ⊑ laterN ((d₁ ⊔ d₂) + (d₁' ⊔ d₂')) id
-∥-IIST {d₁ = d₁} {d₁'} {d₂} {d₂'} {f} {f'} {g} {g'} p q = {!   !}
+∥-IIST f-inv-f' g-inv-g' = {!   !}
 
 F-IIST : ∀ (e : E X Y) → B⟦ e ⟧ ∙ F⟦ e ⟧ ⊑ laterN (DB⟦ e ⟧ + DF⟦ e ⟧) id
-F-IIST (`map-fold {A} a f g) = helper a
+F-IIST (`map-fold a f g) = helper a
   where
-    helper : (a : A) → (B⟦ `map-fold a f g ⟧ ∙ F⟦ `map-fold a f g ⟧) ⊑ id
+    helper : ∀ a → (B⟦ `map-fold a f g ⟧ ∙ F⟦ `map-fold a f g ⟧) ⊑ id
+    helper a .same-d = refl
     helper a .step y with f a .from y in eq
     ... | nothing = ⊥ₗ
-    ... | just x rewrite f a .from→to eq = yield refl (helper (g a x))
+    ... | just x rewrite f a .from→to eq = yield y (helper (g a x))
 F-IIST (`delay x) = unshift-shift x
 F-IIST (`hasten x) = shift-unshift x
 F-IIST (e `⋙ e') = ∙-IIST (F-IIST e') (F-IIST e)
 F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : ∀ (e : E X Y) → F⟦ e ⟧ ∙ B⟦ e ⟧ ⊑ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
-B-IIST (`map-fold {A} a f g) = helper a
+B-IIST (`map-fold a f g) = helper a
   where
-    helper : (a : A) → (F⟦ `map-fold a f g ⟧ ∙ B⟦ `map-fold a f g ⟧) ⊑ id
+    helper : ∀ a → (F⟦ `map-fold a f g ⟧ ∙ B⟦ `map-fold a f g ⟧) ⊑ id
+    helper a .same-d = refl
     helper a .step x with f a .to x in eq
     ... | nothing = ⊥ₗ
-    ... | just y rewrite f a .to→from eq = yield refl (helper (g a x))
+    ... | just y rewrite f a .to→from eq = yield x (helper (g a x))
 B-IIST (`delay x) = shift-unshift x
 B-IIST (`hasten x) = unshift-shift x
 B-IIST (e `⋙ e') = ∙-IIST (B-IIST e) (B-IIST e')
