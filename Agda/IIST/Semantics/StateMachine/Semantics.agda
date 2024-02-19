@@ -1,232 +1,25 @@
 {-# OPTIONS --guardedness #-}
 
-module IIST.Semantics.StateMachine where
+module IIST.Semantics.StateMachine.Semantics where
 
-open import Codata.Musical.Notation
-open import Codata.Musical.Colist.Base using ( Colist; []; _∷_ )
-open import Codata.Musical.Colist.Bisimilarity using ( []; _∷_ ) renaming ( _≈_ to Bisim )
-open import Codata.Musical.Stream using ( Stream; _∷_ )
-open import Data.Bool.Base using ( Bool; true; false )
 open import Data.Maybe.Base as Maybe using ( Maybe; just; nothing; maybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; pred; _+_; _∸_; _⊔_ )
 open import Data.Nat.Properties using ( suc-injective; +-suc; +-identityʳ; ⊔-identityʳ; +-comm; +-assoc; ⊔-comm )
 open import Data.Nat.Instances
 open import Data.List.Base using ( List; []; _∷_ )
-open import Data.Product.Base using ( Σ-syntax; _×_; _,_ )
+open import Data.Product.Base using ( _×_; _,_ )
 open import Function.Base using ( case_of_ )
-open import Relation.Binary.Core using ( _Preserves_⟶_; _Preserves₂_⟶_⟶_ )
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary.Decidable.Core using ( yes; no; recompute )
 
 open import IIST.Common
 open import IIST.Syntax
+open import IIST.Semantics.StateMachine.IST
 
 private
   variable
     A X Y Z U V W : Set
     d d₁ d₂ d₃ d₄ : ℕ
-
---------------------------------------------------------------------------------
--- Definitionally d-incremental sequence transformation
-
-record IST (X Y : Set) (d : ℕ) : Set
-data Step (X Y : Set) : ℕ → Set
-
-record IST X Y d where
-  coinductive
-  field step : X → Step X Y d
-
-data Step X Y where
-  ⊥ : Step X Y d
-  next : IST X Y d → Step X Y (suc d)
-  yield : Y → IST X Y 0 → Step X Y 0
-
-open IST
-
-eat : IST X Y d → List X → Maybe (List Y)
-eatₛ : Step X Y d → List X → Maybe (List Y)
-eat f [] = just []
-eat f (x ∷ xs) = eatₛ (step f x) xs
-eatₛ ⊥ xs = nothing
-eatₛ (next f) xs = eat f xs
-eatₛ (yield y f) xs = Maybe.map (y ∷_) (eat f xs)
-
-eat∞ : IST X Y d → Stream X → Colist Y
-eatₛ∞ : Step X Y d → ∞ (Stream X) → Colist Y
-eat∞ f (x ∷ xs) = eatₛ∞ (step f x) xs
-eatₛ∞ ⊥ xs = []
-eatₛ∞ (next f) xs = eat∞ f (♭ xs)
-eatₛ∞ (yield y f) xs = y ∷ ♯ eat∞ f (♭ xs)
-
-cast : .(d₁ ≡ d₂) → IST X Y d₁ → IST X Y d₂
-castₛ : .(d₁ ≡ d₂) → Step X Y d₁ → Step X Y d₂
-step (cast eq f) x = castₛ eq (step f x)
-castₛ {d₂ = zero} eq ⊥ = ⊥
-castₛ {d₂ = zero} eq (yield y f) = yield y f
-castₛ {d₂ = suc d₂} eq ⊥ = ⊥
-castₛ {d₂ = suc d₂} eq (next f) = next (cast (cong pred eq) f)
-
---------------------------------------------------------------------------------
--- Bisimulation
-
-infix 4 _≈_ _≈ₛ_
-
-record _≈_ (f : IST X Y d₁) (g : IST X Y d₂) : Set
-data _≈ₛ_ {X Y} : Step X Y d₁ → Step X Y d₂ → Set
-
-record _≈_ {X Y d₁ d₂} f g where
-  coinductive
-  field
-    same-d : d₁ ≡ d₂
-    step : ∀ (x : X) → step f x ≈ₛ step g x
-
-data _≈ₛ_ {X Y} where
-  ⊥ : ⊥ {d = d₁} ≈ₛ ⊥ {d = d₂}
-  next : {f : IST X Y d₁} {g : IST X Y d₂} (p : f ≈ g) → next f ≈ₛ next g
-  yield : ∀ x {f g} (p : f ≈ g) → yield x f ≈ₛ yield x g
-
-open _≈_
-
-≈-refl : {f : IST X Y d} → f ≈ f
-≈ₛ-refl : {s : Step X Y d} → s ≈ₛ s
-same-d ≈-refl = refl
-step ≈-refl x = ≈ₛ-refl
-≈ₛ-refl {s = ⊥} = ⊥
-≈ₛ-refl {s = next f} = next ≈-refl
-≈ₛ-refl {s = yield x f} = yield x ≈-refl
-
-≈-sym : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → g ≈ f
-≈ₛ-sym : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → t ≈ₛ s
-same-d (≈-sym f≈g) = sym (same-d f≈g)
-step (≈-sym f≈g) x = ≈ₛ-sym (step f≈g x)
-≈ₛ-sym ⊥ = ⊥
-≈ₛ-sym (next f≈g) = next (≈-sym f≈g)
-≈ₛ-sym (yield x f≈g) = yield x (≈-sym f≈g)
-
-≈-trans : {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ≈ h → f ≈ h
-≈ₛ-trans : {s : Step X Y d₁} {t : Step X Y d₂} {u : Step X Y d₃} → s ≈ₛ t → t ≈ₛ u → s ≈ₛ u
-same-d (≈-trans f≈g g≈h) = trans (same-d f≈g) (same-d g≈h)
-step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
-≈ₛ-trans ⊥ ⊥ = ⊥
-≈ₛ-trans (next f≈g) (next g≈h) = next (≈-trans f≈g g≈h)
-≈ₛ-trans (yield x f≈g) (yield .x g≈h) = yield x (≈-trans f≈g g≈h)
-
-≈-eat : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → ∀ xs → eat f xs ≡ eat g xs
-≈ₛ-eatₛ : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → ∀ xs → eatₛ s xs ≡ eatₛ t xs
-≈-eat f≈g [] = refl
-≈-eat f≈g (x ∷ xs) = ≈ₛ-eatₛ (step f≈g x) xs
-≈ₛ-eatₛ ⊥ xs = refl
-≈ₛ-eatₛ (next f≈g) xs = ≈-eat f≈g xs
-≈ₛ-eatₛ (yield y f≈g) xs = cong (Maybe.map _) (≈-eat f≈g xs)
-
-≈-eat∞ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → ∀ xs → Bisim (eat∞ f xs) (eat∞ g xs)
-≈ₛ-eatₛ∞ : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → ∀ xs → Bisim (eatₛ∞ s xs) (eatₛ∞ t xs)
-≈-eat∞ f≈g (x ∷ xs) = ≈ₛ-eatₛ∞ (step f≈g x) xs
-≈ₛ-eatₛ∞ ⊥ xs = []
-≈ₛ-eatₛ∞ (next f≈g) xs = ≈-eat∞ f≈g (♭ xs)
-≈ₛ-eatₛ∞ (yield y f≈g) xs = y ∷ ♯ ≈-eat∞ f≈g (♭ xs)
-
-≈-cast : .{eq : d₁ ≡ d₂} {f : IST X Y d₁} → cast eq f ≈ f
-≈ₛ-castₛ : .{eq : d₁ ≡ d₂} {s : Step X Y d₁} → castₛ eq s ≈ₛ s
-same-d (≈-cast {d₁ = d₁} {d₂ = d₂} {eq = eq}) = recompute (d₂ ≟ d₁) (sym eq)
-step ≈-cast x = ≈ₛ-castₛ
-≈ₛ-castₛ {d₂ = zero} {s = ⊥} = ⊥
-≈ₛ-castₛ {d₂ = zero} {s = yield y f} = ≈ₛ-refl
-≈ₛ-castₛ {d₂ = suc d₂} {s = ⊥} = ⊥
-≈ₛ-castₛ {d₂ = suc d₂} {s = next f} = next ≈-cast
-
-module ≈-Reasoning where
-
-  infix 1 begin_
-  infixr 2 _≈⟨_⟩_
-  infix 3 _∎
-
-  begin_ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → f ≈ g
-  begin p = p
-
-  _≈⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ≈ h → f ≈ h
-  _ ≈⟨ p ⟩ q = ≈-trans p q
-
-  _∎ : (f : IST X Y d) → f ≈ f
-  _ ∎ = ≈-refl
-
---------------------------------------------------------------------------------
--- Less defined
-
-infix 4 _⊑_ _⊑ₛ_
-
-record _⊑_ (f : IST X Y d₁) (g : IST X Y d₂) : Set
-data _⊑ₛ_ {X Y} : Step X Y d₁ → Step X Y d₂ → Set
-
-record _⊑_ {X Y d₁ d₂} f g where
-  coinductive
-  field
-    same-d : d₁ ≡ d₂
-    step : ∀ (x : X) → step f x ⊑ₛ step g x
-
-data _⊑ₛ_ {X Y} where
-  ⊥ₗ : ∀ {d₁ d₂} {s : Step X Y d₂} → ⊥ {d = d₁} ⊑ₛ s
-  next : {f : IST X Y d₁} {g : IST X Y d₂} (p : f ⊑ g) → next f ⊑ₛ next g
-  yield : ∀ x {f g} (p : f ⊑ g) → yield x f ⊑ₛ yield x g
-
-open _⊑_
-
-≈-to-⊑ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → f ⊑ g
-≈ₛ-to-⊑ₛ : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → s ⊑ₛ t
-same-d (≈-to-⊑ f≈g) = same-d f≈g
-step (≈-to-⊑ f≈g) x = ≈ₛ-to-⊑ₛ (step f≈g x)
-≈ₛ-to-⊑ₛ ⊥ = ⊥ₗ
-≈ₛ-to-⊑ₛ (next f≈g) = next (≈-to-⊑ f≈g)
-≈ₛ-to-⊑ₛ (yield x f≈g) = yield x (≈-to-⊑ f≈g)
-
-⊑-refl : {f : IST X Y d} → f ⊑ f
-⊑ₛ-refl : {s : Step X Y d} → s ⊑ₛ s
-⊑-refl = ≈-to-⊑ ≈-refl
-⊑ₛ-refl = ≈ₛ-to-⊑ₛ ≈ₛ-refl
-
-⊑-trans : {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃} → f ⊑ g → g ⊑ h → f ⊑ h
-⊑ₛ-trans : {s : Step X Y d₁} {t : Step X Y d₂} {u : Step X Y d₃} → s ⊑ₛ t → t ⊑ₛ u → s ⊑ₛ u
-same-d (⊑-trans f⊑g g⊑h) = trans (same-d f⊑g) (same-d g⊑h)
-step (⊑-trans f⊑g g⊑h) x = ⊑ₛ-trans (step f⊑g x) (step g⊑h x)
-⊑ₛ-trans ⊥ₗ _ = ⊥ₗ
-⊑ₛ-trans (next f⊑g) (next g⊑h) = next (⊑-trans f⊑g g⊑h)
-⊑ₛ-trans (yield x f⊑g) (yield .x g⊑h) = yield x (⊑-trans f⊑g g⊑h)
-
-module ⊑-Reasoning where
-
-  infix 1 begin_
-  infixr 2 _≈⟨_⟩_ _⊑⟨_⟩_
-  infix 3 _∎
-
-  begin_ : {f : IST X Y d₁} {g : IST X Y d₂} → f ⊑ g → f ⊑ g
-  begin p = p
-
-  _≈⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ⊑ h → f ⊑ h
-  _ ≈⟨ p ⟩ q = ⊑-trans (≈-to-⊑ p) q
-
-  _⊑⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ⊑ g → g ⊑ h → f ⊑ h
-  _ ⊑⟨ p ⟩ q = ⊑-trans p q
-
-  _∎ : (f : IST X Y d) → f ⊑ f
-  _ ∎ = ⊑-refl
-
-module ⊑ₛ-Reasoning where
-
-  infix 1 begin_
-  infixr 2 _≈⟨_⟩_ _⊑⟨_⟩_
-  infix 3 _∎
-
-  begin_ : {f : Step X Y d₁} {g : Step X Y d₂} → f ⊑ₛ g → f ⊑ₛ g
-  begin p = p
-
-  _≈⟨_⟩_ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → f ≈ₛ g → g ⊑ₛ h → f ⊑ₛ h
-  _ ≈⟨ p ⟩ q = ⊑ₛ-trans (≈ₛ-to-⊑ₛ p) q
-
-  _⊑⟨_⟩_ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → f ⊑ₛ g → g ⊑ₛ h → f ⊑ₛ h
-  _ ⊑⟨ p ⟩ q = ⊑ₛ-trans p q
-
-  _∎ : (f : Step X Y d) → f ⊑ₛ f
-  _ ∎ = ⊑ₛ-refl
 
 --------------------------------------------------------------------------------
 -- Semantics
@@ -383,6 +176,10 @@ step (≈-cong-⋙ f≈f' g≈g') x = ≈ₛ-cong-⋙′ (step f≈f' x) g≈g'
 ≈ₛ-cong-⋙″ f≈f' (next g≈g') = next (≈-cong-⋙ f≈f' g≈g')
 ≈ₛ-cong-⋙″ f≈f' (yield z g≈g') = yield z (≈-cong-⋙ f≈f' g≈g')
 
+⋙-cast : .{eq₁ : d₁ ≡ d₂} .{eq₂ : d₃ ≡ d₄} {f : IST X Y d₁} {g : IST Y Z d₃}
+  → cast eq₁ f ⋙ cast eq₂ g ≈ cast (cong₂ _+_ eq₁ eq₂) (f ⋙ g)
+⋙-cast = ≈-trans (≈-cong-⋙ ≈-cast ≈-cast) (≈-sym ≈-cast)
+
 ≈-cong-later : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → later f ≈ later g
 same-d (≈-cong-later f≈g) = cong suc (same-d f≈g)
 step (≈-cong-later f≈g) x = next (≈-cong-⋙ ≈-refl f≈g)
@@ -406,10 +203,6 @@ laterN-join (suc m) n = ≈-cong-later (laterN-join m n)
 laterN-cast : ∀ {m n} .(eq : m ≡ n) {f : IST X Y d} → laterN m f ≈ laterN n f
 laterN-cast {m = zero} {n = zero} eq = ≈-refl
 laterN-cast {m = suc m} {n = suc n} eq = ≈-cong-later (laterN-cast (suc-injective eq))
-
-⋙-cast : .{eq₁ : d₁ ≡ d₂} .{eq₂ : d₃ ≡ d₄} {f : IST X Y d₁} {g : IST Y Z d₃}
-  → cast eq₁ f ⋙ cast eq₂ g ≈ cast (cong₂ _+_ eq₁ eq₂) (f ⋙ g)
-⋙-cast = ≈-trans (≈-cong-⋙ ≈-cast ≈-cast) (≈-sym ≈-cast)
 
 ≈-cong-⊛′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
   → f ≈ f'
@@ -475,17 +268,20 @@ B∘I≈F (e `⊗ e') = ≈-cong-⊛ (B∘I≈F e) (B∘I≈F e')
 
 --------------------------------------------------------------------------------
 
-shift-unshift : {{_ : Eq X}} (x : X) → shift x ⋙ unshift x ≈ later id
-same-d (shift-unshift x) = refl
-step (shift-unshift x) _ with x ≟ x
-... | no contra with () ← contra refl
-... | yes refl = next ≈-refl
+_IsIISTOf_ : IST X Y d₁ → IST Y X d₂ → Set
+_IsIISTOf_ {d₁ = d₁} {d₂ = d₂} f g = g ⋙ f ⊑ laterN (d₂ + d₁) id
 
-unshift-shift : {{_ : Eq X}} (x : X) → unshift x ⋙ shift x ⊑ later id
-same-d (unshift-shift x) = refl
-step (unshift-shift x) x' with x ≟ x'
+shift-IIST : {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
+same-d (shift-IIST x) = refl
+step (shift-IIST x) x' with x ≟ x'
 ... | no _ = ⊥ₗ
 ... | yes refl = next (≈-to-⊑ (≈-trans ⋙-identityₗ (≈-sym ⋙-identityᵣ)))
+
+unshift-IIST : {{_ : Eq X}} (x : X) → unshift x IsIISTOf shift x
+same-d (unshift-IIST x) = refl
+step (unshift-IIST x) _ with x ≟ x
+... | no contra with () ← contra refl
+... | yes refl = next ⊑-refl
 
 ⊑-cong-⋙ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Y Z d₃} {g' : IST Y Z d₄}
   → f ⊑ f'
@@ -568,7 +364,6 @@ step ⊑-⋙-later x = ⊑-⋙́′-later refl
 ⊑-⋙-laterN : ∀ n {f : IST X Y d₁} {g : IST Y Z d₂} → f ⋙ laterN n g ⊑ laterN n (f ⋙ g)
 ⊑-⋙-laterN zero = ⊑-refl
 ⊑-⋙-laterN (suc n) = ⊑-trans ⊑-⋙-later (⊑-cong-later (⊑-⋙-laterN n))
-
 ⊑-cong-⊛′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
   → f ⊑ f'
   → g ⊑ g'
@@ -606,9 +401,9 @@ step (⊑-cong-⊛′ f⊑f' g⊑g') (x , z) = ⊑-cong-⊛ₛ′ (step f⊑f' x
       cast _ (laterN (d₄ ∸ d₂) f')  ∎
 
 ⋙-IIST : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Y Z d₃} {g' : IST Z Y d₄}
-  → f ⋙ f' ⊑ laterN (d₁ + d₂) id
-  → g ⋙ g' ⊑ laterN (d₃ + d₄) id
-  → (f ⋙ g) ⋙ (g' ⋙ f') ⊑ laterN ((d₁ + d₃) + (d₄ + d₂)) id
+  → f' IsIISTOf f
+  → g' IsIISTOf g
+  → (g' ⋙ f') IsIISTOf (f ⋙ g)
 ⋙-IIST {d₁ = d₁} {d₂} {d₃} {d₄} {f} {f'} {g} {g'} f-inv-f' g-inv-g' = begin
   (f ⋙ g) ⋙ (g' ⋙ f')                  ≈⟨ ≈-sym ⋙-assoc ⟩
   f ⋙ (g ⋙ (g' ⋙ f'))                  ≈⟨ ≈-cong-⋙ ≈-refl ⋙-assoc ⟩
@@ -678,9 +473,9 @@ step (⊛′-later-dist {f = f} {g}) (x , z) = next (begin
   where open ≈-Reasoning
 
 ⊛′-IIST : {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₁} {g' : IST W Z d₂}
-  → f ⋙ f' ⊑ laterN (d₁ + d₂) id
-  → g ⋙ g' ⊑ laterN (d₁ + d₂) id
-  → (f ⊛′ g) ⋙ (f' ⊛′ g') ⊑ laterN (d₁ + d₂) id
+  → f' IsIISTOf f
+  → g' IsIISTOf g
+  → (f' ⊛′ g') IsIISTOf (f ⊛′ g)
 ⊛′-IIST {d₁ = d₁} {d₂ = d₂} {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' = begin
   (f ⊛′ g) ⋙ (f' ⊛′ g')                      ≈⟨ ⋙-⊛′-interchange ⟩
   (f ⋙ f') ⊛′ (g ⋙ g')                      ⊑⟨ ⊑-cong-⊛′ f-inv-f' g-inv-g' ⟩
@@ -690,9 +485,9 @@ step (⊛′-later-dist {f = f} {g}) (x , z) = next (begin
   where open ⊑-Reasoning
 
 ⊛-IIST : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₃} {g' : IST W Z d₄}
-  → f ⋙ f' ⊑ laterN (d₁ + d₂) id
-  → g ⋙ g' ⊑ laterN (d₃ + d₄) id
-  → (f ⊛ g) ⋙ (f' ⊛ g') ⊑ laterN ((d₁ ⊔ d₃) + (d₂ ⊔ d₄)) id
+  → f' IsIISTOf f
+  → g' IsIISTOf g
+  → (f' ⊛ g') IsIISTOf (f ⊛ g)
 ⊛-IIST {d₁ = d₁} {d₂} {d₃} {d₄} f-inv-f' g-inv-g' =
   ⊛′-IIST
     (h₂ f-inv-f')
@@ -727,7 +522,7 @@ step (⊛′-later-dist {f = f} {g}) (x , z) = next (begin
       laterN ((d₁ ⊔ d₃) + (d₂ ⊔ d₄)) id                            ∎
       where open ⊑-Reasoning
 
-F-IIST : (e : E X Y) → B⟦ e ⟧ ⋙ F⟦ e ⟧ ⊑ laterN (DB⟦ e ⟧ + DF⟦ e ⟧) id
+F-IIST : (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
 F-IIST (`map-fold a f g) = helper a
   where
     helper : ∀ a → (B⟦ `map-fold a f g ⟧ ⋙ F⟦ `map-fold a f g ⟧) ⊑ id
@@ -735,12 +530,12 @@ F-IIST (`map-fold a f g) = helper a
     helper a .step y with f a .from y in eq
     ... | nothing = ⊥ₗ
     ... | just x rewrite f a .from→to eq = yield y (helper (g a x))
-F-IIST (`delay x) = unshift-shift x
-F-IIST (`hasten x) = ≈-to-⊑ (shift-unshift x)
+F-IIST (`delay x) = shift-IIST x
+F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = ⋙-IIST (F-IIST e') (F-IIST e)
 F-IIST (e `⊗ e') = ⊛-IIST (F-IIST e) (F-IIST e')
 
-B-IIST : (e : E X Y) → F⟦ e ⟧ ⋙ B⟦ e ⟧ ⊑ laterN (DF⟦ e ⟧ + DB⟦ e ⟧) id
+B-IIST : (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
   where
     helper : ∀ a → (F⟦ `map-fold a f g ⟧ ⋙ B⟦ `map-fold a f g ⟧) ⊑ id
@@ -748,7 +543,7 @@ B-IIST (`map-fold a f g) = helper a
     helper a .step x with f a .to x in eq
     ... | nothing = ⊥ₗ
     ... | just y rewrite f a .to→from eq = yield x (helper (g a x))
-B-IIST (`delay x) = ≈-to-⊑ (shift-unshift x)
-B-IIST (`hasten x) = unshift-shift x
+B-IIST (`delay x) = unshift-IIST x
+B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = ⋙-IIST (B-IIST e) (B-IIST e')
 B-IIST (e `⊗ e') = ⊛-IIST (B-IIST e) (B-IIST e')
