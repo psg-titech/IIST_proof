@@ -1,4 +1,4 @@
-module IIST.List where
+module IIST.Semantics.List where
 
 open import Level using ( 0ℓ )
 open import Data.List.Base using ( List; []; _∷_; zip; unzip; length )
@@ -14,7 +14,7 @@ open import Effect.Monad using ( RawMonad )
 open import Function using ( id; _∘_ )
 open import Relation.Nullary using ( yes; no )
 open import Relation.Binary.Core using ( _=[_]⇒_; _Preserves₂_⟶_⟶_ )
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality.Core
 
 open import IIST.Common
 open import IIST.Syntax

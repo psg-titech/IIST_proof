@@ -1,7 +1,9 @@
+{-# OPTIONS --safe #-}
+
 module IIST.Common where
 
 open import Data.Maybe.Base using ( Maybe; just; nothing )
-open import Relation.Binary.PropositionalEquality using ( _≡_; _≢_; refl; sym; trans )
+open import Relation.Binary.PropositionalEquality.Core
 open import Relation.Binary.Structures using ( IsDecEquivalence )
 
 private

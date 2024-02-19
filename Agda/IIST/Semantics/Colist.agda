@@ -1,6 +1,6 @@
 {-# OPTIONS --guardedness #-}
 
-module IIST.Colist where
+module IIST.Semantics.Colist where
 
 open import Data.Maybe.Base using ( Maybe; just; nothing; maybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_ )
@@ -9,7 +9,7 @@ open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Unit.Base using ( ⊤; tt )
 open import Function using ( _∘_ )
 open import Relation.Binary.Core using ( _=[_]⇒_ )
-open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans; cong )
+open import Relation.Binary.PropositionalEquality.Core
 open import Relation.Nullary using ( ¬_; yes; no )
 
 open import Codata.PartialColist as Colist⊥
