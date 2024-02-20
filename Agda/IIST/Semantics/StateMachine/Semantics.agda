@@ -189,8 +189,8 @@ step (≈-cong-later f≈g) x = next (≈-cong-⋙ ≈-refl f≈g)
 ≈-cong-laterN (suc n) f≈g = ≈-cong-later (≈-cong-laterN n f≈g)
 
 ⋙-later : {f : IST X Y d₁} {g : IST Y Z d₂} → later f ⋙ g ≈ later (f ⋙ g)
-⋙-later .same-d = refl
-⋙-later .step x = next (≈-sym ⋙-assoc)
+same-d ⋙-later = refl
+step ⋙-later x = next (≈-sym ⋙-assoc)
 
 ⋙-laterN : ∀ n {f : IST X Y d₁} {g : IST Y Z d₂} → laterN n f ⋙ g ≈ laterN n (f ⋙ g)
 ⋙-laterN zero = ≈-refl
@@ -364,6 +364,7 @@ step ⊑-⋙-later x = ⊑-⋙́′-later refl
 ⊑-⋙-laterN : ∀ n {f : IST X Y d₁} {g : IST Y Z d₂} → f ⋙ laterN n g ⊑ laterN n (f ⋙ g)
 ⊑-⋙-laterN zero = ⊑-refl
 ⊑-⋙-laterN (suc n) = ⊑-trans ⊑-⋙-later (⊑-cong-later (⊑-⋙-laterN n))
+
 ⊑-cong-⊛′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
   → f ⊑ f'
   → g ⊑ g'

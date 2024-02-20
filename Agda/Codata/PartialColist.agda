@@ -4,6 +4,7 @@ module Codata.PartialColist where
 
 open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
 open import Data.Nat.Base using ( ℕ; zero; suc )
+open import Data.List.Base using ( List; []; _∷_ )
 open import Relation.Binary.Bundles using ( Setoid; Preorder )
 open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans )
 open import Relation.Binary.Structures using ( IsEquivalence; IsPreorder )
@@ -35,6 +36,10 @@ open ∞Colist⊥ public
 
 -- η is safe for ∞Colist⊥
 {-# ETA ∞Colist⊥ #-}
+
+fromList : List A → Colist⊥ A
+fromList [] = []
+fromList (x ∷ xs) = x ∷ delay (fromList xs)
 
 colength : Colist⊥ A → Coℕ⊥
 colength [] = zero
@@ -125,6 +130,9 @@ open _∞≈_ public
 ≈-setoid : ∀ {A} → Setoid _ _
 ≈-setoid {A} = record { isEquivalence = ≈-isEquivalence {A} }
 
+module ≈-Reasoning {A} where
+  open import Relation.Binary.Reasoning.Setoid (≈-setoid {A}) public
+
 ≈-cong-map : ∀ {xs xs' : Colist⊥ A} (f : A → B)
   → xs ≈ xs'
   → map f xs ≈ map f xs'
@@ -154,6 +162,11 @@ unzip-zip : ∀ {xys : Colist⊥ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys)
 unzip-zip {xys = []} = []
 unzip-zip {xys = ⊥} = ⊥
 unzip-zip {xys = xy ∷ xs} = xy ∷ λ where .force → unzip-zip
+
+zip-⊥ᵣ : ∀ {xs : Colist⊥ A} → zip {A} {B} xs ⊥ ≈ ⊥
+zip-⊥ᵣ {xs = []} = ⊥
+zip-⊥ᵣ {xs = ⊥} = ⊥
+zip-⊥ᵣ {xs = _ ∷ _} = ⊥
 
 -------------------------------------------------------------------------------
 -- Prefix + Same definedness
@@ -195,6 +208,9 @@ open _∞≺_ public
 
 ≺-preorder : ∀ {A} → Preorder _ _ _
 ≺-preorder {A} = record { isPreorder = ≺-isPreorder {A} }
+
+module ≺-Reasoning {A} where
+  open import Relation.Binary.Reasoning.Preorder (≺-preorder {A}) public
 
 ≺-cong-zip : ∀ {xs xs' : Colist⊥ A} {ys ys' : Colist⊥ B}
   → xs' ≺ xs
@@ -267,6 +283,9 @@ open _∞≺≺_ public
 ≺≺-preorder : ∀ {A} → Preorder _ _ _
 ≺≺-preorder {A} = record { isPreorder = ≺≺-isPreorder {A} }
 
+module ≺≺-Reasoning {A} where
+  open import Relation.Binary.Reasoning.Preorder (≺≺-preorder {A}) public
+
 ≺≺-cong-zip : ∀ {xs xs' : Colist⊥ A} {ys ys' : Colist⊥ B}
   → xs' ≺≺ xs
   → ys' ≺≺ ys
@@ -314,3 +333,14 @@ zip-unzipᵣ (⊥) ys = ⊥
 zip-unzipᵣ (x ∷ xs) [] = []
 zip-unzipᵣ (x ∷ xs) ⊥ = ⊥
 zip-unzipᵣ (x ∷ xs) (y ∷ ys) = y ∷ λ where .force → zip-unzipᵣ (force xs) (force ys)
+
+--------------------------------------------------------------------------------
+
+data Finite {A} : Colist⊥ A → Set where
+  [] : Finite []
+  ⊥ : Finite ⊥
+  _∷_ : ∀ x {xs} (p : Finite xs) → Finite (x ∷ delay xs)
+
+finite-fromList : (xs : List A) → Finite (fromList xs)
+finite-fromList [] = []
+finite-fromList (x ∷ xs) = x ∷ finite-fromList xs

@@ -69,8 +69,8 @@ unshift x (y ∷ xs) with x ≟ y
 ... | yes _ = force xs
 
 -- parallel composition
-_∥_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
-(f ∥ g) xzs = zip (f (unzipₗ xzs)) (g (unzipᵣ xzs))
+_⊛_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
+(f ⊛ g) xzs = zip (f (unzipₗ xzs)) (g (unzipᵣ xzs))
 
 F-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST X Y
 F-map-fold a f g [] = []
@@ -84,7 +84,7 @@ F⟦ `map-fold a f g ⟧ = F-map-fold a f g
 F⟦ `delay x ⟧ = shift x
 F⟦ `hasten x ⟧ = unshift x
 F⟦ e `⋙ e' ⟧ = F⟦ e' ⟧ ∘ F⟦ e ⟧
-F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ∥ F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊛ F⟦ e' ⟧
 
 B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST Y X
 B-map-fold a f g [] = []
@@ -98,7 +98,7 @@ B⟦ `map-fold a f g ⟧ = B-map-fold a f g
 B⟦ `delay x ⟧ = unshift x
 B⟦ `hasten x ⟧ = shift x
 B⟦ e `⋙ e' ⟧ = B⟦ e ⟧ ∘ B⟦ e' ⟧
-B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ∥ B⟦ e' ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊛ B⟦ e' ⟧
 
 --------------------------------------------------------------------------------
 
@@ -131,11 +131,11 @@ unshift-incremental x (y ∷ p) with x ≟ y
 ... | no _ = ⊥
 ... | yes _ = force p
 
-∥-incremental : ∀ {f : ST X Y} {g : ST Z W}
+⊛-incremental : ∀ {f : ST X Y} {g : ST Z W}
   → IsIncremental f
   → IsIncremental g
-  → IsIncremental (f ∥ g)
-∥-incremental {f = f} {g} p q r =
+  → IsIncremental (f ⊛ g)
+⊛-incremental {f = f} {g} p q r =
   ≺-cong-zip (p (≺-cong-unzipₗ r)) (q (≺-cong-unzipᵣ r))
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
@@ -150,7 +150,7 @@ F-incremental (`map-fold a f g) = helper a
 F-incremental (`delay x) = shift-incremental x
 F-incremental (`hasten x) = unshift-incremental x
 F-incremental (e `⋙ e') = F-incremental e' ∘ F-incremental e
-F-incremental (e `⊗ e') = ∥-incremental (F-incremental e) (F-incremental e')
+F-incremental (e `⊗ e') = ⊛-incremental (F-incremental e) (F-incremental e')
 
 B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧
 B-incremental (`map-fold a f g) = helper a
@@ -164,7 +164,7 @@ B-incremental (`map-fold a f g) = helper a
 B-incremental (`delay x) = unshift-incremental x
 B-incremental (`hasten x) = shift-incremental x
 B-incremental (e `⋙ e') = B-incremental e ∘ B-incremental e'
-B-incremental (e `⊗ e') = ∥-incremental (B-incremental e) (B-incremental e')
+B-incremental (e `⊗ e') = ⊛-incremental (B-incremental e) (B-incremental e')
 
 --------------------------------------------------------------------------------
 -- d-Incrementality of F and B
@@ -199,11 +199,11 @@ module _ where
       colength xs ∸ℕ (d' + d)
     ∎
 
-  ∥-hasDelay : ∀ {f : ST X Y} {g : ST Z W} d d'
+  ⊛-hasDelay : ∀ {f : ST X Y} {g : ST Z W} d d'
     → HasDelay d f
     → HasDelay d' g
-    → HasDelay (d ⊔ d') (f ∥ g)
-  ∥-hasDelay {f = f} {g} d d' p q xzs =
+    → HasDelay (d ⊔ d') (f ⊛ g)
+  ⊛-hasDelay {f = f} {g} d d' p q xzs =
     begin
       colength (zip (f (unzipₗ xzs)) (g (unzipᵣ xzs)))
     ≈⟨ colength-zip ⟩
@@ -228,7 +228,7 @@ module _ where
   F-hasDelay (`delay x) = shift-hasDelay x
   F-hasDelay (`hasten x) = unshift-hasDelay x
   F-hasDelay (e `⋙ e') = ∘-hasDelay DF⟦ e' ⟧ DF⟦ e ⟧ (F-hasDelay e') (F-hasDelay e)
-  F-hasDelay (e `⊗ e') = ∥-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
+  F-hasDelay (e `⊗ e') = ⊛-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
 
   B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
   B-hasDelay (`map-fold a f g) = helper a
@@ -242,7 +242,7 @@ module _ where
   B-hasDelay (`delay x) = unshift-hasDelay x
   B-hasDelay (`hasten x) = shift-hasDelay x
   B-hasDelay (e `⋙ e') = ∘-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
-  B-hasDelay (e `⊗ e') = ∥-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
+  B-hasDelay (e `⊗ e') = ⊛-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
 
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
@@ -262,11 +262,11 @@ module _ where
 ... | no _ = ⊥
 ... | yes _ = force p
 
-≺≺-cong-∥ : ∀ {f : ST X Y} {g : ST Z W}
+≺≺-cong-⊛ : ∀ {f : ST X Y} {g : ST Z W}
   → _≺≺_ =[ f ]⇒ _≺≺_
   → _≺≺_ =[ g ]⇒ _≺≺_
-  → _≺≺_ =[ f ∥ g ]⇒ _≺≺_
-≺≺-cong-∥ f-inc g-inc pf =
+  → _≺≺_ =[ f ⊛ g ]⇒ _≺≺_
+≺≺-cong-⊛ f-inc g-inc pf =
   ≺≺-cong-zip (f-inc (≺≺-cong-unzipₗ pf)) (g-inc (≺≺-cong-unzipᵣ pf))
 
 ≺≺-cong-F : ∀ (e : E X Y) → _≺≺_ =[ F⟦ e ⟧ ]⇒ _≺≺_
@@ -281,7 +281,7 @@ module _ where
 ≺≺-cong-F (`delay x) = ≺≺-cong-shift x
 ≺≺-cong-F (`hasten x) = ≺≺-cong-unshift x
 ≺≺-cong-F (e `⋙ e') = ≺≺-cong-F e' ∘ ≺≺-cong-F e
-≺≺-cong-F (e `⊗ e') = ≺≺-cong-∥ (≺≺-cong-F e) (≺≺-cong-F e')
+≺≺-cong-F (e `⊗ e') = ≺≺-cong-⊛ (≺≺-cong-F e) (≺≺-cong-F e')
 
 ≺≺-cong-B : ∀ (e : E X Y) → _≺≺_ =[ B⟦ e ⟧ ]⇒ _≺≺_
 ≺≺-cong-B (`map-fold a f g) = helper a
@@ -295,7 +295,7 @@ module _ where
 ≺≺-cong-B (`delay x) = ≺≺-cong-unshift x
 ≺≺-cong-B (`hasten x) = ≺≺-cong-shift x
 ≺≺-cong-B (e `⋙ e') = ≺≺-cong-B e ∘ ≺≺-cong-B e'
-≺≺-cong-B (e `⊗ e') = ≺≺-cong-∥ (≺≺-cong-B e) (≺≺-cong-B e')
+≺≺-cong-B (e `⊗ e') = ≺≺-cong-⊛ (≺≺-cong-B e) (≺≺-cong-B e')
 
 shift-≺≺-∷ : ∀ (x : A) xs → shift x xs ≺≺ x ∷ delay xs
 shift-≺≺-∷ x [] = []
@@ -331,15 +331,15 @@ unshift-IIST x (y ∷ xs) with x ≟ x
   ∎
   where open import Relation.Binary.Reasoning.Preorder ≺≺-preorder
 
-∥-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
+⊛-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
   → f IsIISTOf f'
   → g IsIISTOf g'
   → _≺≺_ =[ f ]⇒ _≺≺_
   → _≺≺_ =[ g ]⇒ _≺≺_
-  → (f ∥ g) IsIISTOf (f' ∥ g')
-∥-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
+  → (f ⊛ g) IsIISTOf (f' ⊛ g')
+⊛-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
   begin
-    (f ∥ g) ((f' ∥ g') yws)
+    (f ⊛ g) ((f' ⊛ g') yws)
   ≡⟨⟩
     zip
       (f (unzipₗ (zip (f' (unzipₗ yws)) (g' (unzipᵣ yws)))))
@@ -369,7 +369,7 @@ F-IIST (`map-fold a f g) = helper a
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (≺≺-cong-F e')
-F-IIST (e `⊗ e') = ∥-IIST (F-IIST e) (F-IIST e') (≺≺-cong-F e) (≺≺-cong-F e')
+F-IIST (e `⊗ e') = ⊛-IIST (F-IIST e) (F-IIST e') (≺≺-cong-F e) (≺≺-cong-F e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
@@ -384,7 +384,7 @@ B-IIST (`map-fold a f g) = helper a
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (≺≺-cong-B e)
-B-IIST (e `⊗ e') = ∥-IIST (B-IIST e) (B-IIST e') (≺≺-cong-B e) (≺≺-cong-B e')
+B-IIST (e `⊗ e') = ⊛-IIST (B-IIST e) (B-IIST e') (≺≺-cong-B e) (≺≺-cong-B e')
 
 --------------------------------------------------------------------------------
 -- Bundles

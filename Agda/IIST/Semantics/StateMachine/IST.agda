@@ -2,20 +2,19 @@
 
 module IIST.Semantics.StateMachine.IST where
 
-open import Codata.Musical.Notation
-open import Codata.Musical.Colist.Base using ( Colist; []; _∷_ )
-open import Codata.Musical.Colist.Bisimilarity using ( []; _∷_ ) renaming ( _≈_ to Bisim )
-open import Codata.Musical.Stream using ( Stream; _∷_ )
 open import Data.Maybe.Base as Maybe using ( Maybe; just; nothing )
 open import Data.Nat.Base using ( ℕ; zero; suc; pred; _+_ )
 open import Data.Nat.Properties using ( +-suc; +-assoc; +-identityʳ; suc-injective )
 open import Data.Nat.Instances
 open import Data.List.Base using ( List; []; _∷_ )
+open import Relation.Binary.Indexed.Heterogeneous.Bundles using ( IndexedSetoid; IndexedPreorder )
+open import Relation.Binary.Indexed.Heterogeneous.Structures using ( IsIndexedEquivalence; IsIndexedPreorder )
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary.Decidable.Core using ( recompute )
 
 open import IIST.Common
 open import IIST.Syntax
+open import Codata.PartialColist using ( Colist⊥; ∞Colist⊥; []; ⊥; _∷_; force ) renaming ( _≈_ to Bisim; _∞≈_ to ∞Bisim )
 
 private
   variable
@@ -39,20 +38,22 @@ data Step X Y where
 
 open IST public
 
-eat : IST X Y d → List X → Maybe (List Y)
-eatₛ : Step X Y d → List X → Maybe (List Y)
+eat : IST X Y d → List X ⇀ List Y
+eatₛ : Step X Y d → List X ⇀ List Y
 eat f [] = just []
 eat f (x ∷ xs) = eatₛ (step f x) xs
 eatₛ ⊥ xs = nothing
 eatₛ (next f) xs = eat f xs
 eatₛ (yield y f) xs = Maybe.map (y ∷_) (eat f xs)
 
-eat∞ : IST X Y d → Stream X → Colist Y
-eatₛ∞ : Step X Y d → ∞ (Stream X) → Colist Y
+eat∞ : IST X Y d → Colist⊥ X → Colist⊥ Y
+eatₛ∞ : Step X Y d → ∞Colist⊥ X → Colist⊥ Y
+eat∞ f [] = []
+eat∞ f ⊥ = ⊥
 eat∞ f (x ∷ xs) = eatₛ∞ (step f x) xs
-eatₛ∞ ⊥ xs = []
-eatₛ∞ (next f) xs = eat∞ f (♭ xs)
-eatₛ∞ (yield y f) xs = y ∷ ♯ eat∞ f (♭ xs)
+eatₛ∞ ⊥ xs = ⊥
+eatₛ∞ (next f) xs = eat∞ f (force xs)
+eatₛ∞ (yield y f) xs = y ∷ λ where .force → eat∞ f (force xs)
 
 cast : .(d₁ ≡ d₂) → IST X Y d₁ → IST X Y d₂
 castₛ : .(d₁ ≡ d₂) → Step X Y d₁ → Step X Y d₂
@@ -107,6 +108,16 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 ≈ₛ-trans (next f≈g) (next g≈h) = next (≈-trans f≈g g≈h)
 ≈ₛ-trans (yield x f≈g) (yield .x g≈h) = yield x (≈-trans f≈g g≈h)
 
+≈-isIndexedEquivalence : IsIndexedEquivalence (IST X Y) _≈_
+≈ₛ-isIndexedEquivalence : IsIndexedEquivalence (Step X Y) _≈ₛ_
+≈-isIndexedEquivalence = record { refl = ≈-refl; sym = ≈-sym; trans = ≈-trans }
+≈ₛ-isIndexedEquivalence = record { refl = ≈ₛ-refl; sym = ≈ₛ-sym; trans = ≈ₛ-trans }
+
+≈-indexedSetoid : ∀ {X Y} → IndexedSetoid ℕ _ _
+≈ₛ-indexedSetoid : ∀ {X Y} → IndexedSetoid ℕ _ _
+≈-indexedSetoid {X} {Y} = record { isEquivalence = ≈-isIndexedEquivalence {X} {Y} }
+≈ₛ-indexedSetoid {X} {Y} = record { isEquivalence = ≈ₛ-isIndexedEquivalence {X} {Y} }
+
 ≈-eat : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → ∀ xs → eat f xs ≡ eat g xs
 ≈ₛ-eatₛ : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → ∀ xs → eatₛ s xs ≡ eatₛ t xs
 ≈-eat f≈g [] = refl
@@ -117,10 +128,21 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 
 ≈-eat∞ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → ∀ xs → Bisim (eat∞ f xs) (eat∞ g xs)
 ≈ₛ-eatₛ∞ : {s : Step X Y d₁} {t : Step X Y d₂} → s ≈ₛ t → ∀ xs → Bisim (eatₛ∞ s xs) (eatₛ∞ t xs)
+≈-eat∞ f≈g [] = []
+≈-eat∞ f≈g ⊥ = ⊥
 ≈-eat∞ f≈g (x ∷ xs) = ≈ₛ-eatₛ∞ (step f≈g x) xs
-≈ₛ-eatₛ∞ ⊥ xs = []
-≈ₛ-eatₛ∞ (next f≈g) xs = ≈-eat∞ f≈g (♭ xs)
-≈ₛ-eatₛ∞ (yield y f≈g) xs = y ∷ ♯ ≈-eat∞ f≈g (♭ xs)
+≈ₛ-eatₛ∞ ⊥ xs = ⊥
+≈ₛ-eatₛ∞ (next f≈g) xs = ≈-eat∞ f≈g (force xs)
+≈ₛ-eatₛ∞ (yield y f≈g) xs = y ∷ λ where .force → ≈-eat∞ f≈g (force xs)
+
+≈-eat∞′ : ∀ (f : IST X Y d) {xs ys} → Bisim xs ys → Bisim (eat∞ f xs) (eat∞ f ys)
+≈-eatₛ∞′ : ∀ (s : Step X Y d) {xs ys} → ∞Bisim xs ys → Bisim (eatₛ∞ s xs) (eatₛ∞ s ys)
+≈-eat∞′ f [] = []
+≈-eat∞′ f ⊥ = ⊥
+≈-eat∞′ f (x ∷ p) = ≈-eatₛ∞′ (step f x) p
+≈-eatₛ∞′ ⊥ p = ⊥
+≈-eatₛ∞′ (next f) p = ≈-eat∞′ f (force p)
+≈-eatₛ∞′ (yield y f) p = y ∷ λ where .force → ≈-eat∞′ f (force p)
 
 ≈-cast : .{eq : d₁ ≡ d₂} {f : IST X Y d₁} → cast eq f ≈ f
 ≈ₛ-castₛ : .{eq : d₁ ≡ d₂} {s : Step X Y d₁} → castₛ eq s ≈ₛ s
@@ -187,6 +209,24 @@ step (⊑-trans f⊑g g⊑h) x = ⊑ₛ-trans (step f⊑g x) (step g⊑h x)
 ⊑ₛ-trans ⊥ₗ _ = ⊥ₗ
 ⊑ₛ-trans (next f⊑g) (next g⊑h) = next (⊑-trans f⊑g g⊑h)
 ⊑ₛ-trans (yield x f⊑g) (yield .x g⊑h) = yield x (⊑-trans f⊑g g⊑h)
+
+⊑-isIndexedPreorder : IsIndexedPreorder (IST X Y) _≈_ _⊑_
+⊑ₛ-isIndexedPreorder : IsIndexedPreorder (Step X Y) _≈ₛ_ _⊑ₛ_
+⊑-isIndexedPreorder = record
+  { isEquivalence = ≈-isIndexedEquivalence
+  ; reflexive = ≈-to-⊑
+  ; trans = ⊑-trans
+  }
+⊑ₛ-isIndexedPreorder = record
+  { isEquivalence = ≈ₛ-isIndexedEquivalence
+  ; reflexive = ≈ₛ-to-⊑ₛ
+  ; trans = ⊑ₛ-trans
+  }
+
+⊑-indexedPreorder : ∀ {X Y} → IndexedPreorder ℕ _ _ _
+⊑ₛ-indexedPreorder : ∀ {X Y} → IndexedPreorder ℕ _ _ _
+⊑-indexedPreorder {X} {Y} = record { isPreorder = ⊑-isIndexedPreorder {X} {Y} }
+⊑ₛ-indexedPreorder {X} {Y} = record { isPreorder = ⊑ₛ-isIndexedPreorder {X} {Y} }
 
 module ⊑-Reasoning where
 
