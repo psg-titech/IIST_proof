@@ -85,6 +85,9 @@ open _∞≈_ public
 ≈-setoid : Setoid _ _
 ≈-setoid = record { isEquivalence = ≈-isEquivalence }
 
+module ≈-Reasoning where
+  open import Relation.Binary.Reasoning.Setoid ≈-setoid public
+
 suc-injective : ∀ {m n} → suc m ≈ suc n → m ∞≈ n
 suc-injective (suc p) = p
 
@@ -196,6 +199,9 @@ open _∞⊑_ public
 
 ⊑-preorder : Preorder _ _ _
 ⊑-preorder = record { isPreorder = ⊑-isPreorder }
+
+module ⊑-Reasoning where
+  open import Relation.Binary.Reasoning.Preorder ⊑-preorder public
 
 ⊑-cong-∸ℕ : ∀ {m n} o → m ⊑ n → m ∸ℕ o ⊑ n ∸ℕ o
 ⊑-cong-∸ℕ zero p = p
