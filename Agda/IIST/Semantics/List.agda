@@ -134,8 +134,8 @@ record Is⟨_,_⟩-IIST_ (d d' : ℕ) (st : ST X Y) : Set where
 -- IIST constructors and semantics
 
 -- Parallel composition
-_⊛_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
-(f ⊛ g) xzs =
+_⊗_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
+(f ⊗ g) xzs =
   let xs , zs = unzip xzs
    in (| zip (f xs) (g zs) |)
 
@@ -149,7 +149,7 @@ F⟦ `map-fold a f g ⟧ = F-map-fold a f g
 F⟦ `delay x ⟧ = pure ∘ shift x
 F⟦ `hasten x ⟧ = unshift x
 F⟦ e `⋙ e' ⟧ = F⟦ e ⟧ >=> F⟦ e' ⟧
-F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊛ F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊗ F⟦ e' ⟧
 
 -- Backward semantics
 B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST Y X
@@ -163,7 +163,7 @@ B⟦ `map-fold a f g ⟧ = B-map-fold a f g
 B⟦ `delay x ⟧ = unshift x
 B⟦ `hasten x ⟧ = pure ∘ shift x
 B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ >=> B⟦ e ⟧
-B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊛ B⟦ e' ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊗ B⟦ e' ⟧
 
 
 _ : F⟦ `delay 0 `⋙ `hasten 0 ⟧ (1 ∷ 2 ∷ 3 ∷ []) ≡ just (1 ∷ 2 ∷ [])
@@ -218,11 +218,11 @@ unshift-incremental x (x' ∷ pfx) eq
   with just zs' ← g ys' | _ , zs'≺zs , refl ← g-inc ys'≺ys eq =
     zs' , zs'≺zs , refl
 
-⊛-incremental : ∀ {f : ST X Y} {g : ST Z W}
+⊗-incremental : ∀ {f : ST X Y} {g : ST Z W}
   → IsIncremental f
   → IsIncremental g
-  → IsIncremental (f ⊛ g)
-⊛-incremental {f = f} {g} f-inc g-inc {xzs'} {xzs} xzs'≺xzs eq
+  → IsIncremental (f ⊗ g)
+⊗-incremental {f = f} {g} f-inc g-inc {xzs'} {xzs} xzs'≺xzs eq
   with just ys ← f (unzip xzs .proj₁) in eq₁
   with just ys' ← f (unzip xzs' .proj₁) | _ , ys'≺ys , refl ← f-inc (≺-unzip₁ xzs'≺xzs) eq₁
   with just ws ← g (unzip xzs .proj₂) in eq₂
@@ -244,7 +244,7 @@ F-incremental (`map-fold a f g) = helper a
 F-incremental (`delay x) = shift-incremental x
 F-incremental (`hasten x) = unshift-incremental x
 F-incremental (e `⋙ e') = >=>-incremental (F-incremental e) (F-incremental e')
-F-incremental (e `⊗ e') = ⊛-incremental (F-incremental e) (F-incremental e')
+F-incremental (e `⊗ e') = ⊗-incremental (F-incremental e) (F-incremental e')
 
 B-incremental : ∀ (e : E X Y) → IsIncremental B⟦ e ⟧
 B-incremental (`map-fold a f g) = helper a
@@ -260,7 +260,7 @@ B-incremental (`map-fold a f g) = helper a
 B-incremental (`delay x) = unshift-incremental x
 B-incremental (`hasten x) = shift-incremental x
 B-incremental (e `⋙ e') = >=>-incremental (B-incremental e') (B-incremental e)
-B-incremental (e `⊗ e') = ⊛-incremental (B-incremental e) (B-incremental e')
+B-incremental (e `⊗ e') = ⊗-incremental (B-incremental e) (B-incremental e')
 
 --------------------------------------------------------------------------------
 -- d-incrementality of F and B
@@ -283,11 +283,11 @@ unshift-hasDelay x (y ∷ xs) eq with yes refl ← x ≟ y =
   rewrite q ys eq | p xs eq₁ =
     ∸-+-assoc (length xs) d d'
 
-⊛-hasDelay : ∀ {d d'} {f : ST X Y} {g : ST Z W}
+⊗-hasDelay : ∀ {d d'} {f : ST X Y} {g : ST Z W}
   → HasDelay d f
   → HasDelay d' g
-  → HasDelay (d ⊔ d') (f ⊛ g)
-⊛-hasDelay {d = d} {d'} {f} {g} f-delay g-delay xzs eq
+  → HasDelay (d ⊔ d') (f ⊗ g)
+⊗-hasDelay {d = d} {d'} {f} {g} f-delay g-delay xzs eq
   with just ys ← f (unzip xzs .proj₁) in eq₁
   with just ws ← g (unzip xzs .proj₂) in eq₂
   rewrite sym (just-injective eq)
@@ -311,7 +311,7 @@ F-hasDelay (`map-fold a f g) = helper a
 F-hasDelay (`delay x) = shift-hasDelay x
 F-hasDelay (`hasten x) = unshift-hasDelay x
 F-hasDelay (e `⋙ e') = >=>-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
-F-hasDelay (e `⊗ e') = ⊛-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
+F-hasDelay (e `⊗ e') = ⊗-hasDelay {d = DF⟦ e ⟧} {d' = DF⟦ e' ⟧} (F-hasDelay e) (F-hasDelay e')
 
 B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
 B-hasDelay (`map-fold a f g) = helper a
@@ -326,7 +326,7 @@ B-hasDelay (`map-fold a f g) = helper a
 B-hasDelay (`delay x) = unshift-hasDelay x
 B-hasDelay (`hasten x) = shift-hasDelay x
 B-hasDelay (e `⋙ e') = >=>-hasDelay {d = DB⟦ e' ⟧} {d' = DB⟦ e ⟧} (B-hasDelay e') (B-hasDelay e)
-B-hasDelay (e `⊗ e') = ⊛-hasDelay {d = DB⟦ e ⟧} {d' = DB⟦ e' ⟧} (B-hasDelay e) (B-hasDelay e')
+B-hasDelay (e `⊗ e') = ⊗-hasDelay {d = DB⟦ e ⟧} {d' = DB⟦ e' ⟧} (B-hasDelay e) (B-hasDelay e')
 
 --------------------------------------------------------------------------------
 -- F and B are inverse of each other
@@ -356,13 +356,13 @@ unshift-IIST x {y ∷ xs} refl with x ≟ x
   with zs'' , zs''≺zs' , eq₃ ← g-inc ys'≺ys eq₂ =
     zs'' , ≺-trans zs''≺zs' zs'≺zs , eq₃
 
-⊛-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
+⊗-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
   → f IsIISTOf f'
   → g IsIISTOf g'
   → IsIncremental f
   → IsIncremental g
-  → (f ⊛ g) IsIISTOf (f' ⊛ g')
-⊛-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc {yws} eq
+  → (f ⊗ g) IsIISTOf (f' ⊗ g')
+⊗-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc {yws} eq
   with just xs ← f' (unzip yws .proj₁) in eq₁
   with just ys' ← f xs in eq₁ | _ , ys'≺ys , refl ← f-inv-f' eq₁
   with just zs ← g' (unzip yws .proj₂) in eq₂
@@ -388,7 +388,7 @@ F-IIST (`map-fold a f g) = helper a
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = >=>-IIST (F-IIST e) (F-IIST e') (F-incremental e')
-F-IIST (e `⊗ e') = ⊛-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
+F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e') (F-incremental e) (F-incremental e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
@@ -404,7 +404,7 @@ B-IIST (`map-fold a f g) = helper a
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = >=>-IIST (B-IIST e') (B-IIST e) (B-incremental e)
-B-IIST (e `⊗ e') = ⊛-IIST (B-IIST e) (B-IIST e') (B-incremental e) (B-incremental e')
+B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e') (B-incremental e) (B-incremental e')
 
 --------------------------------------------------------------------------------
 -- Bundles

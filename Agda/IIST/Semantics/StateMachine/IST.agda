@@ -14,7 +14,7 @@ open import Relation.Nullary.Decidable.Core using ( recompute )
 
 open import IIST.Common
 open import IIST.Syntax
-open import Codata.PartialColist using ( Colist⊥; ∞Colist⊥; []; ⊥; _∷_; force ) renaming ( _≈_ to Bisim; _∞≈_ to ∞Bisim )
+open import Codata.PartialColist using ( Colist⊥; ∞Colist⊥; []; ⊥; _∷_; delay; force ) renaming ( _≈_ to Bisim; _∞≈_ to ∞Bisim )
 
 private
   variable
@@ -34,6 +34,7 @@ record IST X Y d where
 data Step X Y where
   ⊥ : Step X Y d
   next : IST X Y d → Step X Y (suc d)
+  yield⊥ : Y → Step X Y 0
   yield : Y → IST X Y 0 → Step X Y 0
 
 open IST public
@@ -44,6 +45,7 @@ eat f [] = just []
 eat f (x ∷ xs) = eatₛ (step f x) xs
 eatₛ ⊥ xs = nothing
 eatₛ (next f) xs = eat f xs
+eatₛ (yield⊥ y) xs = nothing
 eatₛ (yield y f) xs = Maybe.map (y ∷_) (eat f xs)
 
 eat∞ : IST X Y d → Colist⊥ X → Colist⊥ Y
@@ -53,12 +55,14 @@ eat∞ f ⊥ = ⊥
 eat∞ f (x ∷ xs) = eatₛ∞ (step f x) xs
 eatₛ∞ ⊥ xs = ⊥
 eatₛ∞ (next f) xs = eat∞ f (force xs)
+eatₛ∞ (yield⊥ y) xs = y ∷ delay ⊥
 eatₛ∞ (yield y f) xs = y ∷ λ where .force → eat∞ f (force xs)
 
 cast : .(d₁ ≡ d₂) → IST X Y d₁ → IST X Y d₂
 castₛ : .(d₁ ≡ d₂) → Step X Y d₁ → Step X Y d₂
 step (cast eq f) x = castₛ eq (step f x)
 castₛ {d₂ = zero} eq ⊥ = ⊥
+castₛ {d₂ = zero} eq (yield⊥ y) = yield⊥ y
 castₛ {d₂ = zero} eq (yield y f) = yield y f
 castₛ {d₂ = suc d₂} eq ⊥ = ⊥
 castₛ {d₂ = suc d₂} eq (next f) = next (cast (cong pred eq) f)
@@ -80,6 +84,7 @@ record _≈_ {X Y d₁ d₂} f g where
 data _≈ₛ_ {X Y} where
   ⊥ : ⊥ {d = d₁} ≈ₛ ⊥ {d = d₂}
   next : {f : IST X Y d₁} {g : IST X Y d₂} (p : f ≈ g) → next f ≈ₛ next g
+  yield⊥ : ∀ x → yield⊥ x ≈ₛ yield⊥ x
   yield : ∀ x {f g} (p : f ≈ g) → yield x f ≈ₛ yield x g
 
 open _≈_ public
@@ -90,6 +95,7 @@ same-d ≈-refl = refl
 step ≈-refl x = ≈ₛ-refl
 ≈ₛ-refl {s = ⊥} = ⊥
 ≈ₛ-refl {s = next f} = next ≈-refl
+≈ₛ-refl {s = yield⊥ x} = yield⊥ x
 ≈ₛ-refl {s = yield x f} = yield x ≈-refl
 
 ≈-sym : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → g ≈ f
@@ -98,6 +104,7 @@ same-d (≈-sym f≈g) = sym (same-d f≈g)
 step (≈-sym f≈g) x = ≈ₛ-sym (step f≈g x)
 ≈ₛ-sym ⊥ = ⊥
 ≈ₛ-sym (next f≈g) = next (≈-sym f≈g)
+≈ₛ-sym (yield⊥ x) = yield⊥ x
 ≈ₛ-sym (yield x f≈g) = yield x (≈-sym f≈g)
 
 ≈-trans : {f : IST X Y d₁} {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ≈ h → f ≈ h
@@ -106,6 +113,7 @@ same-d (≈-trans f≈g g≈h) = trans (same-d f≈g) (same-d g≈h)
 step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 ≈ₛ-trans ⊥ ⊥ = ⊥
 ≈ₛ-trans (next f≈g) (next g≈h) = next (≈-trans f≈g g≈h)
+≈ₛ-trans (yield⊥ x) (yield⊥ .x) = yield⊥ x
 ≈ₛ-trans (yield x f≈g) (yield .x g≈h) = yield x (≈-trans f≈g g≈h)
 
 ≈-isIndexedEquivalence : IsIndexedEquivalence (IST X Y) _≈_
@@ -124,6 +132,7 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 ≈-eat f≈g (x ∷ xs) = ≈ₛ-eatₛ (step f≈g x) xs
 ≈ₛ-eatₛ ⊥ xs = refl
 ≈ₛ-eatₛ (next f≈g) xs = ≈-eat f≈g xs
+≈ₛ-eatₛ (yield⊥ _) xs = refl
 ≈ₛ-eatₛ (yield y f≈g) xs = cong (Maybe.map _) (≈-eat f≈g xs)
 
 ≈-eat∞ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → ∀ xs → Bisim (eat∞ f xs) (eat∞ g xs)
@@ -133,6 +142,7 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 ≈-eat∞ f≈g (x ∷ xs) = ≈ₛ-eatₛ∞ (step f≈g x) xs
 ≈ₛ-eatₛ∞ ⊥ xs = ⊥
 ≈ₛ-eatₛ∞ (next f≈g) xs = ≈-eat∞ f≈g (force xs)
+≈ₛ-eatₛ∞ (yield⊥ y) xs = y ∷ λ where .force → ⊥
 ≈ₛ-eatₛ∞ (yield y f≈g) xs = y ∷ λ where .force → ≈-eat∞ f≈g (force xs)
 
 ≈-eat∞′ : ∀ (f : IST X Y d) {xs ys} → Bisim xs ys → Bisim (eat∞ f xs) (eat∞ f ys)
@@ -142,6 +152,7 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 ≈-eat∞′ f (x ∷ p) = ≈-eatₛ∞′ (step f x) p
 ≈-eatₛ∞′ ⊥ p = ⊥
 ≈-eatₛ∞′ (next f) p = ≈-eat∞′ f (force p)
+≈-eatₛ∞′ (yield⊥ y) p = y ∷ λ where .force → ⊥
 ≈-eatₛ∞′ (yield y f) p = y ∷ λ where .force → ≈-eat∞′ f (force p)
 
 ≈-cast : .{eq : d₁ ≡ d₂} {f : IST X Y d₁} → cast eq f ≈ f
@@ -149,6 +160,7 @@ step (≈-trans f≈g g≈h) x = ≈ₛ-trans (step f≈g x) (step g≈h x)
 same-d (≈-cast {d₁ = d₁} {d₂ = d₂} {eq = eq}) = recompute (d₂ ≟ d₁) (sym eq)
 step ≈-cast x = ≈ₛ-castₛ
 ≈ₛ-castₛ {d₂ = zero} {s = ⊥} = ⊥
+≈ₛ-castₛ {d₂ = zero} {s = yield⊥ y} = yield⊥ y
 ≈ₛ-castₛ {d₂ = zero} {s = yield y f} = ≈ₛ-refl
 ≈ₛ-castₛ {d₂ = suc d₂} {s = ⊥} = ⊥
 ≈ₛ-castₛ {d₂ = suc d₂} {s = next f} = next ≈-cast
@@ -185,6 +197,8 @@ record _⊑_ {X Y d₁ d₂} f g where
 data _⊑ₛ_ {X Y} where
   ⊥ₗ : ∀ {d₁ d₂} {s : Step X Y d₂} → ⊥ {d = d₁} ⊑ₛ s
   next : {f : IST X Y d₁} {g : IST X Y d₂} (p : f ⊑ g) → next f ⊑ₛ next g
+  yield⊥ : ∀ x → yield⊥ x ⊑ₛ yield⊥ x
+  yield⊥ₗ : ∀ x {f} → yield⊥ x ⊑ₛ yield x f
   yield : ∀ x {f g} (p : f ⊑ g) → yield x f ⊑ₛ yield x g
 
 open _⊑_ public
@@ -195,6 +209,7 @@ same-d (≈-to-⊑ f≈g) = same-d f≈g
 step (≈-to-⊑ f≈g) x = ≈ₛ-to-⊑ₛ (step f≈g x)
 ≈ₛ-to-⊑ₛ ⊥ = ⊥ₗ
 ≈ₛ-to-⊑ₛ (next f≈g) = next (≈-to-⊑ f≈g)
+≈ₛ-to-⊑ₛ (yield⊥ x) = yield⊥ x
 ≈ₛ-to-⊑ₛ (yield x f≈g) = yield x (≈-to-⊑ f≈g)
 
 ⊑-refl : {f : IST X Y d} → f ⊑ f
@@ -208,6 +223,9 @@ same-d (⊑-trans f⊑g g⊑h) = trans (same-d f⊑g) (same-d g⊑h)
 step (⊑-trans f⊑g g⊑h) x = ⊑ₛ-trans (step f⊑g x) (step g⊑h x)
 ⊑ₛ-trans ⊥ₗ _ = ⊥ₗ
 ⊑ₛ-trans (next f⊑g) (next g⊑h) = next (⊑-trans f⊑g g⊑h)
+⊑ₛ-trans (yield⊥ x) (yield⊥ .x) = yield⊥ x
+⊑ₛ-trans (yield⊥ x) (yield⊥ₗ .x) = yield⊥ₗ x
+⊑ₛ-trans (yield⊥ₗ x) (yield .x _) = yield⊥ₗ x
 ⊑ₛ-trans (yield x f⊑g) (yield .x g⊑h) = yield x (⊑-trans f⊑g g⊑h)
 
 ⊑-isIndexedPreorder : IsIndexedPreorder (IST X Y) _≈_ _⊑_

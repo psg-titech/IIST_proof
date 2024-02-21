@@ -69,9 +69,9 @@ unshift x (y ∷ xs) with x ≟ y
 ... | no _ = ⊥
 ... | yes _ = force xs
 
--- parallel composition
-_⊛_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
-(f ⊛ g) xzs = zip (f (unzipₗ xzs)) (g (unzipᵣ xzs))
+-- Parallel composition
+_⊗_ : ST X Y → ST Z W → ST (X × Z) (Y × W)
+(f ⊗ g) xzs = zip (f (unzipₗ xzs)) (g (unzipᵣ xzs))
 
 F-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST X Y
 F-map-fold a f g [] = []
@@ -85,7 +85,7 @@ F⟦ `map-fold a f g ⟧ = F-map-fold a f g
 F⟦ `delay x ⟧ = shift x
 F⟦ `hasten x ⟧ = unshift x
 F⟦ e `⋙ e' ⟧ = F⟦ e' ⟧ ∘ F⟦ e ⟧
-F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊛ F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊗ F⟦ e' ⟧
 
 B-map-fold : A → (A → X ⇌ Y) → (A → X → A) → ST Y X
 B-map-fold a f g [] = []
@@ -99,7 +99,7 @@ B⟦ `map-fold a f g ⟧ = B-map-fold a f g
 B⟦ `delay x ⟧ = unshift x
 B⟦ `hasten x ⟧ = shift x
 B⟦ e `⋙ e' ⟧ = B⟦ e ⟧ ∘ B⟦ e' ⟧
-B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊛ B⟦ e' ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊗ B⟦ e' ⟧
 
 --------------------------------------------------------------------------------
 
@@ -135,11 +135,11 @@ prefix-cong-unshift x (y ∷ p) | yes _ = force p
 prefix-cong-unshift {k = ⊥≺⊥} x (_ ∷ p) | no _ = ⊥
 prefix-cong-unshift {k = ⊥≺xs} x (_ ∷ p) | no _ = ⊥ₗ
 
-prefix-cong-⊛ : ∀ {f : ST X Y} {g : ST Z W}
+prefix-cong-⊗ : ∀ {f : ST X Y} {g : ST Z W}
   → Prefix k =[ f ]⇒ Prefix k
   → Prefix k =[ g ]⇒ Prefix k
-  → Prefix k =[ f ⊛ g ]⇒ Prefix k
-prefix-cong-⊛ p q r = prefix-cong-zip (p (prefix-cong-unzipₗ r)) (q (prefix-cong-unzipᵣ r))
+  → Prefix k =[ f ⊗ g ]⇒ Prefix k
+prefix-cong-⊗ p q r = prefix-cong-zip (p (prefix-cong-unzipₗ r)) (q (prefix-cong-unzipᵣ r))
 
 prefix-cong-F : ∀ (e : E X Y) → Prefix k =[ F⟦ e ⟧ ]⇒ Prefix k
 prefix-cong-F (`map-fold a f g) = helper a
@@ -155,7 +155,7 @@ prefix-cong-F (`map-fold a f g) = helper a
 prefix-cong-F (`delay x) = prefix-cong-shift x
 prefix-cong-F (`hasten x) = prefix-cong-unshift x
 prefix-cong-F (e `⋙ e') = prefix-cong-F e' ∘ prefix-cong-F e
-prefix-cong-F (e `⊗ e') = prefix-cong-⊛ (prefix-cong-F e) (prefix-cong-F e')
+prefix-cong-F (e `⊗ e') = prefix-cong-⊗ (prefix-cong-F e) (prefix-cong-F e')
 
 prefix-cong-B : ∀ (e : E X Y) → Prefix k =[ B⟦ e ⟧ ]⇒ Prefix k
 prefix-cong-B (`map-fold a f g) = helper a
@@ -171,7 +171,7 @@ prefix-cong-B (`map-fold a f g) = helper a
 prefix-cong-B (`delay x) = prefix-cong-unshift x
 prefix-cong-B (`hasten x) = prefix-cong-shift x
 prefix-cong-B (e `⋙ e') = prefix-cong-B e ∘ prefix-cong-B e'
-prefix-cong-B (e `⊗ e') = prefix-cong-⊛ (prefix-cong-B e) (prefix-cong-B e')
+prefix-cong-B (e `⊗ e') = prefix-cong-⊗ (prefix-cong-B e) (prefix-cong-B e')
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
 F-incremental = prefix-cong-F
@@ -201,28 +201,24 @@ module _ where
     → HasDelay d f
     → HasDelay d' g
     → HasDelay (d' + d) (f ∘ g)
-  ∘-hasDelay {f = f} {g} d d' p q xs =
-    begin
-      colength (f (g xs))
-    ≲⟨ p (g xs) ⟩
-      colength (g xs) ∸ℕ d
-    ≲⟨ ⊑-cong-∸ℕ d (q xs) ⟩
-      colength xs ∸ℕ d' ∸ℕ d
-    ≈⟨ ∸ℕ-+-assoc (colength xs) d' d ⟩
-      colength xs ∸ℕ (d' + d)
-    ∎
+  ∘-hasDelay {f = f} {g} d d' p q xs = begin
+    colength (f (g xs))      ≲⟨ p (g xs) ⟩
+    colength (g xs) ∸ℕ d     ≲⟨ ⊑-cong-∸ℕ d (q xs) ⟩
+    colength xs ∸ℕ d' ∸ℕ d   ≈⟨ ∸ℕ-+-assoc (colength xs) d' d ⟩
+    colength xs ∸ℕ (d' + d)  ∎
 
-  ⊛-hasDelay : ∀ {f : ST X Y} {g : ST Z W} d d'
+  ⊗-hasDelay : ∀ {f : ST X Y} {g : ST Z W} d d'
     → HasDelay d f
     → HasDelay d' g
-    → HasDelay (d ⊔ d') (f ⊛ g)
-  ⊛-hasDelay {f = f} {g} d d' p q xzs =
+    → HasDelay (d ⊔ d') (f ⊗ g)
+  ⊗-hasDelay {f = f} {g} d d' p q xzs =
+    let xs , zs = unzipₗ xzs , unzipᵣ xzs in
     begin
-      colength (zip (f (unzipₗ xzs)) (g (unzipᵣ xzs)))
+      colength (zip (f xs) (g zs))
     ≈⟨ colength-zip ⟩
-      colength (f (unzipₗ xzs)) ⊓ colength (g (unzipᵣ xzs))
-    ≲⟨ ⊑-cong-⊓ (p (unzipₗ xzs)) (q (unzipᵣ xzs)) ⟩
-      (colength (unzipₗ xzs) ∸ℕ d) ⊓ (colength (unzipᵣ xzs) ∸ℕ d')
+      colength (f xs) ⊓ colength (g zs)
+    ≲⟨ ⊑-cong-⊓ (p xs) (q zs) ⟩
+      (colength xs ∸ℕ d) ⊓ (colength zs ∸ℕ d')
     ≈⟨ ≈-cong-⊓ (≈-cong-∸ℕ d colength-unzipₗ) (≈-cong-∸ℕ d' colength-unzipᵣ) ⟩
       (colength xzs ∸ℕ d) ⊓ (colength xzs ∸ℕ d')
     ≈⟨ Coℕ⊥.≈-sym (∸ℕ-distribˡ-⊔-⊓ (colength xzs) d d') ⟩
@@ -241,7 +237,7 @@ module _ where
   F-hasDelay (`delay x) = shift-hasDelay x
   F-hasDelay (`hasten x) = unshift-hasDelay x
   F-hasDelay (e `⋙ e') = ∘-hasDelay DF⟦ e' ⟧ DF⟦ e ⟧ (F-hasDelay e') (F-hasDelay e)
-  F-hasDelay (e `⊗ e') = ⊛-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
+  F-hasDelay (e `⊗ e') = ⊗-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
 
   B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
   B-hasDelay (`map-fold a f g) = helper a
@@ -255,7 +251,7 @@ module _ where
   B-hasDelay (`delay x) = unshift-hasDelay x
   B-hasDelay (`hasten x) = shift-hasDelay x
   B-hasDelay (e `⋙ e') = ∘-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
-  B-hasDelay (e `⊗ e') = ⊛-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
+  B-hasDelay (e `⊗ e') = ⊗-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
 
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
@@ -294,15 +290,15 @@ unshift-IIST x (y ∷ xs) with x ≟ x
   ∎
   where open PrefixReasoning
 
-⊛-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
+⊗-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
   → f IsIISTOf f'
   → g IsIISTOf g'
   → _≺≺_ =[ f ]⇒ _≺≺_
   → _≺≺_ =[ g ]⇒ _≺≺_
-  → (f ⊛ g) IsIISTOf (f' ⊛ g')
-⊛-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
+  → (f ⊗ g) IsIISTOf (f' ⊗ g')
+⊗-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
   begin
-    (f ⊛ g) ((f' ⊛ g') yws)
+    (f ⊗ g) ((f' ⊗ g') yws)
   ≡⟨⟩
     zip
       (f (unzipₗ (zip (f' (unzipₗ yws)) (g' (unzipᵣ yws)))))
@@ -332,7 +328,7 @@ F-IIST (`map-fold a f g) = helper a
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (prefix-cong-F e')
-F-IIST (e `⊗ e') = ⊛-IIST (F-IIST e) (F-IIST e') (prefix-cong-F e) (prefix-cong-F e')
+F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e') (prefix-cong-F e) (prefix-cong-F e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
@@ -347,7 +343,7 @@ B-IIST (`map-fold a f g) = helper a
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (prefix-cong-B e)
-B-IIST (e `⊗ e') = ⊛-IIST (B-IIST e) (B-IIST e') (prefix-cong-B e) (prefix-cong-B e')
+B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e') (prefix-cong-B e) (prefix-cong-B e')
 
 --------------------------------------------------------------------------------
 -- Bundles
