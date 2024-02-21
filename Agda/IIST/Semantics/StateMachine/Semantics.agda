@@ -25,7 +25,7 @@ private
 -- Semantics
 
 infixl 9 _⋙_ _⋙′_ _⋙″_
-infixl 8 _⊛_
+infixl 8 _⊗_
 
 id : IST X X 0
 step id x = yield x id
@@ -69,13 +69,13 @@ laterN : ∀ n → IST X Y d → IST X Y (n + d)
 laterN zero f = f
 laterN (suc n) f = later (laterN n f)
 
-_⊛′_ : IST X Y d → IST Z W d → IST (X × Z) (Y × W) d
-_⊛ₛ′_ : Step X Y d → Step Z W d → Step (X × Z) (Y × W) d
-step (f ⊛′ g) (x , z) = step f x ⊛ₛ′ step g z
-⊥ ⊛ₛ′ _ = ⊥
-_ ⊛ₛ′ ⊥ = ⊥
-next f ⊛ₛ′ next g = next (f ⊛′ g)
-yield y f ⊛ₛ′ yield w g = yield (y , w) (f ⊛′ g)
+_⊗′_ : IST X Y d → IST Z W d → IST (X × Z) (Y × W) d
+_⊗ₛ′_ : Step X Y d → Step Z W d → Step (X × Z) (Y × W) d
+step (f ⊗′ g) (x , z) = step f x ⊗ₛ′ step g z
+⊥ ⊗ₛ′ _ = ⊥
+_ ⊗ₛ′ ⊥ = ⊥
+next f ⊗ₛ′ next g = next (f ⊗′ g)
+yield y f ⊗ₛ′ yield w g = yield (y , w) (f ⊗′ g)
 
 m∸n+n≡m⊔n : ∀ m n → m ∸ n + n ≡ m ⊔ n
 m∸n+n≡m⊔n zero zero = refl
@@ -83,9 +83,9 @@ m∸n+n≡m⊔n zero (suc n) = refl
 m∸n+n≡m⊔n (suc m) zero = cong suc (+-identityʳ m)
 m∸n+n≡m⊔n (suc m) (suc n) = trans (+-suc (m ∸ n) n) (cong suc (m∸n+n≡m⊔n m n))
 
-_⊛_ : IST X Y d₁ → IST Z W d₂ → IST (X × Z) (Y × W) (d₁ ⊔ d₂)
-_⊛_ {d₁ = d₁} {d₂ = d₂} f g =
-  cast (trans (m∸n+n≡m⊔n d₂ d₁) (⊔-comm d₂ d₁)) (laterN (d₂ ∸ d₁) f) ⊛′
+_⊗_ : IST X Y d₁ → IST Z W d₂ → IST (X × Z) (Y × W) (d₁ ⊔ d₂)
+_⊗_ {d₁ = d₁} {d₂ = d₂} f g =
+  cast (trans (m∸n+n≡m⊔n d₂ d₁) (⊔-comm d₂ d₁)) (laterN (d₂ ∸ d₁) f) ⊗′
   cast (m∸n+n≡m⊔n d₁ d₂) (laterN (d₁ ∸ d₂) g)
 
 F⟦_⟧ : (e : E X Y) → IST X Y DF⟦ e ⟧
@@ -93,14 +93,14 @@ F⟦ `map-fold a f g ⟧ = F-map-fold a f g
 F⟦ `delay x ⟧ = shift x
 F⟦ `hasten x ⟧ = unshift x
 F⟦ e `⋙ e' ⟧ = F⟦ e ⟧ ⋙ F⟦ e' ⟧
-F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊛ F⟦ e' ⟧
+F⟦ e `⊗ e' ⟧ = F⟦ e ⟧ ⊗ F⟦ e' ⟧
 
 B⟦_⟧ : (e : E X Y) → IST Y X DB⟦ e ⟧
 B⟦ `map-fold a f g ⟧ = B-map-fold a f g
 B⟦ `delay x ⟧ = unshift x
 B⟦ `hasten x ⟧ = shift x
 B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ ⋙ B⟦ e ⟧
-B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊛ B⟦ e' ⟧
+B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊗ B⟦ e' ⟧
 
 _ : eat id (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ≡ just (0 ∷ 1 ∷ 2 ∷ 3 ∷ [])
 _ = refl
@@ -204,27 +204,27 @@ laterN-cast : ∀ {m n} .(eq : m ≡ n) {f : IST X Y d} → laterN m f ≈ later
 laterN-cast {m = zero} {n = zero} eq = ≈-refl
 laterN-cast {m = suc m} {n = suc n} eq = ≈-cong-later (laterN-cast (suc-injective eq))
 
-≈-cong-⊛′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
+≈-cong-⊗′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
   → f ≈ f'
   → g ≈ g'
-  → f ⊛′ g ≈ f' ⊛′ g'
-≈-cong-⊛ₛ′ : {s : Step X Y d₁} {s' : Step X Y d₂} {t : Step Z W d₁} {t' : Step Z W d₂}
+  → f ⊗′ g ≈ f' ⊗′ g'
+≈-cong-⊗ₛ′ : {s : Step X Y d₁} {s' : Step X Y d₂} {t : Step Z W d₁} {t' : Step Z W d₂}
   → s ≈ₛ s'
   → t ≈ₛ t'
-  → s ⊛ₛ′ t ≈ₛ s' ⊛ₛ′ t'
-same-d (≈-cong-⊛′ f≈f' g≈g') = same-d f≈f'
-step (≈-cong-⊛′ f≈f' g≈g') (x , z) = ≈-cong-⊛ₛ′ (step f≈f' x) (step g≈g' z)
-≈-cong-⊛ₛ′ ⊥ _ = ⊥
-≈-cong-⊛ₛ′ (next _) ⊥ = ⊥
-≈-cong-⊛ₛ′ (yield _ _) ⊥ = ⊥
-≈-cong-⊛ₛ′ (next f≈f') (next g≈g') = next (≈-cong-⊛′ f≈f' g≈g')
-≈-cong-⊛ₛ′ (yield y f≈f') (yield w g≈g') = yield (y , w) (≈-cong-⊛′ f≈f' g≈g')
+  → s ⊗ₛ′ t ≈ₛ s' ⊗ₛ′ t'
+same-d (≈-cong-⊗′ f≈f' g≈g') = same-d f≈f'
+step (≈-cong-⊗′ f≈f' g≈g') (x , z) = ≈-cong-⊗ₛ′ (step f≈f' x) (step g≈g' z)
+≈-cong-⊗ₛ′ ⊥ _ = ⊥
+≈-cong-⊗ₛ′ (next _) ⊥ = ⊥
+≈-cong-⊗ₛ′ (yield _ _) ⊥ = ⊥
+≈-cong-⊗ₛ′ (next f≈f') (next g≈g') = next (≈-cong-⊗′ f≈f' g≈g')
+≈-cong-⊗ₛ′ (yield y f≈f') (yield w g≈g') = yield (y , w) (≈-cong-⊗′ f≈f' g≈g')
 
-≈-cong-⊛ : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₃} {g' : IST Z W d₄}
+≈-cong-⊗ : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₃} {g' : IST Z W d₄}
   → f ≈ f'
   → g ≈ g'
-  → f ⊛ g ≈ f' ⊛ g'
-≈-cong-⊛ f≈f' g≈g' = ≈-cong-⊛′ (h f≈f' (same-d g≈g')) (h g≈g' (same-d f≈f'))
+  → f ⊗ g ≈ f' ⊗ g'
+≈-cong-⊗ f≈f' g≈g' = ≈-cong-⊗′ (h f≈f' (same-d g≈g')) (h g≈g' (same-d f≈f'))
   where
     open ≈-Reasoning
 
@@ -251,7 +251,7 @@ F∘I≈B (`map-fold a f g) = helper refl
 F∘I≈B (`delay x) = ≈-refl
 F∘I≈B (`hasten x) = ≈-refl
 F∘I≈B (e `⋙ e') = ≈-cong-⋙ (F∘I≈B e') (F∘I≈B e)
-F∘I≈B (e `⊗ e') = ≈-cong-⊛ (F∘I≈B e) (F∘I≈B e')
+F∘I≈B (e `⊗ e') = ≈-cong-⊗ (F∘I≈B e) (F∘I≈B e')
 
 B∘I≈F : (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≈ F⟦ e ⟧
 B∘I≈F (`map-fold a f g) = helper refl
@@ -264,7 +264,7 @@ B∘I≈F (`map-fold a f g) = helper refl
 B∘I≈F (`delay x) = ≈-refl
 B∘I≈F (`hasten x) = ≈-refl
 B∘I≈F (e `⋙ e') = ≈-cong-⋙ (B∘I≈F e) (B∘I≈F e')
-B∘I≈F (e `⊗ e') = ≈-cong-⊛ (B∘I≈F e) (B∘I≈F e')
+B∘I≈F (e `⊗ e') = ≈-cong-⊗ (B∘I≈F e) (B∘I≈F e')
 
 --------------------------------------------------------------------------------
 
@@ -365,27 +365,27 @@ step ⊑-⋙-later x = ⊑-⋙́′-later refl
 ⊑-⋙-laterN zero = ⊑-refl
 ⊑-⋙-laterN (suc n) = ⊑-trans ⊑-⋙-later (⊑-cong-later (⊑-⋙-laterN n))
 
-⊑-cong-⊛′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
+⊑-cong-⊗′ : {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₁} {g' : IST Z W d₂}
   → f ⊑ f'
   → g ⊑ g'
-  → f ⊛′ g ⊑ f' ⊛′ g'
-⊑-cong-⊛ₛ′ : {s : Step X Y d₁} {s' : Step X Y d₂} {t : Step Z W d₁} {t' : Step Z W d₂}
+  → f ⊗′ g ⊑ f' ⊗′ g'
+⊑-cong-⊗ₛ′ : {s : Step X Y d₁} {s' : Step X Y d₂} {t : Step Z W d₁} {t' : Step Z W d₂}
   → s ⊑ₛ s'
   → t ⊑ₛ t'
-  → s ⊛ₛ′ t ⊑ₛ s' ⊛ₛ′ t'
-same-d (⊑-cong-⊛′ f⊑f' g⊑g') = same-d f⊑f'
-step (⊑-cong-⊛′ f⊑f' g⊑g') (x , z) = ⊑-cong-⊛ₛ′ (step f⊑f' x) (step g⊑g' z)
-⊑-cong-⊛ₛ′ ⊥ₗ _ = ⊥ₗ
-⊑-cong-⊛ₛ′ (next _) ⊥ₗ = ⊥ₗ
-⊑-cong-⊛ₛ′ (yield _ _) ⊥ₗ = ⊥ₗ
-⊑-cong-⊛ₛ′ (next f⊑f') (next g⊑g') = next (⊑-cong-⊛′ f⊑f' g⊑g')
-⊑-cong-⊛ₛ′ (yield y f⊑f') (yield w g⊑g') = yield (y , w) (⊑-cong-⊛′ f⊑f' g⊑g')
+  → s ⊗ₛ′ t ⊑ₛ s' ⊗ₛ′ t'
+same-d (⊑-cong-⊗′ f⊑f' g⊑g') = same-d f⊑f'
+step (⊑-cong-⊗′ f⊑f' g⊑g') (x , z) = ⊑-cong-⊗ₛ′ (step f⊑f' x) (step g⊑g' z)
+⊑-cong-⊗ₛ′ ⊥ₗ _ = ⊥ₗ
+⊑-cong-⊗ₛ′ (next _) ⊥ₗ = ⊥ₗ
+⊑-cong-⊗ₛ′ (yield _ _) ⊥ₗ = ⊥ₗ
+⊑-cong-⊗ₛ′ (next f⊑f') (next g⊑g') = next (⊑-cong-⊗′ f⊑f' g⊑g')
+⊑-cong-⊗ₛ′ (yield y f⊑f') (yield w g⊑g') = yield (y , w) (⊑-cong-⊗′ f⊑f' g⊑g')
 
-⊑-cong-⊛ : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₃} {g' : IST Z W d₄}
+⊑-cong-⊗ : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST X Y d₂} {g : IST Z W d₃} {g' : IST Z W d₄}
   → f ⊑ f'
   → g ⊑ g'
-  → f ⊛ g ⊑ f' ⊛ g'
-⊑-cong-⊛ f⊑f' g⊑g' = ⊑-cong-⊛′ (h f⊑f' (same-d g⊑g')) (h g⊑g' (same-d f⊑f'))
+  → f ⊗ g ⊑ f' ⊗ g'
+⊑-cong-⊗ f⊑f' g⊑g' = ⊑-cong-⊗′ (h f⊑f' (same-d g⊑g')) (h g⊑g' (same-d f⊑f'))
   where
     open ⊑-Reasoning
 
@@ -423,74 +423,74 @@ step (⊑-cong-⊛′ f⊑f' g⊑g') (x , z) = ⊑-cong-⊛ₛ′ (step f⊑f' x
     h : ∀ m n o p → (m + n) + (o + p) ≡ (o + m) + (n + p)
     h = solve-∀
 
-⊛′-id : id {X} ⊛′ id {Y} ≈ id {X × Y}
-same-d ⊛′-id = refl
-step ⊛′-id xy = yield xy ⊛′-id
+⊗′-id : id {X} ⊗′ id {Y} ≈ id {X × Y}
+same-d ⊗′-id = refl
+step ⊗′-id xy = yield xy ⊗′-id
 
-⊛ₛ′-⊥ᵣ : {s : Step X Y d₁} → s ⊛ₛ′ (⊥ {Z} {W} {d = d₁}) ≈ₛ (⊥ {d = d₂})
-⊛ₛ′-⊥ᵣ {s = ⊥} = ⊥
-⊛ₛ′-⊥ᵣ {s = next f} = ⊥
-⊛ₛ′-⊥ᵣ {s = yield y f} = ⊥
+⊗ₛ′-⊥ᵣ : {s : Step X Y d₁} → s ⊗ₛ′ (⊥ {Z} {W} {d = d₁}) ≈ₛ (⊥ {d = d₂})
+⊗ₛ′-⊥ᵣ {s = ⊥} = ⊥
+⊗ₛ′-⊥ᵣ {s = next f} = ⊥
+⊗ₛ′-⊥ᵣ {s = yield y f} = ⊥
 
-⋙-⊛′-interchange : {f : IST X Y d₁} {f' : IST Y Z d₂} {g : IST U V d₁} {g' : IST V W d₂}
-  → (f ⊛′ g) ⋙ (f' ⊛′ g') ≈ (f ⋙ f') ⊛′ (g ⋙ g')
-⋙′-⊛-interchange : {s : Step X Y d₁} {f' : IST Y Z d₂} {t : Step U V d₁} {g' : IST V W d₂}
-  → (s ⊛ₛ′ t) ⋙′ (f' ⊛′ g') ≈ₛ (s ⋙′ f') ⊛ₛ′ (t ⋙′ g')
-⋙″-⊛-interchange : {f : IST X Y 0} {s : Step Y Z d₂} {g : IST U V 0} {t : Step V W d₂}
-  → (f ⊛′ g) ⋙″ (s ⊛ₛ′ t) ≈ₛ (f ⋙″ s) ⊛ₛ′ (g ⋙″ t)
-same-d ⋙-⊛′-interchange = refl
-step (⋙-⊛′-interchange {f = f} {g = g}) (x , u) = ⋙′-⊛-interchange {s = step f x} {t = step g u}
-⋙′-⊛-interchange {s = ⊥} {t = _} = ⊥
-⋙′-⊛-interchange {s = next _} {t = ⊥} = ⊥
-⋙′-⊛-interchange {s = yield _ _} {t = ⊥} = ≈ₛ-sym ⊛ₛ′-⊥ᵣ
-⋙′-⊛-interchange {s = next f} {t = next g} = next ⋙-⊛′-interchange
-⋙′-⊛-interchange {s = yield y f} {t = yield v g} = ⋙″-⊛-interchange
-⋙″-⊛-interchange {s = ⊥} {t = _} = ⊥
-⋙″-⊛-interchange {s = next _} {t = ⊥} = ⊥
-⋙″-⊛-interchange {s = yield _ _} {t = ⊥} = ⊥
-⋙″-⊛-interchange {s = next f'} {t = next g'} = next ⋙-⊛′-interchange
-⋙″-⊛-interchange {s = yield z f'} {t = yield w g'} = yield (z , w) ⋙-⊛′-interchange
+⋙-⊗′-interchange : {f : IST X Y d₁} {f' : IST Y Z d₂} {g : IST U V d₁} {g' : IST V W d₂}
+  → (f ⊗′ g) ⋙ (f' ⊗′ g') ≈ (f ⋙ f') ⊗′ (g ⋙ g')
+⋙′-⊗-interchange : {s : Step X Y d₁} {f' : IST Y Z d₂} {t : Step U V d₁} {g' : IST V W d₂}
+  → (s ⊗ₛ′ t) ⋙′ (f' ⊗′ g') ≈ₛ (s ⋙′ f') ⊗ₛ′ (t ⋙′ g')
+⋙″-⊗-interchange : {f : IST X Y 0} {s : Step Y Z d₂} {g : IST U V 0} {t : Step V W d₂}
+  → (f ⊗′ g) ⋙″ (s ⊗ₛ′ t) ≈ₛ (f ⋙″ s) ⊗ₛ′ (g ⋙″ t)
+same-d ⋙-⊗′-interchange = refl
+step (⋙-⊗′-interchange {f = f} {g = g}) (x , u) = ⋙′-⊗-interchange {s = step f x} {t = step g u}
+⋙′-⊗-interchange {s = ⊥} {t = _} = ⊥
+⋙′-⊗-interchange {s = next _} {t = ⊥} = ⊥
+⋙′-⊗-interchange {s = yield _ _} {t = ⊥} = ≈ₛ-sym ⊗ₛ′-⊥ᵣ
+⋙′-⊗-interchange {s = next f} {t = next g} = next ⋙-⊗′-interchange
+⋙′-⊗-interchange {s = yield y f} {t = yield v g} = ⋙″-⊗-interchange
+⋙″-⊗-interchange {s = ⊥} {t = _} = ⊥
+⋙″-⊗-interchange {s = next _} {t = ⊥} = ⊥
+⋙″-⊗-interchange {s = yield _ _} {t = ⊥} = ⊥
+⋙″-⊗-interchange {s = next f'} {t = next g'} = next ⋙-⊗′-interchange
+⋙″-⊗-interchange {s = yield z f'} {t = yield w g'} = yield (z , w) ⋙-⊗′-interchange
 
-shift-split : {x : X} {y : Y} → shift (x , y) ≈ shift x ⊛′ shift y
+shift-split : {x : X} {y : Y} → shift (x , y) ≈ shift x ⊗′ shift y
 same-d shift-split = refl
 step shift-split _ = yield _ shift-split
 
-⊛′-later-dist : {f : IST X Y d} {g : IST Z W d}
-  → later (f ⊛′ g) ≈ later f ⊛′ later g
-same-d ⊛′-later-dist = refl
-step (⊛′-later-dist {f = f} {g}) (x , z) = next (begin
-  shift (x , z) ⋙ (f ⊛′ g)          ≈⟨ ≈-cong-⋙ shift-split ≈-refl ⟩
-  (shift x ⊛′ shift z) ⋙ (f ⊛′ g)   ≈⟨ ⋙-⊛′-interchange ⟩
-  (shift x ⋙ f) ⊛′ (shift z ⋙ g)   ∎)
+⊗′-later-dist : {f : IST X Y d} {g : IST Z W d}
+  → later (f ⊗′ g) ≈ later f ⊗′ later g
+same-d ⊗′-later-dist = refl
+step (⊗′-later-dist {f = f} {g}) (x , z) = next (begin
+  shift (x , z) ⋙ (f ⊗′ g)          ≈⟨ ≈-cong-⋙ shift-split ≈-refl ⟩
+  (shift x ⊗′ shift z) ⋙ (f ⊗′ g)   ≈⟨ ⋙-⊗′-interchange ⟩
+  (shift x ⋙ f) ⊗′ (shift z ⋙ g)   ∎)
   where open ≈-Reasoning
 
-⊛′-laterN-dist : ∀ n {f : IST X Y d} {g : IST Z W d}
-  → laterN n (f ⊛′ g) ≈ laterN n f ⊛′ laterN n g
-⊛′-laterN-dist zero = ≈-refl
-⊛′-laterN-dist (suc n) {f} {g} = begin
-  later (laterN n (f ⊛′ g))                 ≈⟨ ≈-cong-later (⊛′-laterN-dist n) ⟩
-  later (laterN n f ⊛′ laterN n g)          ≈⟨ ⊛′-later-dist ⟩
-  later (laterN n f) ⊛′ later (laterN n g)  ∎
+⊗′-laterN-dist : ∀ n {f : IST X Y d} {g : IST Z W d}
+  → laterN n (f ⊗′ g) ≈ laterN n f ⊗′ laterN n g
+⊗′-laterN-dist zero = ≈-refl
+⊗′-laterN-dist (suc n) {f} {g} = begin
+  later (laterN n (f ⊗′ g))                 ≈⟨ ≈-cong-later (⊗′-laterN-dist n) ⟩
+  later (laterN n f ⊗′ laterN n g)          ≈⟨ ⊗′-later-dist ⟩
+  later (laterN n f) ⊗′ later (laterN n g)  ∎
   where open ≈-Reasoning
 
-⊛′-IIST : {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₁} {g' : IST W Z d₂}
+⊗′-IIST : {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₁} {g' : IST W Z d₂}
   → f' IsIISTOf f
   → g' IsIISTOf g
-  → (f' ⊛′ g') IsIISTOf (f ⊛′ g)
-⊛′-IIST {d₁ = d₁} {d₂ = d₂} {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' = begin
-  (f ⊛′ g) ⋙ (f' ⊛′ g')                      ≈⟨ ⋙-⊛′-interchange ⟩
-  (f ⋙ f') ⊛′ (g ⋙ g')                      ⊑⟨ ⊑-cong-⊛′ f-inv-f' g-inv-g' ⟩
-  laterN (d₁ + d₂) id ⊛′ laterN (d₁ + d₂) id  ≈⟨ ≈-sym (⊛′-laterN-dist (d₁ + d₂)) ⟩
-  laterN (d₁ + d₂) (id ⊛′ id)                 ≈⟨ ≈-cong-laterN (d₁ + d₂) ⊛′-id ⟩
+  → (f' ⊗′ g') IsIISTOf (f ⊗′ g)
+⊗′-IIST {d₁ = d₁} {d₂ = d₂} {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' = begin
+  (f ⊗′ g) ⋙ (f' ⊗′ g')                      ≈⟨ ⋙-⊗′-interchange ⟩
+  (f ⋙ f') ⊗′ (g ⋙ g')                      ⊑⟨ ⊑-cong-⊗′ f-inv-f' g-inv-g' ⟩
+  laterN (d₁ + d₂) id ⊗′ laterN (d₁ + d₂) id  ≈⟨ ≈-sym (⊗′-laterN-dist (d₁ + d₂)) ⟩
+  laterN (d₁ + d₂) (id ⊗′ id)                 ≈⟨ ≈-cong-laterN (d₁ + d₂) ⊗′-id ⟩
   laterN (d₁ + d₂) id                         ∎
   where open ⊑-Reasoning
 
-⊛-IIST : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₃} {g' : IST W Z d₄}
+⊗-IIST : ∀ {d₁ d₂ d₃ d₄} {f : IST X Y d₁} {f' : IST Y X d₂} {g : IST Z W d₃} {g' : IST W Z d₄}
   → f' IsIISTOf f
   → g' IsIISTOf g
-  → (f' ⊛ g') IsIISTOf (f ⊛ g)
-⊛-IIST {d₁ = d₁} {d₂} {d₃} {d₄} f-inv-f' g-inv-g' =
-  ⊛′-IIST
+  → (f' ⊗ g') IsIISTOf (f ⊗ g)
+⊗-IIST {d₁ = d₁} {d₂} {d₃} {d₄} f-inv-f' g-inv-g' =
+  ⊗′-IIST
     (h₂ f-inv-f')
     (⊑-trans (h₂ g-inv-g') (≈-to-⊑ (laterN-cast (cong₂ _+_ (⊔-comm d₃ d₁) (⊔-comm d₄ d₂)))))
   where
@@ -534,7 +534,7 @@ F-IIST (`map-fold a f g) = helper a
 F-IIST (`delay x) = shift-IIST x
 F-IIST (`hasten x) = unshift-IIST x
 F-IIST (e `⋙ e') = ⋙-IIST (F-IIST e') (F-IIST e)
-F-IIST (e `⊗ e') = ⊛-IIST (F-IIST e) (F-IIST e')
+F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
 B-IIST (`map-fold a f g) = helper a
@@ -547,4 +547,4 @@ B-IIST (`map-fold a f g) = helper a
 B-IIST (`delay x) = unshift-IIST x
 B-IIST (`hasten x) = shift-IIST x
 B-IIST (e `⋙ e') = ⋙-IIST (B-IIST e) (B-IIST e')
-B-IIST (e `⊗ e') = ⊛-IIST (B-IIST e) (B-IIST e')
+B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e')

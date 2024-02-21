@@ -98,20 +98,20 @@ map-<*>₂ f g h nothing nothing = refl
 ⋙″-eatₛ-dist f (S.yield z g) xs rewrite >>=-map′ (S.eat f xs) (S.eat g) (z ∷_) =
   cong (maybe (λ zs → just (z ∷ zs)) nothing) (⋙-eat-dist f g xs)
 
-⊛′-eat-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
-  → S.eat (f S.⊛′ g) xzs ≡ (S.eat f L.⊛ S.eat g) xzs
-⊛ₛ′-eatₛ-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
-  → S.eatₛ (s S.⊛ₛ′ t) xzs ≡ (S.eatₛ s L.⊛ S.eatₛ t) xzs
-⊛′-eat-dist f g [] = refl
-⊛′-eat-dist f g ((x , z) ∷ xzs) = ⊛ₛ′-eatₛ-dist (S.step f x) (S.step g z) xzs
-⊛ₛ′-eatₛ-dist S.⊥ _ xzs = refl
-⊛ₛ′-eatₛ-dist (S.next f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip (S.eat f (unzip xzs .proj₁)) |))
-⊛ₛ′-eatₛ-dist (S.yield y f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .proj₁)) |))
-⊛ₛ′-eatₛ-dist (S.next f) (S.next g) xzs = ⊛′-eat-dist f g xzs
-⊛ₛ′-eatₛ-dist (S.yield y f) (S.yield w g) xzs =
+⊗′-eat-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
+  → S.eat (f S.⊗′ g) xzs ≡ (S.eat f L.⊗ S.eat g) xzs
+⊗ₛ′-eatₛ-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
+  → S.eatₛ (s S.⊗ₛ′ t) xzs ≡ (S.eatₛ s L.⊗ S.eatₛ t) xzs
+⊗′-eat-dist f g [] = refl
+⊗′-eat-dist f g ((x , z) ∷ xzs) = ⊗ₛ′-eatₛ-dist (S.step f x) (S.step g z) xzs
+⊗ₛ′-eatₛ-dist S.⊥ _ xzs = refl
+⊗ₛ′-eatₛ-dist (S.next f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip (S.eat f (unzip xzs .proj₁)) |))
+⊗ₛ′-eatₛ-dist (S.yield y f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .proj₁)) |))
+⊗ₛ′-eatₛ-dist (S.next f) (S.next g) xzs = ⊗′-eat-dist f g xzs
+⊗ₛ′-eatₛ-dist (S.yield y f) (S.yield w g) xzs =
   begin
-    ((y , w) ∷_) <$> S.eat (f S.⊛′ g) xzs
-  ≡⟨ cong (((y , w) ∷_) <$>_) (⊛′-eat-dist f g xzs) ⟩
+    ((y , w) ∷_) <$> S.eat (f S.⊗′ g) xzs
+  ≡⟨ cong (((y , w) ∷_) <$>_) (⊗′-eat-dist f g xzs) ⟩
     ((y , w) ∷_) <$> (| List.zip (S.eat f (unzip xzs .proj₁)) (S.eat g (unzip xzs .proj₂)) |)
   ≡⟨ <*>-map₂ ((y , w) ∷_) List.zip (S.eat f (unzip xzs .proj₁)) _ ⟩
     (| (λ ys ws → (y , w) ∷ List.zip ys ws) (S.eat f (unzip xzs .proj₁)) (S.eat g (unzip xzs .proj₂)) |)
@@ -120,15 +120,15 @@ map-<*>₂ f g h nothing nothing = refl
   ∎
   where open ≡-Reasoning
 
-⊛-eat-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
-  → S.eat (f S.⊛ g) xzs ≡ (S.eat f L.⊛ S.eat g) xzs
-⊛-eat-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
+⊗-eat-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
+  → S.eat (f S.⊗ g) xzs ≡ (S.eat f L.⊗ S.eat g) xzs
+⊗-eat-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
   begin
-    S.eat (f S.⊛ g) xzs
-  ≡⟨ ⊛′-eat-dist _ _ xzs ⟩
-    (S.eat (S.cast _ (S.laterN (d₂ ∸ d₁) f)) L.⊛ S.eat (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
+    S.eat (f S.⊗ g) xzs
+  ≡⟨ ⊗′-eat-dist _ _ xzs ⟩
+    (S.eat (S.cast _ (S.laterN (d₂ ∸ d₁) f)) L.⊗ S.eat (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
   ≡⟨ {!   !} ⟩
-    (S.eat f L.⊛ S.eat g) xzs
+    (S.eat f L.⊗ S.eat g) xzs
   ∎
   where open ≡-Reasoning
 
@@ -140,19 +140,19 @@ S≡L-⋙ {f = f} {f'} {g} p q xs rewrite ⋙-eat-dist f g xs | p xs with f' xs
 ... | nothing = refl
 ... | just ys = q ys
 
-S≡L-⊛ : {f : S.IST X Y d₁} {f' : L.ST X Y} {g : S.IST Z W d₂} {g' : L.ST Z W}
+S≡L-⊗ : {f : S.IST X Y d₁} {f' : L.ST X Y} {g : S.IST Z W d₂} {g' : L.ST Z W}
   → (∀ xs → S.eat f xs ≡ f' xs)
   → (∀ xs → S.eat g xs ≡ g' xs)
-  → ∀ xs → S.eat (f S.⊛ g) xs ≡ (f' L.⊛ g') xs
-S≡L-⊛ {f = f} {g = g} p q xzs
-  rewrite ⊛-eat-dist f g xzs | p (unzip xzs .proj₁) | q (unzip xzs .proj₂) = refl
+  → ∀ xs → S.eat (f S.⊗ g) xs ≡ (f' L.⊗ g') xs
+S≡L-⊗ {f = f} {g = g} p q xzs
+  rewrite ⊗-eat-dist f g xzs | p (unzip xzs .proj₁) | q (unzip xzs .proj₂) = refl
 
 S≡L-F : ∀ (e : E X Y) xs → S.eat S.F⟦ e ⟧ xs ≡ L.F⟦ e ⟧ xs
 S≡L-F (`map-fold a f g) = S≡L-F-map-fold a f g
 S≡L-F (`delay x) = S≡L-shift x
 S≡L-F (`hasten x) = S≡L-unshift x
 S≡L-F (e `⋙ e') = S≡L-⋙ (S≡L-F e) (S≡L-F e')
-S≡L-F (e `⊗ e') = S≡L-⊛ (S≡L-F e) (S≡L-F e')
+S≡L-F (e `⊗ e') = S≡L-⊗ (S≡L-F e) (S≡L-F e')
 
 S≡L-B : ∀ (e : E X Y) xs → S.eat S.B⟦ e ⟧ xs ≡ L.B⟦ e ⟧ xs
 S≡L-B e xs = begin
@@ -204,28 +204,28 @@ S≡C-F-map-fold a f g (x ∷ xs) with f a .to x
 ⋙″-eat∞-dist f (S.next g) xs = ⋙-eat∞-dist f g (force xs)
 ⋙″-eat∞-dist f (S.yield z g) xs = z ∷ λ where .force → ⋙-eat∞-dist f g (force xs)
 
-⊛′-eat∞-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
-  → S.eat∞ (f S.⊛′ g) xzs ≈ (S.eat∞ f C.⊛ S.eat∞ g) xzs
-⊛ₛ′-eatₛ∞-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
-  → S.eatₛ∞ (s S.⊛ₛ′ t) xzs ≈ zip (S.eatₛ∞ s (delay (unzipₗ (force xzs)))) (S.eatₛ∞ t (delay (unzipᵣ (force xzs))))
-⊛′-eat∞-dist f g [] = []
-⊛′-eat∞-dist f g ⊥ = ⊥
-⊛′-eat∞-dist f g ((x , z) ∷ xzs) = ⊛ₛ′-eatₛ∞-dist (S.step f x) (S.step g z) xzs
-⊛ₛ′-eatₛ∞-dist S.⊥ _ xzs = ⊥
-⊛ₛ′-eatₛ∞-dist (S.next _) S.⊥ xzs = ≈-sym zip-⊥ᵣ
-⊛ₛ′-eatₛ∞-dist (S.yield _ _) S.⊥ xzs = ⊥
-⊛ₛ′-eatₛ∞-dist (S.next f) (S.next g) xzs = ⊛′-eat∞-dist f g (force xzs)
-⊛ₛ′-eatₛ∞-dist (S.yield y f) (S.yield w g) xzs = (y , w) ∷ λ where .force → ⊛′-eat∞-dist f g (force xzs)
+⊗′-eat∞-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
+  → S.eat∞ (f S.⊗′ g) xzs ≈ (S.eat∞ f C.⊗ S.eat∞ g) xzs
+⊗ₛ′-eatₛ∞-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
+  → S.eatₛ∞ (s S.⊗ₛ′ t) xzs ≈ zip (S.eatₛ∞ s (delay (unzipₗ (force xzs)))) (S.eatₛ∞ t (delay (unzipᵣ (force xzs))))
+⊗′-eat∞-dist f g [] = []
+⊗′-eat∞-dist f g ⊥ = ⊥
+⊗′-eat∞-dist f g ((x , z) ∷ xzs) = ⊗ₛ′-eatₛ∞-dist (S.step f x) (S.step g z) xzs
+⊗ₛ′-eatₛ∞-dist S.⊥ _ xzs = ⊥
+⊗ₛ′-eatₛ∞-dist (S.next _) S.⊥ xzs = ≈-sym zip-⊥ᵣ
+⊗ₛ′-eatₛ∞-dist (S.yield _ _) S.⊥ xzs = ⊥
+⊗ₛ′-eatₛ∞-dist (S.next f) (S.next g) xzs = ⊗′-eat∞-dist f g (force xzs)
+⊗ₛ′-eatₛ∞-dist (S.yield y f) (S.yield w g) xzs = (y , w) ∷ λ where .force → ⊗′-eat∞-dist f g (force xzs)
 
-⊛-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
-  → S.eat∞ (f S.⊛ g) xzs ≈ (S.eat∞ f C.⊛ S.eat∞ g) xzs
-⊛-eat∞-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
+⊗-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
+  → S.eat∞ (f S.⊗ g) xzs ≈ (S.eat∞ f C.⊗ S.eat∞ g) xzs
+⊗-eat∞-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
   begin
-    S.eat∞ (f S.⊛ g) xzs
-  ≈⟨ ⊛′-eat∞-dist _ _ xzs ⟩
-    (S.eat∞ (S.cast _ (S.laterN (d₂ ∸ d₁) f)) C.⊛ S.eat∞ (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
+    S.eat∞ (f S.⊗ g) xzs
+  ≈⟨ ⊗′-eat∞-dist _ _ xzs ⟩
+    (S.eat∞ (S.cast _ (S.laterN (d₂ ∸ d₁) f)) C.⊗ S.eat∞ (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
   ≈⟨ {!   !} ⟩
-    (S.eat∞ f C.⊛ S.eat∞ g) xzs
+    (S.eat∞ f C.⊗ S.eat∞ g) xzs
   ∎
   where open ≈-Reasoning
 
@@ -240,14 +240,14 @@ S≡C-⋙ {f = f} {f'} {g} {g'} p q xs = begin
   g' (f' xs)              ∎
   where open ≈-Reasoning
 
-S≡C-⊛ : {f : S.IST X Y d₁} {f' : C.ST X Y} {g : S.IST Z W d₂} {g' : C.ST Z W}
+S≡C-⊗ : {f : S.IST X Y d₁} {f' : C.ST X Y} {g : S.IST Z W d₂} {g' : C.ST Z W}
   → (∀ xs → S.eat∞ f xs ≈ f' xs)
   → (∀ xs → S.eat∞ g xs ≈ g' xs)
-  → ∀ xzs → S.eat∞ (f S.⊛ g) xzs ≈ (f' C.⊛ g') xzs
-S≡C-⊛ {f = f} {f'} {g} {g'} p q xzs = begin
-  S.eat∞ (f S.⊛ g) xzs         ≈⟨ ⊛-eat∞-dist f g xzs ⟩
-  (S.eat∞ f C.⊛ S.eat∞ g) xzs  ≈⟨ ≈-cong-zip (p (unzipₗ xzs)) (q (unzipᵣ xzs)) ⟩
-  (f' C.⊛ g') xzs               ∎
+  → ∀ xzs → S.eat∞ (f S.⊗ g) xzs ≈ (f' C.⊗ g') xzs
+S≡C-⊗ {f = f} {f'} {g} {g'} p q xzs = begin
+  S.eat∞ (f S.⊗ g) xzs         ≈⟨ ⊗-eat∞-dist f g xzs ⟩
+  (S.eat∞ f C.⊗ S.eat∞ g) xzs  ≈⟨ ≈-cong-zip (p (unzipₗ xzs)) (q (unzipᵣ xzs)) ⟩
+  (f' C.⊗ g') xzs               ∎
   where open ≈-Reasoning
 
 S≡C-F : ∀ (e : E X Y) xs → S.eat∞ S.F⟦ e ⟧ xs ≈ C.F⟦ e ⟧ xs
@@ -255,7 +255,7 @@ S≡C-F (`map-fold a f g) = S≡C-F-map-fold a f g
 S≡C-F (`delay x) = S≡C-shift x
 S≡C-F (`hasten x) = S≡C-unshift x
 S≡C-F (e `⋙ e') = S≡C-⋙ (S≡C-F e) (S≡C-F e')
-S≡C-F (e `⊗ e') = S≡C-⊛ (S≡C-F e) (S≡C-F e')
+S≡C-F (e `⊗ e') = S≡C-⊗ (S≡C-F e) (S≡C-F e')
 
 S≡C-B : ∀ (e : E X Y) xs → S.eat∞ S.B⟦ e ⟧ xs ≈ C.B⟦ e ⟧ xs
 S≡C-B e xs = begin
@@ -264,3 +264,13 @@ S≡C-B e xs = begin
   C.F⟦ I⟦ e ⟧ ⟧ xs         ≈⟨ C.F∘I≡B e xs ⟩
   C.B⟦ e ⟧ xs              ∎
   where open ≈-Reasoning
+
+--------------------------------------------------------------------------------
+
+fail : S.IST X Y d
+S.step fail _ = S.⊥
+
+counterexample :
+  S.eat (fail {ℕ} {ℕ} {0} S.⊗ S.later S.id) ((0 , 0) ∷ []) ≢
+  (S.eat (fail {ℕ} {ℕ} {0}) L.⊗ S.eat (S.later S.id)) ((0 , 0) ∷ [])
+counterexample ()
