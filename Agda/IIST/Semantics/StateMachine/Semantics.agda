@@ -305,7 +305,7 @@ step (⊑-cong-⋙ f⊑f' g⊑g') x = ⊑ₛ-cong-⋙′ (step f⊑f' x) g⊑g'
 ⊑ₛ-cong-⋙″ f⊑f' (yield z g⊑g') = yield z (⊑-cong-⋙ f⊑f' g⊑g')
 
 ⊑-cong-later : {f : IST X Y d₁} {g : IST X Y d₂} → f ⊑ g → later f ⊑ later g
-⊑-cong-later f⊑g .same-d = cong suc (same-d f⊑g)
+same-d (⊑-cong-later f⊑g) = cong suc (same-d f⊑g)
 step (⊑-cong-later f⊑g) x = next (⊑-cong-⋙ ⊑-refl f⊑g)
 
 ⊑-cong-laterN : ∀ n {f : IST X Y d₁} {g : IST X Y d₂} → f ⊑ g → laterN n f ⊑ laterN n g

@@ -156,14 +156,16 @@ step ≈-cast x = ≈ₛ-castₛ
 module ≈-Reasoning where
 
   infix 1 begin_
-  infixr 2 _≈⟨_⟩_
+  infixr 2 step-≈
   infix 3 _∎
 
   begin_ : {f : IST X Y d₁} {g : IST X Y d₂} → f ≈ g → f ≈ g
   begin p = p
 
-  _≈⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ≈ h → f ≈ h
-  _ ≈⟨ p ⟩ q = ≈-trans p q
+  step-≈ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → g ≈ h → f ≈ g → f ≈ h
+  step-≈ f p q = ≈-trans q p
+
+  syntax step-≈ f p q = f ≈⟨ q ⟩ p
 
   _∎ : (f : IST X Y d) → f ≈ f
   _ ∎ = ≈-refl
@@ -231,17 +233,21 @@ step (⊑-trans f⊑g g⊑h) x = ⊑ₛ-trans (step f⊑g x) (step g⊑h x)
 module ⊑-Reasoning where
 
   infix 1 begin_
-  infixr 2 _≈⟨_⟩_ _⊑⟨_⟩_
+  infixr 2 step-≈ step-⊑
   infix 3 _∎
 
   begin_ : {f : IST X Y d₁} {g : IST X Y d₂} → f ⊑ g → f ⊑ g
   begin p = p
 
-  _≈⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ≈ g → g ⊑ h → f ⊑ h
-  _ ≈⟨ p ⟩ q = ⊑-trans (≈-to-⊑ p) q
+  step-≈ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → g ⊑ h → f ≈ g → f ⊑ h
+  step-≈ f p q = ⊑-trans (≈-to-⊑ q) p
 
-  _⊑⟨_⟩_ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → f ⊑ g → g ⊑ h → f ⊑ h
-  _ ⊑⟨ p ⟩ q = ⊑-trans p q
+  syntax step-≈ f p q = f ≈⟨ q ⟩ p
+
+  step-⊑ : (f : IST X Y d₁) {g : IST X Y d₂} {h : IST X Y d₃} → g ⊑ h → f ⊑ g → f ⊑ h
+  step-⊑ f p q = ⊑-trans q p
+
+  syntax step-⊑ f p q = f ⊑⟨ q ⟩ p
 
   _∎ : (f : IST X Y d) → f ⊑ f
   _ ∎ = ⊑-refl
@@ -249,17 +255,21 @@ module ⊑-Reasoning where
 module ⊑ₛ-Reasoning where
 
   infix 1 begin_
-  infixr 2 _≈⟨_⟩_ _⊑⟨_⟩_
+  infixr 2 step-≈ step-⊑
   infix 3 _∎
 
   begin_ : {f : Step X Y d₁} {g : Step X Y d₂} → f ⊑ₛ g → f ⊑ₛ g
   begin p = p
 
-  _≈⟨_⟩_ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → f ≈ₛ g → g ⊑ₛ h → f ⊑ₛ h
-  _ ≈⟨ p ⟩ q = ⊑ₛ-trans (≈ₛ-to-⊑ₛ p) q
+  step-≈ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → g ⊑ₛ h → f ≈ₛ g → f ⊑ₛ h
+  step-≈ f p q = ⊑ₛ-trans (≈ₛ-to-⊑ₛ q) p
 
-  _⊑⟨_⟩_ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → f ⊑ₛ g → g ⊑ₛ h → f ⊑ₛ h
-  _ ⊑⟨ p ⟩ q = ⊑ₛ-trans p q
+  syntax step-≈ f p q = f ≈⟨ q ⟩ p
+
+  step-⊑ : (f : Step X Y d₁) {g : Step X Y d₂} {h : Step X Y d₃} → g ⊑ₛ h → f ⊑ₛ g → f ⊑ₛ h
+  step-⊑ f p q = ⊑ₛ-trans q p
+
+  syntax step-⊑ f p q = f ⊑⟨ q ⟩ p
 
   _∎ : (f : Step X Y d) → f ⊑ₛ f
   _ ∎ = ⊑ₛ-refl
