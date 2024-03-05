@@ -8,7 +8,7 @@ open import Data.Maybe.Base as Maybe using ( Maybe; nothing; just; maybe; _>>=_ 
 open import Data.Maybe.Effectful using () renaming ( monad to monadMaybe )
 open import Data.Nat.Base using ( ℕ; zero; suc; _∸_ )
 open import Data.Nat.Instances
-open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
+open import Data.Product.Base using ( _×_; _,_; fst; snd )
 open import Effect.Monad using ( RawMonad )
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary using ( yes; no )
@@ -105,18 +105,18 @@ map-<*>₂ f g h nothing nothing = refl
 ⊗′-eat-dist f g [] = refl
 ⊗′-eat-dist f g ((x , z) ∷ xzs) = ⊗ₛ′-eatₛ-dist (S.step f x) (S.step g z) xzs
 ⊗ₛ′-eatₛ-dist S.⊥ _ xzs = refl
-⊗ₛ′-eatₛ-dist (S.next f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip (S.eat f (unzip xzs .proj₁)) |))
-⊗ₛ′-eatₛ-dist (S.yield y f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .proj₁)) |))
+⊗ₛ′-eatₛ-dist (S.next f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip (S.eat f (unzip xzs .fst)) |))
+⊗ₛ′-eatₛ-dist (S.yield y f) S.⊥ xzs = sym (<*>-nothingᵣ (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .fst)) |))
 ⊗ₛ′-eatₛ-dist (S.next f) (S.next g) xzs = ⊗′-eat-dist f g xzs
 ⊗ₛ′-eatₛ-dist (S.yield y f) (S.yield w g) xzs =
   begin
     ((y , w) ∷_) <$> S.eat (f S.⊗′ g) xzs
   ≡⟨ cong (((y , w) ∷_) <$>_) (⊗′-eat-dist f g xzs) ⟩
-    ((y , w) ∷_) <$> (| List.zip (S.eat f (unzip xzs .proj₁)) (S.eat g (unzip xzs .proj₂)) |)
-  ≡⟨ <*>-map₂ ((y , w) ∷_) List.zip (S.eat f (unzip xzs .proj₁)) _ ⟩
-    (| (λ ys ws → (y , w) ∷ List.zip ys ws) (S.eat f (unzip xzs .proj₁)) (S.eat g (unzip xzs .proj₂)) |)
-  ≡⟨ sym (map-<*>₂ List.zip (y ∷_) (w ∷_) (S.eat f (unzip xzs .proj₁)) _) ⟩
-    (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .proj₁)) ((w ∷_) <$> S.eat g (unzip xzs .proj₂)) |)
+    ((y , w) ∷_) <$> (| List.zip (S.eat f (unzip xzs .fst)) (S.eat g (unzip xzs .snd)) |)
+  ≡⟨ <*>-map₂ ((y , w) ∷_) List.zip (S.eat f (unzip xzs .fst)) _ ⟩
+    (| (λ ys ws → (y , w) ∷ List.zip ys ws) (S.eat f (unzip xzs .fst)) (S.eat g (unzip xzs .snd)) |)
+  ≡⟨ sym (map-<*>₂ List.zip (y ∷_) (w ∷_) (S.eat f (unzip xzs .fst)) _) ⟩
+    (| List.zip ((y ∷_) <$> S.eat f (unzip xzs .fst)) ((w ∷_) <$> S.eat g (unzip xzs .snd)) |)
   ∎
   where open ≡-Reasoning
 
@@ -145,7 +145,7 @@ S≡L-⊗ : {f : S.IST X Y d₁} {f' : L.ST X Y} {g : S.IST Z W d₂} {g' : L.ST
   → (∀ xs → S.eat g xs ≡ g' xs)
   → ∀ xs → S.eat (f S.⊗ g) xs ≡ (f' L.⊗ g') xs
 S≡L-⊗ {f = f} {g = g} p q xzs
-  rewrite ⊗-eat-dist f g xzs | p (unzip xzs .proj₁) | q (unzip xzs .proj₂) = refl
+  rewrite ⊗-eat-dist f g xzs | p (unzip xzs .fst) | q (unzip xzs .snd) = refl
 
 S≡L-F : ∀ (e : E X Y) xs → S.eat S.F⟦ e ⟧ xs ≡ L.F⟦ e ⟧ xs
 S≡L-F (`map-fold a f g) = S≡L-F-map-fold a f g

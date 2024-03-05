@@ -1,23 +1,27 @@
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --guardedness --cubical #-}
 
 module Codata.PartialConat where
 
-open import Data.Nat.Base using ( ℕ; zero; suc; _+_; _⊔_ )
-open import Data.Nat.Properties using ( +-identityʳ; +-suc )
-open import Relation.Binary.Bundles using ( Setoid; Preorder )
-open import Relation.Binary.Structures using ( IsEquivalence; IsPreorder )
+open import Cubical.Foundations.Everything
+open import Cubical.Data.Nat.Base using ( ℕ; zero; suc; _+_ )
+open import Cubical.Data.Nat.Properties using ( +-zero ) renaming ( max to _⊔_ )
+open import Cubical.Data.Empty.Base as Empty using () renaming ( ⊥ to Empty )
+open import Cubical.Data.Unit.Base using ( Unit; tt )
+open import Cubical.Relation.Nullary.Base using ( ¬_ )
+open import Relation.Binary.Bundles using ( Preorder )
+open import Relation.Binary.Structures using ( IsPreorder )
 
 --------------------------------------------------------------------------------
 -- Partial Conatural
 
 mutual
 
-  data Coℕ⊥ : Set where
+  data Coℕ⊥ : Type where
     zero : Coℕ⊥
     ⊥ : Coℕ⊥
     suc : (n : ∞Coℕ⊥) → Coℕ⊥
 
-  record ∞Coℕ⊥ : Set where
+  record ∞Coℕ⊥ : Type where
     coinductive
     constructor delay
     field force : Coℕ⊥
@@ -43,157 +47,144 @@ _ ⊓ zero = zero
 suc m ⊓ suc n = suc λ where .force → force m ⊓ force n
 
 --------------------------------------------------------------------------------
--- Bisimulation
+-- Properties
 
-infix 4 _≈_ _∞≈_
+zero≢⊥ : ¬ zero ≡ ⊥
+zero≢⊥ p = subst P p tt
+  where
+    P : ∀ (n : Coℕ⊥) → Type
+    P zero = Unit
+    P ⊥ = Empty
+    P (suc n) = Empty
 
-mutual
+zero≢suc : ∀ {n} → ¬ zero ≡ suc n
+zero≢suc p = subst P p tt
+  where
+    P : ∀ (n : Coℕ⊥) → Type
+    P zero = Unit
+    P ⊥ = Empty
+    P (suc n) = Empty
 
-  data _≈_ : Coℕ⊥ → Coℕ⊥ → Set where
-    zero : zero ≈ zero
-    ⊥ : ⊥ ≈ ⊥
-    suc : ∀ {m n} (p : m ∞≈ n) → suc m ≈ suc n
+⊥≢suc : ∀ {n} → ¬ ⊥ ≡ suc n
+⊥≢suc p = subst P p tt
+  where
+    P : ∀ (n : Coℕ⊥) → Type
+    P zero = Empty
+    P ⊥ = Unit
+    P (suc n) = Empty
 
-  record _∞≈_ (m n : ∞Coℕ⊥) : Set where
-    coinductive
-    field force : force m ≈ force n
+suc-injective : {m n : ∞Coℕ⊥} → suc m ≡ suc n → force m ≡ force n
+suc-injective = congS λ where
+  zero → zero
+  ⊥ → ⊥
+  (suc n) → force n
 
-open _∞≈_ public
+n⊓⊥≡⊥ : ∀ n → n ⊓ ⊥ ≡ ⊥
+n⊓⊥≡⊥ zero = refl
+n⊓⊥≡⊥ ⊥ = refl
+n⊓⊥≡⊥ (suc n) = refl
 
-≈-refl : ∀ {n} → n ≈ n
-≈-refl {zero} = zero
-≈-refl {⊥} = ⊥
-≈-refl {suc n} = suc λ where .force → ≈-refl
+⊓-idem : ∀ n → n ⊓ n ≡ n
+⊓-idem zero = refl
+⊓-idem ⊥ = refl
+⊓-idem (suc n) i = suc λ where .force → ⊓-idem (force n) i
 
-≈-sym : ∀ {m n} → m ≈ n → n ≈ m
-≈-sym zero = zero
-≈-sym ⊥ = ⊥
-≈-sym (suc m≈n) = suc λ where .force → ≈-sym (force m≈n)
-
-≈-trans : ∀ {m n o} → m ≈ n → n ≈ o → m ≈ o
-≈-trans zero n≈o = n≈o
-≈-trans ⊥ n≈o = n≈o
-≈-trans (suc m≈n) (suc n≈o) = suc λ where .force → ≈-trans (force m≈n) (force n≈o)
-
-≈-isEquivalence : IsEquivalence _≈_
-≈-isEquivalence = record
-  { refl = ≈-refl
-  ; sym = ≈-sym
-  ; trans = ≈-trans
-  }
-
-≈-setoid : Setoid _ _
-≈-setoid = record { isEquivalence = ≈-isEquivalence }
-
-module ≈-Reasoning where
-  open import Relation.Binary.Reasoning.Setoid ≈-setoid public
-
-suc-injective : ∀ {m n} → suc m ≈ suc n → m ∞≈ n
-suc-injective (suc p) = p
-
-≈-cong-∸ℕ : ∀ {m n} o → m ≈ n → m ∸ℕ o ≈ n ∸ℕ o
-≈-cong-∸ℕ zero m≈n = m≈n
-≈-cong-∸ℕ (suc o) zero = zero
-≈-cong-∸ℕ (suc o) ⊥ = ⊥
-≈-cong-∸ℕ (suc o) (suc m≈n) = ≈-cong-∸ℕ o (force m≈n)
-
-≈-cong-⊓ : ∀ {m n o p} → m ≈ n → o ≈ p → m ⊓ o ≈ n ⊓ p
-≈-cong-⊓ zero zero = zero
-≈-cong-⊓ zero ⊥ = ⊥
-≈-cong-⊓ zero (suc _) = zero
-≈-cong-⊓ ⊥ zero = ⊥
-≈-cong-⊓ ⊥ ⊥ = ⊥
-≈-cong-⊓ ⊥ (suc _) = ⊥
-≈-cong-⊓ (suc _) zero = zero
-≈-cong-⊓ (suc _) ⊥ = ⊥
-≈-cong-⊓ (suc m≈n) (suc o≈p) = suc λ where .force → ≈-cong-⊓ (force m≈n) (force o≈p)
-
-∸ℕ-+-assoc : ∀ m n o → m ∸ℕ n ∸ℕ o ≈ m ∸ℕ (n + o)
-∸ℕ-+-assoc m zero o = ≈-refl
-∸ℕ-+-assoc m (suc n) zero rewrite +-identityʳ n = ≈-refl
-∸ℕ-+-assoc zero (suc n) (suc o) = zero
-∸ℕ-+-assoc ⊥ (suc n) (suc o) = ⊥
+∸ℕ-+-assoc : ∀ m n o → m ∸ℕ n ∸ℕ o ≡ m ∸ℕ (n + o)
+∸ℕ-+-assoc m zero o = refl
+∸ℕ-+-assoc m (suc n) zero = congS (λ n → m ∸ℕ suc n) (sym (+-zero n))
+∸ℕ-+-assoc zero (suc n) (suc o) = refl
+∸ℕ-+-assoc ⊥ (suc n) (suc o) = refl
 ∸ℕ-+-assoc (suc m) (suc n) (suc o) = ∸ℕ-+-assoc (force m) n (suc o)
 
-⊓-idem : ∀ n → n ⊓ n ≈ n
-⊓-idem zero = zero
-⊓-idem ⊥ = ⊥
-⊓-idem (suc n) = suc λ where .force → ⊓-idem (force n)
-
-[m∸ℕn]⊓m≈m∸ℕn : ∀ m n → (m ∸ℕ n) ⊓ m ≈ m ∸ℕ n
+[m∸ℕn]⊓m≈m∸ℕn : ∀ m n → (m ∸ℕ n) ⊓ m ≡ m ∸ℕ n
 [m∸ℕn]⊓m≈m∸ℕn m zero = ⊓-idem m
-[m∸ℕn]⊓m≈m∸ℕn zero (suc n) = zero
-[m∸ℕn]⊓m≈m∸ℕn ⊥ (suc n) = ⊥
+[m∸ℕn]⊓m≈m∸ℕn zero (suc n) = refl
+[m∸ℕn]⊓m≈m∸ℕn ⊥ (suc n) = refl
 [m∸ℕn]⊓m≈m∸ℕn (suc m) (suc n) = lem ([m∸ℕn]⊓m≈m∸ℕn (force m) n)
   where
-    lem : ∀ {m n} → m ⊓ n ≈ m → m ⊓ suc (delay n) ≈ m
+    lem : ∀ {m n} → m ⊓ n ≡ m → m ⊓ suc (delay n) ≡ m
     lem {zero} {zero} p = p
     lem {⊥} {zero} p = p
-    lem {zero} {⊥} p = zero
+    lem {zero} {⊥} p = refl
     lem {⊥} {⊥} p = p
     lem {zero} {suc n} p = p
     lem {⊥} {suc n} p = p
-    lem {suc m} {suc n} p = suc λ where .force → lem (force (suc-injective p))
+    lem {suc m} {zero} p = Empty.rec (zero≢suc p)
+    lem {suc n} {⊥} p = Empty.rec (⊥≢suc p)
+    lem {suc m} {suc n} p i = suc λ where .force → lem (suc-injective p) i
 
-m⊓[m∸ℕn]≈m∸ℕn : ∀ m n → m ⊓ (m ∸ℕ n) ≈ m ∸ℕ n
+m⊓[m∸ℕn]≈m∸ℕn : ∀ m n → m ⊓ (m ∸ℕ n) ≡ m ∸ℕ n
 m⊓[m∸ℕn]≈m∸ℕn m zero = ⊓-idem m
-m⊓[m∸ℕn]≈m∸ℕn zero (suc n) = zero
-m⊓[m∸ℕn]≈m∸ℕn ⊥ (suc n) = ⊥
+m⊓[m∸ℕn]≈m∸ℕn zero (suc n) = refl
+m⊓[m∸ℕn]≈m∸ℕn ⊥ (suc n) = refl
 m⊓[m∸ℕn]≈m∸ℕn (suc m) (suc n) = lem (m⊓[m∸ℕn]≈m∸ℕn (force m) n)
   where
-    lem : ∀ {m n} → m ⊓ n ≈ n → suc (delay m) ⊓ n ≈ n
+    lem : ∀ {m n} → m ⊓ n ≡ n → suc (delay m) ⊓ n ≡ n
     lem {zero} {zero} p = p
     lem {zero} {⊥} p = p
+    lem {zero} {suc n} p = Empty.rec (zero≢suc p)
+    lem {⊥} {zero} p = refl
     lem {⊥} {⊥} p = p
+    lem {⊥} {suc n} p = Empty.rec (⊥≢suc p)
     lem {suc m} {zero} p = p
     lem {suc m} {⊥} p = p
-    lem {suc m} {suc n} p = suc λ where .force → lem (force (suc-injective p))
+    lem {suc m} {suc n} p i = suc λ where .force → lem (suc-injective p) i
 
-∸ℕ-distribˡ-⊔-⊓ : ∀ m n o → m ∸ℕ (n ⊔ o) ≈ (m ∸ℕ n) ⊓ (m ∸ℕ o)
-∸ℕ-distribˡ-⊔-⊓ m zero zero = ≈-sym (⊓-idem m)
-∸ℕ-distribˡ-⊔-⊓ m zero (suc o) = ≈-sym (m⊓[m∸ℕn]≈m∸ℕn m (suc o))
-∸ℕ-distribˡ-⊔-⊓ m (suc n) zero = ≈-sym ([m∸ℕn]⊓m≈m∸ℕn m (suc n))
-∸ℕ-distribˡ-⊔-⊓ zero (suc n) (suc o) = zero
-∸ℕ-distribˡ-⊔-⊓ ⊥ (suc n) (suc o) = ⊥
+∸ℕ-distribˡ-⊔-⊓ : ∀ m n o → m ∸ℕ (n ⊔ o) ≡ (m ∸ℕ n) ⊓ (m ∸ℕ o)
+∸ℕ-distribˡ-⊔-⊓ m zero zero = sym (⊓-idem m)
+∸ℕ-distribˡ-⊔-⊓ m zero (suc o) = sym (m⊓[m∸ℕn]≈m∸ℕn m (suc o))
+∸ℕ-distribˡ-⊔-⊓ m (suc n) zero = sym ([m∸ℕn]⊓m≈m∸ℕn m (suc n))
+∸ℕ-distribˡ-⊔-⊓ zero (suc n) (suc o) = refl
+∸ℕ-distribˡ-⊔-⊓ ⊥ (suc n) (suc o) = refl
 ∸ℕ-distribˡ-⊔-⊓ (suc m) (suc n) (suc o) = ∸ℕ-distribˡ-⊔-⊓ (force m) n o
 
 --------------------------------------------------------------------------------
 -- Less defined
 
-infix 4 _⊑_ _∞⊑_
+infix 4 _⊑_ _⊑′_ _∞⊑_
 
 mutual
 
-  data _⊑_ : Coℕ⊥ → Coℕ⊥ → Set where
-    zero : zero ⊑ zero
-    ⊥ₗ : ∀ {n} → ⊥ ⊑ n
-    suc : ∀ {m n} (p : m ∞⊑ n) → suc m ⊑ suc n
+  data _⊑_ : Coℕ⊥ → Coℕ⊥ → Type where
+    con : ∀ {m n} → m ⊑′ n → m ⊑ n
 
-  record _∞⊑_ (m n : ∞Coℕ⊥) : Set where
+  _⊑′_ : Coℕ⊥ → Coℕ⊥ → Type
+  zero ⊑′ zero = Unit
+  ⊥ ⊑′ _ = Unit
+  suc m ⊑′ suc n = m ∞⊑ n
+  _ ⊑′ _ = Empty
+
+  record _∞⊑_ (m n : ∞Coℕ⊥) : Type where
     coinductive
     field force : force m ⊑ force n
 
 open _∞⊑_ public
 
 ⊑-refl : ∀ {n} → n ⊑ n
-⊑-refl {zero} = zero
-⊑-refl {⊥} = ⊥ₗ
-⊑-refl {suc n} = suc λ where .force → ⊑-refl
+⊑-refl {zero} = con tt
+⊑-refl {⊥} = con tt
+⊑-refl {suc n} = con λ where .force → ⊑-refl
+
+≡-to-⊑ : ∀ {m n} → m ≡ n → m ⊑ n
+≡-to-⊑ eq = subst (_ ⊑_) eq ⊑-refl
 
 ⊑-trans : ∀ {m n o} → m ⊑ n → n ⊑ o → m ⊑ o
-⊑-trans zero q = q
-⊑-trans ⊥ₗ q = ⊥ₗ
-⊑-trans (suc p) (suc q) = suc λ where .force → ⊑-trans (force p) (force q)
+⊑-trans {⊥} {n} {o} p q = con tt
+⊑-trans {zero} {zero} {zero} p q = con tt
+⊑-trans {suc m} {suc n} {suc o} (con p) (con q) = con λ where .force → ⊑-trans (force p) (force q)
+⊑-trans {zero} {suc _} {o} (con ()) q
+⊑-trans {suc _} {zero} {o} (con ()) q
+⊑-trans {m} {zero} {suc _} p (con ())
+⊑-trans {m} {suc _} {zero} p (con ())
+⊑-trans {zero} {⊥} {o} (con ()) q
+⊑-trans {m} {zero} {⊥} p (con ())
+⊑-trans {suc m} {⊥} {o} (con ()) q
+⊑-trans {m} {suc n} {⊥} p (con ())
 
-≈-to-⊑ : ∀ {m n} → m ≈ n → m ⊑ n
-≈-to-⊑ zero = zero
-≈-to-⊑ ⊥ = ⊥ₗ
-≈-to-⊑ (suc p) = suc λ where .force → ≈-to-⊑ (force p)
-
-⊑-isPreorder : IsPreorder _≈_ _⊑_
+⊑-isPreorder : IsPreorder _≡_ _⊑_
 ⊑-isPreorder = record
-  { isEquivalence = ≈-isEquivalence
-  ; reflexive = ≈-to-⊑
+  { isEquivalence = record { refl = refl; sym = sym; trans = _∙_ }
+  ; reflexive = ≡-to-⊑
   ; trans = ⊑-trans
   }
 
@@ -205,17 +196,27 @@ module ⊑-Reasoning where
 
 ⊑-cong-∸ℕ : ∀ {m n} o → m ⊑ n → m ∸ℕ o ⊑ n ∸ℕ o
 ⊑-cong-∸ℕ zero p = p
-⊑-cong-∸ℕ (suc o) zero = zero
-⊑-cong-∸ℕ (suc o) ⊥ₗ = ⊥ₗ
-⊑-cong-∸ℕ (suc o) (suc p) = ⊑-cong-∸ℕ o (force p)
+⊑-cong-∸ℕ {zero} {zero} (suc o) (con tt) = con tt
+⊑-cong-∸ℕ {zero} {⊥} (suc o) (con ())
+⊑-cong-∸ℕ {zero} {suc n} (suc o) (con ())
+⊑-cong-∸ℕ {⊥} (suc o) (con tt) = con tt
+⊑-cong-∸ℕ {suc m} {zero} (suc o) (con ())
+⊑-cong-∸ℕ {suc m} {⊥} (suc o) (con ())
+⊑-cong-∸ℕ {suc m} {suc n} (suc o) (con p) = ⊑-cong-∸ℕ o (force p)
 
 ⊑-cong-⊓ : ∀ {m n o p} → m ⊑ n → o ⊑ p → m ⊓ o ⊑ n ⊓ p
-⊑-cong-⊓ zero zero = zero
-⊑-cong-⊓ zero ⊥ₗ = ⊥ₗ
-⊑-cong-⊓ zero (suc _) = zero
-⊑-cong-⊓ ⊥ₗ zero = ⊥ₗ
-⊑-cong-⊓ ⊥ₗ ⊥ₗ = ⊥ₗ
-⊑-cong-⊓ ⊥ₗ (suc _) = ⊥ₗ
-⊑-cong-⊓ (suc _) zero = zero
-⊑-cong-⊓ (suc _) ⊥ₗ = ⊥ₗ
-⊑-cong-⊓ (suc p) (suc q) = suc λ where .force → ⊑-cong-⊓ (force p) (force q)
+⊑-cong-⊓ {⊥} {n} {o} {p} q r = con tt
+⊑-cong-⊓ {m} {n} {⊥} {p} q r = ⊑-trans (≡-to-⊑ (n⊓⊥≡⊥ m)) (con tt)
+⊑-cong-⊓ {zero} {⊥} {o} {p} (con ()) r
+⊑-cong-⊓ {zero} {suc _} {o} {p} (con ()) r
+⊑-cong-⊓ {suc _} {⊥} {o} {p} (con ()) r
+⊑-cong-⊓ {suc _} {zero} {o} {p} (con ()) r
+⊑-cong-⊓ {m} {n} {zero} {⊥} q (con ())
+⊑-cong-⊓ {m} {n} {zero} {suc _} q (con ())
+⊑-cong-⊓ {m} {n} {suc _} {zero} q (con ())
+⊑-cong-⊓ {m} {n} {suc _} {⊥} q (con ())
+⊑-cong-⊓ {zero} {zero} {zero} {zero} q r = con tt
+⊑-cong-⊓ {zero} {zero} {suc o} {suc p} q r = con tt
+⊑-cong-⊓ {suc m} {suc n} {zero} {zero} q r = con tt
+⊑-cong-⊓ {suc m} {suc n} {suc o} {suc p} (con q) (con r) =
+  con λ where .force → ⊑-cong-⊓ (force q) (force r)

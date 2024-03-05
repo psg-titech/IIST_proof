@@ -1,19 +1,23 @@
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --guardedness --cubical #-}
 
 module Codata.PartialColist where
 
-open import Data.Product.Base using ( _×_; _,_; proj₁; proj₂ )
-open import Data.Nat.Base using ( ℕ; zero; suc )
-open import Data.List.Base using ( List; []; _∷_ )
-open import Relation.Binary.Bundles using ( Setoid; Preorder )
-open import Relation.Binary.PropositionalEquality using ( _≡_; refl; sym; trans )
-open import Relation.Binary.Structures using ( IsEquivalence; IsPreorder )
+open import Cubical.Foundations.Everything
+open import Cubical.Data.Empty.Base as Empty using () renaming ( ⊥ to Empty )
+open import Cubical.Data.Sigma.Base using ( _×_; _,_; fst; snd )
+open import Cubical.Data.Nat.Base using ( ℕ; zero; suc )
+open import Cubical.Data.List.Base using ( List; []; _∷_ )
+open import Cubical.Data.Unit.Base using ( Unit; tt )
+open import Relation.Binary.Bundles using ( Preorder )
+open import Relation.Binary.Structures using ( IsPreorder )
 
-open import Codata.PartialConat as Coℕ⊥ using ( Coℕ⊥; zero; ⊥; suc; force; _⊓_ )
+open import Codata.PartialConat using ( Coℕ⊥; zero; ⊥; suc; force; _⊓_ )
 
 private
   variable
-    A B : Set
+    A B : Type
+
+postulate sorry : A
 
 --------------------------------------------------------------------------------
 -- Partial Colist
@@ -22,12 +26,12 @@ infixr 5 _∷_
 
 mutual
 
-  data Colist⊥ (A : Set) : Set where
+  data Colist⊥ (A : Type) : Type where
     [] : Colist⊥ A
     ⊥ : Colist⊥ A
     _∷_ : (x : A) (xs : ∞Colist⊥ A) → Colist⊥ A
 
-  record ∞Colist⊥ (A : Set) : Set where
+  record ∞Colist⊥ (A : Type) : Type where
     coinductive
     constructor delay
     field force : Colist⊥ A
@@ -59,160 +63,106 @@ zip _ [] = []
 zip (x ∷ xs) (y ∷ ys) = (x , y) ∷ λ where .force → zip (force xs) (force ys)
 
 unzipₗ : Colist⊥ (A × B) → Colist⊥ A
-unzipₗ = map proj₁
-
 unzipᵣ : Colist⊥ (A × B) → Colist⊥ B
-unzipᵣ = map proj₂
-
-colength-map : ∀ (f : A → B) xs → colength (map f xs) Coℕ⊥.≈ colength xs
-colength-map f [] = zero
-colength-map f ⊥ = ⊥
-colength-map f (x ∷ xs) = suc λ where .force → colength-map f (force xs)
-
-colength-zip : ∀ {xs : Colist⊥ A} {ys : Colist⊥ B}
-  → colength (zip xs ys) Coℕ⊥.≈ (colength xs ⊓ colength ys)
-colength-zip {xs = []} {[]} = zero
-colength-zip {xs = []} {⊥} = ⊥
-colength-zip {xs = []} {_ ∷ _} = zero
-colength-zip {xs = ⊥} {[]} = ⊥
-colength-zip {xs = ⊥} {⊥} = ⊥
-colength-zip {xs = ⊥} {_ ∷ _} = ⊥
-colength-zip {xs = _ ∷ _} {[]} = zero
-colength-zip {xs = _ ∷ _} {⊥} = ⊥
-colength-zip {xs = x ∷ xs} {y ∷ ys} = suc λ where .force → colength-zip
-
-colength-unzipₗ : ∀ {xs : Colist⊥ (A × B)} → colength (unzipₗ xs) Coℕ⊥.≈ colength xs
-colength-unzipₗ = colength-map _ _
-
-colength-unzipᵣ : ∀ {xs : Colist⊥ (A × B)} → colength (unzipᵣ xs) Coℕ⊥.≈ colength xs
-colength-unzipᵣ = colength-map _ _
+unzipₗ = map fst
+unzipᵣ = map snd
 
 --------------------------------------------------------------------------------
--- Bisimulation
+-- Properties
 
-infix 4 _≈_ _∞≈_
+colength-map : ∀ (f : A → B) xs → colength (map f xs) ≡ colength xs
+colength-map f [] = refl
+colength-map f ⊥ = refl
+colength-map f (x ∷ xs) i = suc λ where .force → colength-map f (force xs) i
 
-mutual
+colength-zip : ∀ {xs : Colist⊥ A} {ys : Colist⊥ B}
+  → colength (zip xs ys) ≡ (colength xs ⊓ colength ys)
+colength-zip {xs = []} {[]} = refl
+colength-zip {xs = []} {⊥} = refl
+colength-zip {xs = []} {_ ∷ _} = refl
+colength-zip {xs = ⊥} {[]} = refl
+colength-zip {xs = ⊥} {⊥} = refl
+colength-zip {xs = ⊥} {_ ∷ _} = refl
+colength-zip {xs = _ ∷ _} {[]} = refl
+colength-zip {xs = _ ∷ _} {⊥} = refl
+colength-zip {xs = x ∷ xs} {y ∷ ys} i = suc λ where .force → colength-zip {xs = force xs} {ys = force ys} i
 
-  data _≈_ {A} : (xs ys : Colist⊥ A) → Set where
-    [] : [] ≈ []
-    ⊥ : ⊥ ≈ ⊥
-    _∷_ : ∀ x {xs ys} (p : xs ∞≈ ys) → x ∷ xs ≈ x ∷ ys
+colength-unzipₗ : ∀ {xs : Colist⊥ (A × B)} → colength (unzipₗ xs) ≡ colength xs
+colength-unzipᵣ : ∀ {xs : Colist⊥ (A × B)} → colength (unzipᵣ xs) ≡ colength xs
+colength-unzipₗ = colength-map _ _
+colength-unzipᵣ = colength-map _ _
 
-  record _∞≈_ (xs ys : ∞Colist⊥ A) : Set where
-    coinductive
-    field force : force xs ≈ force ys
+unzip-zip : ∀ {xys : Colist⊥ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys) ≡ xys
+unzip-zip {xys = []} = refl
+unzip-zip {xys = ⊥} = refl
+unzip-zip {xys = xy ∷ xys} i = xy ∷ λ where .force → unzip-zip {xys = force xys} i
 
-open _∞≈_ public
-
-≈-refl : ∀ {xs : Colist⊥ A} → xs ≈ xs
-≈-refl {xs = []} = []
-≈-refl {xs = ⊥} = ⊥
-≈-refl {xs = x ∷ xs} = x ∷ λ where .force → ≈-refl
-
-≈-sym : ∀ {xs ys : Colist⊥ A} → xs ≈ ys → ys ≈ xs
-≈-sym [] = []
-≈-sym ⊥ = ⊥
-≈-sym (x ∷ p) = x ∷ λ where .force → ≈-sym (force p)
-
-≈-trans : ∀ {xs ys zs : Colist⊥ A} → xs ≈ ys → ys ≈ zs → xs ≈ zs
-≈-trans [] q = q
-≈-trans ⊥ q = q
-≈-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ≈-trans (force p) (force q)
-
-≈-isEquivalence : ∀ {A} → IsEquivalence {A = Colist⊥ A} _≈_
-≈-isEquivalence = record
-  { refl = ≈-refl
-  ; sym = ≈-sym
-  ; trans = ≈-trans
-  }
-
-≈-setoid : ∀ {A} → Setoid _ _
-≈-setoid {A} = record { isEquivalence = ≈-isEquivalence {A} }
-
-module ≈-Reasoning {A} where
-  open import Relation.Binary.Reasoning.Setoid (≈-setoid {A}) public
-
-≈-cong-map : ∀ {xs xs' : Colist⊥ A} (f : A → B)
-  → xs ≈ xs'
-  → map f xs ≈ map f xs'
-≈-cong-map f [] = []
-≈-cong-map f ⊥ = ⊥
-≈-cong-map f (x ∷ p) = f x ∷ λ where .force → ≈-cong-map f (force p)
-
-≈-cong-zip : ∀ {xs xs' : Colist⊥ A} {ys ys' : Colist⊥ B}
-  → xs ≈ xs'
-  → ys ≈ ys'
-  → zip xs ys ≈ zip xs' ys'
-≈-cong-zip ⊥ _ = ⊥
-≈-cong-zip [] ⊥ = ⊥
-≈-cong-zip (_ ∷ _) ⊥ = ⊥
-≈-cong-zip [] [] = []
-≈-cong-zip [] (_ ∷ _) = []
-≈-cong-zip (_ ∷ _) [] = []
-≈-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → ≈-cong-zip (force p) (force q)
-
-≈-cong-unzipₗ : ∀ {xs xs' : Colist⊥ (A × B)} → xs ≈ xs' → unzipₗ xs ≈ unzipₗ xs'
-≈-cong-unzipₗ = ≈-cong-map _
-
-≈-cong-unzipᵣ : ∀ {xs xs' : Colist⊥ (A × B)} → xs ≈ xs' → unzipᵣ xs ≈ unzipᵣ xs'
-≈-cong-unzipᵣ = ≈-cong-map _
-
-unzip-zip : ∀ {xys : Colist⊥ (A × B)} → zip (unzipₗ xys) (unzipᵣ xys) ≈ xys
-unzip-zip {xys = []} = []
-unzip-zip {xys = ⊥} = ⊥
-unzip-zip {xys = xy ∷ xs} = xy ∷ λ where .force → unzip-zip
-
-zip-⊥ᵣ : ∀ {xs : Colist⊥ A} → zip {A} {B} xs ⊥ ≈ ⊥
-zip-⊥ᵣ {xs = []} = ⊥
-zip-⊥ᵣ {xs = ⊥} = ⊥
-zip-⊥ᵣ {xs = _ ∷ _} = ⊥
+zip-⊥ᵣ : ∀ {xs} → Path (Colist⊥ (A × B)) (zip xs ⊥) ⊥
+zip-⊥ᵣ {xs = []} = refl
+zip-⊥ᵣ {xs = ⊥} = refl
+zip-⊥ᵣ {xs = _ ∷ _} = refl
 
 -------------------------------------------------------------------------------
 -- Prefix
 
 infix 4 _≺_ _≺≺_
 
-data PrefixKind : Set where
-  ⊥≺⊥ ⊥≺xs : PrefixKind
+data PrefixKind : Type where
+  ⊥≺⊥ ⊥≺ : PrefixKind
 
 mutual
 
-  data Prefix {A} : PrefixKind → Colist⊥ A → Colist⊥ A → Set where
-    [] : ∀ {k xs} → Prefix k [] xs
-    ⊥ : Prefix ⊥≺⊥ ⊥ ⊥
-    ⊥ₗ : ∀ {xs} → Prefix ⊥≺xs ⊥ xs
-    _∷_ : ∀ {k} x {xs ys} (p : ∞Prefix k xs ys) → Prefix k (x ∷ xs) (x ∷ ys)
+  data Prefix {A} : PrefixKind → Colist⊥ A → Colist⊥ A → Type where
+    con : ∀ {k xs ys} → Prefix′ k xs ys → Prefix k xs ys
 
-  record ∞Prefix k (xs ys : ∞Colist⊥ A) : Set where
+  Prefix′ : PrefixKind → Colist⊥ A → Colist⊥ A → Type
+  Prefix′ k [] ys = Unit
+  Prefix′ ⊥≺⊥ ⊥ ⊥ = Unit
+  Prefix′ ⊥≺ ⊥ ys = Unit
+  Prefix′ k (x ∷ xs) (y ∷ ys) = (x ≡ y) × ∞Prefix k xs ys
+  Prefix′ k xs ys = Empty
+
+  record ∞Prefix k (xs ys : ∞Colist⊥ A) : Type where
     coinductive
     field force : Prefix k (force xs) (force ys)
 
 open ∞Prefix public
 
-_≺_ _≺≺_ : Colist⊥ A → Colist⊥ A → Set
+_≺_ _≺≺_ : Colist⊥ A → Colist⊥ A → Type
 _≺_ = Prefix ⊥≺⊥
-_≺≺_ = Prefix ⊥≺xs
+_≺≺_ = Prefix ⊥≺
 
-prefix-reflexive : ∀ {k} {xs ys : Colist⊥ A} → xs ≈ ys → Prefix k xs ys
-prefix-reflexive [] = []
-prefix-reflexive {k = ⊥≺⊥} ⊥ = ⊥
-prefix-reflexive {k = ⊥≺xs} ⊥ = ⊥ₗ
-prefix-reflexive (x ∷ p) = x ∷ λ where .force → prefix-reflexive (force p)
+prefix-refl : ∀ {k} {xs : Colist⊥ A} → Prefix k xs xs
+prefix-refl {xs = []} = con tt
+prefix-refl {k = ⊥≺⊥} {xs = ⊥} = con tt
+prefix-refl {k = ⊥≺} {xs = ⊥} = con tt
+prefix-refl {xs = x ∷ xs} = con (refl , λ where .force → prefix-refl)
+
+≡-to-prefix : ∀ {k} {xs ys : Colist⊥ A} → xs ≡ ys → Prefix k xs ys
+≡-to-prefix eq = subst (Prefix _ _) eq prefix-refl
 
 prefix-trans : ∀ {k} {xs ys zs : Colist⊥ A}
   → Prefix k xs ys
   → Prefix k ys zs
   → Prefix k xs zs
-prefix-trans [] _ = []
-prefix-trans ⊥ ⊥ = ⊥
-prefix-trans ⊥ₗ _ = ⊥ₗ
-prefix-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → prefix-trans (force p) (force q)
+prefix-trans {xs = []} {ys} {zs} p q = con tt
+prefix-trans {k = ⊥≺⊥} {xs = ⊥} {⊥} {⊥} p q = con tt
+prefix-trans {k = ⊥≺} {xs = ⊥} {ys} {zs} p q = con tt
+prefix-trans {xs = x ∷ xs} {y ∷ ys} {z ∷ zs} (con (p , p')) (con (q , q')) =
+  con (p ∙ q , λ where .force → prefix-trans (force p') (force q'))
+prefix-trans {xs = x ∷ xs} {[]} {zs} (con ()) q
+prefix-trans {xs = xs} {y ∷ ys} {[]} p (con ())
+prefix-trans {k = ⊥≺⊥} {xs = ⊥} {[]} {zs} (con ()) q
+prefix-trans {k = ⊥≺⊥} {xs = ⊥} {y ∷ ys} {zs} (con ()) q
+prefix-trans {k = ⊥≺⊥} {xs = xs} {⊥} {[]} p (con ())
+prefix-trans {k = ⊥≺⊥} {xs = xs} {⊥} {z ∷ zs} p (con ())
+prefix-trans {xs = x ∷ xs} {⊥} {zs} (con ()) q
+prefix-trans {xs = xs} {ys = y ∷ ys} {⊥} p (con ())
 
-prefix-isPreorder : ∀ {A k} → IsPreorder {A = Colist⊥ A} _≈_ (Prefix k)
+prefix-isPreorder : ∀ {A k} → IsPreorder _≡_ (Prefix {A} k)
 prefix-isPreorder = record
-  { isEquivalence = ≈-isEquivalence
-  ; reflexive = prefix-reflexive
+  { isEquivalence = record { refl = refl; sym = sym; trans = _∙_ }
+  ; reflexive = ≡-to-prefix
   ; trans = prefix-trans
   }
 
@@ -226,49 +176,71 @@ prefix-cong-zip : ∀ {k} {xs' xs : Colist⊥ A} {ys' ys : Colist⊥ B}
   → Prefix k xs' xs
   → Prefix k ys' ys
   → Prefix k (zip xs' ys') (zip xs ys)
-prefix-cong-zip ⊥ _ = ⊥
-prefix-cong-zip ⊥ₗ _ = ⊥ₗ
-prefix-cong-zip {xs = []} [] ⊥ = ⊥
-prefix-cong-zip {xs = ⊥} [] ⊥ = ⊥
-prefix-cong-zip {xs = x ∷ xs} [] ⊥ = ⊥
-prefix-cong-zip (_ ∷ _) ⊥ = ⊥
-prefix-cong-zip [] ⊥ₗ = ⊥ₗ
-prefix-cong-zip (_ ∷ _) ⊥ₗ = ⊥ₗ
-prefix-cong-zip [] [] = []
-prefix-cong-zip [] (_ ∷ _) = []
-prefix-cong-zip (x ∷ p) [] = []
-prefix-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → prefix-cong-zip (force p) (force q)
+prefix-cong-zip = sorry
+-- prefix-cong-zip {k = ⊥≺⊥} {xs' = ⊥} {⊥} {ys'} {ys} p q = con tt
+-- prefix-cong-zip {k = ⊥≺} {xs' = ⊥} {xs} {ys'} {ys} p q = con tt
+-- prefix-cong-zip {k = ⊥≺⊥} {xs' = []} {[]} {⊥} {⊥} p q = con tt
+-- prefix-cong-zip {k = ⊥≺⊥} {xs' = _ ∷ _} {_ ∷ _} {⊥} {⊥} p q = con tt
+-- prefix-cong-zip {k = ⊥≺} {xs' = []} {[]} {⊥} {ys} p q = con tt
+-- prefix-cong-zip {k = ⊥≺} {xs' = _ ∷ _} {_ ∷ _} {⊥} {ys} p q = con tt
+-- prefix-cong-zip {xs' = []} {xs} {[]} {ys} p q = con tt
+-- prefix-cong-zip {xs' = []} {xs} {_ ∷ _} {ys} p q = con tt
+-- prefix-cong-zip {xs' = _ ∷ _} {xs} {[]} {ys} p q = con tt
+-- prefix-cong-zip {xs' = _ ∷ _} {_ ∷ _} {_ ∷ _} {_ ∷ _} (con (p , p')) (con (q , q')) =
+--   con (cong₂ _,_ p q , λ where .force → prefix-cong-zip (force p') (force q'))
+-- prefix-cong-zip {k = ⊥≺⊥} {xs' = ⊥} {[]} {ys'} {ys} (con ()) q
+-- prefix-cong-zip {k = ⊥≺⊥} {xs' = ⊥} {x ∷ xs} {ys'} {ys} (con ()) q
+-- prefix-cong-zip {xs' = xs'} {xs} {ys'} {ys} p q = {! xs' xs ys' ys  !}
+-- prefix-cong-zip ⊥ _ = ⊥
+-- prefix-cong-zip ⊥ₗ _ = ⊥ₗ
+-- prefix-cong-zip {xs = []} [] ⊥ = ⊥
+-- prefix-cong-zip {xs = ⊥} [] ⊥ = ⊥
+-- prefix-cong-zip {xs = x ∷ xs} [] ⊥ = ⊥
+-- prefix-cong-zip (_ ∷ _) ⊥ = ⊥
+-- prefix-cong-zip [] ⊥ₗ = ⊥ₗ
+-- prefix-cong-zip (_ ∷ _) ⊥ₗ = ⊥ₗ
+-- prefix-cong-zip [] [] = []
+-- prefix-cong-zip [] (_ ∷ _) = []
+-- prefix-cong-zip (x ∷ p) [] = []
+-- prefix-cong-zip (x ∷ p) (y ∷ q) = (x , y) ∷ λ where .force → prefix-cong-zip (force p) (force q)
+
+prefix-cong-map : ∀ (f : A → B) {k} {xs' xs : Colist⊥ A}
+  → Prefix k xs' xs
+  → Prefix k (map f xs') (map f xs)
+prefix-cong-map f {xs' = []} {xs} p = con tt
+prefix-cong-map f {k = ⊥≺⊥} {xs' = ⊥} {[]} (con ())
+prefix-cong-map f {k = ⊥≺⊥} {xs' = ⊥} {⊥} (con tt) = con tt
+prefix-cong-map f {k = ⊥≺⊥} {xs' = ⊥} {x ∷ xs} (con ())
+prefix-cong-map f {k = ⊥≺} {xs' = ⊥} {xs} (con tt) = con tt
+prefix-cong-map f {xs' = x' ∷ xs'} {[]} (con ())
+prefix-cong-map f {xs' = x' ∷ xs'} {⊥} (con ())
+prefix-cong-map f {xs' = x' ∷ xs'} {x ∷ xs} (con (p , q)) =
+  con (cong f p , λ where .force → prefix-cong-map f (force q))
 
 prefix-cong-unzipₗ : ∀ {k} {xys' xys : Colist⊥ (A × B)}
   → Prefix k xys' xys
   → Prefix k (unzipₗ xys') (unzipₗ xys)
-prefix-cong-unzipₗ [] = []
-prefix-cong-unzipₗ ⊥ = ⊥
-prefix-cong-unzipₗ ⊥ₗ = ⊥ₗ
-prefix-cong-unzipₗ ((x , _) ∷ p) = x ∷ λ where .force → prefix-cong-unzipₗ (force p)
+prefix-cong-unzipₗ = prefix-cong-map fst
 
 prefix-cong-unzipᵣ : ∀ {k} {xys' xys : Colist⊥ (A × B)}
   → Prefix k xys' xys
   → Prefix k (unzipᵣ xys') (unzipᵣ xys)
-prefix-cong-unzipᵣ [] = []
-prefix-cong-unzipᵣ ⊥ = ⊥
-prefix-cong-unzipᵣ ⊥ₗ = ⊥ₗ
-prefix-cong-unzipᵣ ((_ , y) ∷ q) = y ∷ λ where .force → prefix-cong-unzipᵣ (force q)
+prefix-cong-unzipᵣ = prefix-cong-map snd
 
 zip-unzipₗ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipₗ (zip xs ys) ≺≺ xs
-zip-unzipₗ [] [] = []
-zip-unzipₗ [] ⊥ = ⊥ₗ
-zip-unzipₗ [] (x ∷ xs) = []
-zip-unzipₗ ⊥ ys = ⊥ₗ
-zip-unzipₗ (x ∷ xs) [] = []
-zip-unzipₗ (x ∷ xs) ⊥ = ⊥ₗ
-zip-unzipₗ (x ∷ xs) (y ∷ ys) = x ∷ λ where .force → zip-unzipₗ (force xs) (force ys)
+zip-unzipₗ [] [] = con tt
+zip-unzipₗ [] ⊥ = con tt
+zip-unzipₗ [] (x ∷ xs) = (con tt)
+zip-unzipₗ ⊥ ys = (con tt)
+zip-unzipₗ (x ∷ xs) [] = con tt
+zip-unzipₗ (x ∷ xs) ⊥ = con tt
+zip-unzipₗ (x ∷ xs) (y ∷ ys) = con (refl , λ where .force → zip-unzipₗ (force xs) (force ys))
 
 zip-unzipᵣ : ∀ (xs : Colist⊥ A) (ys : Colist⊥ B) → unzipᵣ (zip xs ys) ≺≺ ys
-zip-unzipᵣ [] [] = []
-zip-unzipᵣ [] ⊥ = ⊥ₗ
-zip-unzipᵣ [] (x ∷ xs) = []
-zip-unzipᵣ ⊥ ys = ⊥ₗ
-zip-unzipᵣ (x ∷ xs) [] = []
-zip-unzipᵣ (x ∷ xs) ⊥ = ⊥ₗ
-zip-unzipᵣ (x ∷ xs) (y ∷ ys) = y ∷ λ where .force → zip-unzipᵣ (force xs) (force ys)
+zip-unzipᵣ [] [] = con tt
+zip-unzipᵣ [] ⊥ = con tt
+zip-unzipᵣ [] (x ∷ xs) = con tt
+zip-unzipᵣ ⊥ ys = con tt
+zip-unzipᵣ (x ∷ xs) [] = con tt
+zip-unzipᵣ (x ∷ xs) ⊥ = con tt
+zip-unzipᵣ (x ∷ xs) (y ∷ ys) = con (refl , λ where .force → zip-unzipᵣ (force xs) (force ys))
