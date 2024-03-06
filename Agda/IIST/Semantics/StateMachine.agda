@@ -1,4 +1,4 @@
-{-# OPTIONS --guardedness #-}
+{-# OPTIONS --guardedness --cubical #-}
 
 module IIST.Semantics.StateMachine where
 
