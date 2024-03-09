@@ -171,114 +171,113 @@ module ≡-Reasoning where
 
 --------------------------------------------------------------------------------
 
-eat∞-id : ∀ (xs : Colist⊥ X) → S.eat∞ S.id xs ≡ xs
-eat∞-id [] = refl
-eat∞-id ⊥ = refl
-eat∞-id (x ∷ xs) i = x ∷ λ where .force → eat∞-id (force xs) i
+eat∞-id : S.eat∞ S.id ≡ idfun (Colist⊥ X)
+eat∞-id i [] = []
+eat∞-id i ⊥ = ⊥
+eat∞-id i (x ∷ xs) = x ∷ λ where .force → eat∞-id i (force xs)
 
-S≡C-shift : ∀ (x : X) xs → S.eat∞ (S.shift x) xs ≡ C.shift x xs
-S≡C-shift x [] = refl
-S≡C-shift x ⊥ = refl
-S≡C-shift x (y ∷ xs) i = x ∷ λ where .force → S≡C-shift y (force xs) i
+S≡C-shift : ∀ (x : X) → S.eat∞ (S.shift x) ≡ C.shift x
+S≡C-shift x i [] = []
+S≡C-shift x i ⊥ = ⊥
+S≡C-shift x i (y ∷ xs) = x ∷ λ where .force → S≡C-shift y i (force xs)
 
-S≡C-unshift : ∀ {{_ : Eq X}} (x : X) xs → S.eat∞ (S.unshift x) xs ≡ C.unshift x xs
-S≡C-unshift x [] = refl
-S≡C-unshift x ⊥ = refl
-S≡C-unshift x (y ∷ xs) i with x ≟ y
+S≡C-unshift : ∀ {{_ : Eq X}} (x : X) → S.eat∞ (S.unshift x) ≡ C.unshift x
+S≡C-unshift x i [] = []
+S≡C-unshift x i ⊥ = ⊥
+S≡C-unshift x i (y ∷ xs) with x ≟ y
 ... | no _ = ⊥
-... | yes refl = eat∞-id (force xs) i
+... | yes refl = eat∞-id i (force xs)
 
-S≡C-F-map-fold : ∀ a (f : A → X ⇌ Y) g xs → S.eat∞ (S.F-map-fold a f g) xs ≡ C.F-map-fold a f g xs
-S≡C-F-map-fold a f g [] = refl
-S≡C-F-map-fold a f g ⊥ = refl
-S≡C-F-map-fold a f g (x ∷ xs) i with f a .to x
+S≡C-F-map-fold : ∀ a (f : A → X ⇌ Y) g → S.eat∞ (S.F-map-fold a f g) ≡ C.F-map-fold a f g
+S≡C-F-map-fold a f g i [] = []
+S≡C-F-map-fold a f g i ⊥ = ⊥
+S≡C-F-map-fold a f g i (x ∷ xs) with f a .to x
 ... | nothing = ⊥
-... | just y = y ∷ λ where .force → S≡C-F-map-fold (g a x) f g (force xs) i
+... | just y = y ∷ λ where .force → S≡C-F-map-fold (g a x) f g i (force xs)
 
-⋙-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Y Z d₂) xs
-  → S.eat∞ (f S.⋙ g) xs ≡ S.eat∞ g (S.eat∞ f xs)
-⋙′-eat∞-dist : ∀ (s : S.Step X Y d₁) (g : S.IST Y Z d₂) xs
-  → S.eatₛ∞ (s S.⋙′ g) xs ≡ S.eat∞ g (S.eatₛ∞ s xs)
-⋙″-eat∞-dist : ∀ (f : S.IST X Y 0) (s : S.Step Y Z d) xs
-  → S.eatₛ∞ (f S.⋙″ s) xs ≡ S.eatₛ∞ s (delay (S.eat∞ f (force xs)))
-⋙-eat∞-dist f g [] = refl
-⋙-eat∞-dist f g ⊥ = refl
-⋙-eat∞-dist f g (x ∷ xs) = ⋙′-eat∞-dist (S.step f x) g xs
-⋙′-eat∞-dist nothing g xs = refl
-⋙′-eat∞-dist {d₁ = zero} (just (y , f)) g xs = ⋙″-eat∞-dist f (S.step g y) xs
-⋙′-eat∞-dist {d₁ = suc d₁} (just f) g xs = ⋙-eat∞-dist f g (force xs)
-⋙″-eat∞-dist f nothing xs = refl
-⋙″-eat∞-dist {d = zero} f (just (z , g)) xs i = z ∷ λ where .force → ⋙-eat∞-dist f g (force xs) i
-⋙″-eat∞-dist {d = suc d} f (just g) xs = ⋙-eat∞-dist f g (force xs)
+⋙-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Y Z d₂)
+  → S.eat∞ (f S.⋙ g) ≡ S.eat∞ g ∘ S.eat∞ f
+⋙′-eat∞-dist : ∀ (s : S.Step X Y d₁) (g : S.IST Y Z d₂)
+  → S.eatₛ∞ (s S.⋙′ g) ≡ S.eat∞ g ∘ S.eatₛ∞ s
+⋙″-eat∞-dist : ∀ (f : S.IST X Y 0) (s : S.Step Y Z d)
+  → S.eatₛ∞ (f S.⋙″ s) ≡ S.eatₛ∞ s ∘ (λ xs → delay (S.eat∞ f (force xs)))
+⋙-eat∞-dist f g i [] = []
+⋙-eat∞-dist f g i ⊥ = ⊥
+⋙-eat∞-dist f g i (x ∷ xs) = ⋙′-eat∞-dist (S.step f x) g i xs
+⋙′-eat∞-dist nothing g i xs = ⊥
+⋙′-eat∞-dist {d₁ = zero} (just (y , f)) g = ⋙″-eat∞-dist f (S.step g y)
+⋙′-eat∞-dist {d₁ = suc d₁} (just f) g i xs = ⋙-eat∞-dist f g i (force xs)
+⋙″-eat∞-dist f nothing i xs = ⊥
+⋙″-eat∞-dist {d = zero} f (just (z , g)) i xs = z ∷ λ where .force → ⋙-eat∞-dist f g i (force xs)
+⋙″-eat∞-dist {d = suc d} f (just g) i xs = ⋙-eat∞-dist f g i (force xs)
 
--- ⊗′-eat∞-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
---   → S.eat∞ (f S.⊗′ g) xzs ≈ (S.eat∞ f C.⊗ S.eat∞ g) xzs
--- ⊗ₛ′-eatₛ∞-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
---   → S.eatₛ∞ (s S.⊗ₛ′ t) xzs ≈ zip (S.eatₛ∞ s (delay (unzipₗ (force xzs)))) (S.eatₛ∞ t (delay (unzipᵣ (force xzs))))
--- ⊗′-eat∞-dist f g [] = []
--- ⊗′-eat∞-dist f g ⊥ = ⊥
--- ⊗′-eat∞-dist f g ((x , z) ∷ xzs) = ⊗ₛ′-eatₛ∞-dist (S.step f x) (S.step g z) xzs
--- ⊗ₛ′-eatₛ∞-dist S.⊥ _ xzs = ⊥
--- ⊗ₛ′-eatₛ∞-dist (S.next _) S.⊥ xzs = ≈-sym zip-⊥ᵣ
--- ⊗ₛ′-eatₛ∞-dist (S.yield _ _) S.⊥ xzs = ⊥
--- ⊗ₛ′-eatₛ∞-dist (S.next f) (S.next g) xzs = ⊗′-eat∞-dist f g (force xzs)
--- ⊗ₛ′-eatₛ∞-dist (S.yield y f) (S.yield w g) xzs = (y , w) ∷ λ where .force → ⊗′-eat∞-dist f g (force xzs)
+-- -- ⊗′-eat∞-dist : ∀ (f : S.IST X Y d) (g : S.IST Z W d) xzs
+-- --   → S.eat∞ (f S.⊗′ g) xzs ≈ (S.eat∞ f C.⊗ S.eat∞ g) xzs
+-- -- ⊗ₛ′-eatₛ∞-dist : ∀ (s : S.Step X Y d) (t : S.Step Z W d) xzs
+-- --   → S.eatₛ∞ (s S.⊗ₛ′ t) xzs ≈ zip (S.eatₛ∞ s (delay (unzipₗ (force xzs)))) (S.eatₛ∞ t (delay (unzipᵣ (force xzs))))
+-- -- ⊗′-eat∞-dist f g [] = []
+-- -- ⊗′-eat∞-dist f g ⊥ = ⊥
+-- -- ⊗′-eat∞-dist f g ((x , z) ∷ xzs) = ⊗ₛ′-eatₛ∞-dist (S.step f x) (S.step g z) xzs
+-- -- ⊗ₛ′-eatₛ∞-dist S.⊥ _ xzs = ⊥
+-- -- ⊗ₛ′-eatₛ∞-dist (S.next _) S.⊥ xzs = ≈-sym zip-⊥ᵣ
+-- -- ⊗ₛ′-eatₛ∞-dist (S.yield _ _) S.⊥ xzs = ⊥
+-- -- ⊗ₛ′-eatₛ∞-dist (S.next f) (S.next g) xzs = ⊗′-eat∞-dist f g (force xzs)
+-- -- ⊗ₛ′-eatₛ∞-dist (S.yield y f) (S.yield w g) xzs = (y , w) ∷ λ where .force → ⊗′-eat∞-dist f g (force xzs)
 
-⊗-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
-  → S.eat∞ (f S.⊗ g) xzs ≡ (S.eat∞ f C.⊗ S.eat∞ g) xzs
-⊗-eat∞-dist f g xzs = {!   !}
--- ⊗-eat∞-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
---   begin
---     S.eat∞ (f S.⊗ g) xzs
---   ≈⟨ ⊗′-eat∞-dist _ _ xzs ⟩
---     (S.eat∞ (S.cast _ (S.laterN (d₂ ∸ d₁) f)) C.⊗ S.eat∞ (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
---   ≈⟨ {!   !} ⟩
---     (S.eat∞ f C.⊗ S.eat∞ g) xzs
---   ∎
---   where open ≈-Reasoning
+-- ⊗-eat∞-dist : ∀ (f : S.IST X Y d₁) (g : S.IST Z W d₂) xzs
+--   → S.eat∞ (f S.⊗ g) xzs ≡ (S.eat∞ f C.⊗ S.eat∞ g) xzs
+-- ⊗-eat∞-dist f g xzs = {!   !}
+-- -- ⊗-eat∞-dist {d₁ = d₁} {d₂ = d₂} f g xzs =
+-- --   begin
+-- --     S.eat∞ (f S.⊗ g) xzs
+-- --   ≈⟨ ⊗′-eat∞-dist _ _ xzs ⟩
+-- --     (S.eat∞ (S.cast _ (S.laterN (d₂ ∸ d₁) f)) C.⊗ S.eat∞ (S.cast _ (S.laterN (d₁ ∸ d₂) g))) xzs
+-- --   ≈⟨ {!   !} ⟩
+-- --     (S.eat∞ f C.⊗ S.eat∞ g) xzs
+-- --   ∎
+-- --   where open ≈-Reasoning
 
 S≡C-⋙ : {f : S.IST X Y d₁} {f' : C.ST X Y} {g : S.IST Y Z d₂} {g' : C.ST Y Z}
-  → (∀ xs → S.eat∞ f xs ≡ f' xs)
-  → (∀ xs → S.eat∞ g xs ≡ g' xs)
-  → ∀ xs → S.eat∞ (f S.⋙ g) xs ≡ g' (f' xs)
-S≡C-⋙ {f = f} {f'} {g} {g'} p q xs =
-  S.eat∞ (f S.⋙ g) xs    ≡⟨ ⋙-eat∞-dist f g xs ⟩
-  S.eat∞ g (S.eat∞ f xs)  ≡⟨ congS (S.eat∞ g) (p xs) ⟩
-  S.eat∞ g (f' xs)        ≡⟨ q (f' xs) ⟩
-  g' (f' xs)              ∎
+  → S.eat∞ f ≡ f'
+  → S.eat∞ g ≡ g'
+  → S.eat∞ (f S.⋙ g) ≡ g' ∘ f'
+S≡C-⋙ {f = f} {f'} {g} {g'} p q =
+  S.eat∞ (f S.⋙ g)    ≡⟨ ⋙-eat∞-dist f g ⟩
+  S.eat∞ g ∘ S.eat∞ f  ≡⟨ cong₂ (λ f g → f ∘ g) q p ⟩
+  g' ∘ f'              ∎
   where open ≡-Reasoning
 
 S≡C-⊗ : {f : S.IST X Y d₁} {f' : C.ST X Y} {g : S.IST Z W d₂} {g' : C.ST Z W}
-  → (∀ xs → S.eat∞ f xs ≡ f' xs)
-  → (∀ xs → S.eat∞ g xs ≡ g' xs)
-  → ∀ xzs → S.eat∞ (f S.⊗ g) xzs ≡ (f' C.⊗ g') xzs
-S≡C-⊗ {f = f} {f'} {g} {g'} p q xzs =
-  S.eat∞ (f S.⊗ g) xzs         ≡⟨ ⊗-eat∞-dist f g xzs ⟩
-  (S.eat∞ f C.⊗ S.eat∞ g) xzs  ≡⟨ cong₂ zip (p (unzipₗ xzs)) (q (unzipᵣ xzs)) ⟩
-  (f' C.⊗ g') xzs              ∎
-  where open ≡-Reasoning
+  → S.eat∞ f ≡ f'
+  → S.eat∞ g ≡ g'
+  → S.eat∞ (f S.⊗ g) ≡ (f' C.⊗ g')
+S≡C-⊗ {f = f} {f'} {g} {g'} p q = {!   !}
+--   S.eat∞ (f S.⊗ g) xzs         ≡⟨ ⊗-eat∞-dist f g xzs ⟩
+--   (S.eat∞ f C.⊗ S.eat∞ g) xzs  ≡⟨ cong₂ zip (p (unzipₗ xzs)) (q (unzipᵣ xzs)) ⟩
+--   (f' C.⊗ g') xzs              ∎
+--   where open ≡-Reasoning
 
-S≡C-F : ∀ (e : E X Y) xs → S.eat∞ S.F⟦ e ⟧ xs ≡ C.F⟦ e ⟧ xs
+S≡C-F : ∀ (e : E X Y) → S.eat∞ S.F⟦ e ⟧ ≡ C.F⟦ e ⟧
 S≡C-F (`map-fold a f g) = S≡C-F-map-fold a f g
 S≡C-F (`delay x) = S≡C-shift x
 S≡C-F (`hasten x) = S≡C-unshift x
 S≡C-F (e `⋙ e') = S≡C-⋙ (S≡C-F e) (S≡C-F e')
 S≡C-F (e `⊗ e') = S≡C-⊗ (S≡C-F e) (S≡C-F e')
 
-S≡C-B : ∀ (e : E X Y) xs → S.eat∞ S.B⟦ e ⟧ xs ≡ C.B⟦ e ⟧ xs
-S≡C-B e xs =
-  S.eat∞ S.B⟦ e ⟧ xs       ≡⟨ congP (λ _ f → S.eat∞ f xs) (symP (S.F∘I≡B e)) ⟩
-  S.eat∞ S.F⟦ I⟦ e ⟧ ⟧ xs  ≡⟨ S≡C-F I⟦ e ⟧ xs ⟩
-  C.F⟦ I⟦ e ⟧ ⟧ xs         ≡⟨ C.F∘I≡B e ≡$ xs ⟩
-  C.B⟦ e ⟧ xs              ∎
+S≡C-B : ∀ (e : E X Y) → S.eat∞ S.B⟦ e ⟧ ≡ C.B⟦ e ⟧
+S≡C-B e =
+  S.eat∞ S.B⟦ e ⟧       ≡⟨ congP (λ _ → S.eat∞) (symP (S.F∘I≡B e)) ⟩
+  S.eat∞ S.F⟦ I⟦ e ⟧ ⟧  ≡⟨ S≡C-F I⟦ e ⟧ ⟩
+  C.F⟦ I⟦ e ⟧ ⟧         ≡⟨ C.F∘I≡B e ⟩
+  C.B⟦ e ⟧              ∎
   where open ≡-Reasoning
 
---------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
 
--- fail : S.IST X Y d
--- S.step fail _ = S.⊥
+-- -- fail : S.IST X Y d
+-- -- S.step fail _ = S.⊥
 
--- counterexample :
---   S.eat (fail {ℕ} {ℕ} {0} S.⊗ S.later S.id) ((0 , 0) ∷ []) ≢
---   (S.eat (fail {ℕ} {ℕ} {0}) L.⊗ S.eat (S.later S.id)) ((0 , 0) ∷ [])
--- counterexample ()
+-- -- counterexample :
+-- --   S.eat (fail {ℕ} {ℕ} {0} S.⊗ S.later S.id) ((0 , 0) ∷ []) ≢
+-- --   (S.eat (fail {ℕ} {ℕ} {0}) L.⊗ S.eat (S.later S.id)) ((0 , 0) ∷ [])
+-- -- counterexample ()
