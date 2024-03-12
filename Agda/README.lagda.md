@@ -38,7 +38,7 @@ private
 
 ## What are IISTs?
 
-An IIST is a kind of "invertible" list/stream processor. It produces more output more input is provided, and has an inverse processor that can recover more elements of the original input as more outputs are given.
+An IIST is a kind of "invertible" list/stream processor. It produces more output as more input is provided, and has an inverse processor that can recover more elements of the original input as more outputs are given.
 
 ### Definitions of IISTs
 
@@ -142,10 +142,15 @@ Eq : Set → Set
 Eq A = IsDecEquivalence {A = A} _≡_ -- Discrete
 
 data E : Set → Set → Set₁ where
+  -- map + fold.
   `map-fold : A → (A → X ⇌ Y) → (A → X → A) → E X Y
+  -- delay the output by one step. The argument is the initial value.
   `delay : {{_ : Eq X}} → X → E X X
+  -- the inverse of `delay`.
   `hasten : {{_ : Eq X}} → X → E X X
+  -- sequential composition.
   _`⋙_ : E X Y → E Y Z → E X Z
+  -- parallel composition.
   _`⊗_ : E X Y → E Z W → E (X × Z) (Y × W)
 ```
 `F⟦-⟧` and `B⟦-⟧` are forward and backward semantics of `E` terms, respectively.
