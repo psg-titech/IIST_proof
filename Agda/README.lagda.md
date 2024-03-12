@@ -1,9 +1,9 @@
 # Formalization of IISTs in Agda
 
-This directory contains a mechanized formalization of Invertible Incremental Sequence Transformations (IISTs) due to Shirai et al..
+This directory contains a mechanized formalization of Invertible Incremental Sequence Transformations (IISTs) by Shirai et al.
 <https://jssst.or.jp/files/user/taikai/2023/papers/15-R-S.pdf> (in Japanese)
 
-We are trying to formalize IISTs in the following three ways:
+We are trying to formalize IISTs in three ways:
 - IISTs as partial functions on lists
 - IISTs as partial functions on colists
 - IISTs as mealy-ish machines
@@ -14,8 +14,6 @@ We are trying to formalize IISTs in the following three ways:
 - agda-stdlib 2.0
 
 ```agda
-{-# OPTIONS --guardedness #-}
-
 module README where
 
 import Level
@@ -40,18 +38,18 @@ private
 
 ## What are IISTs?
 
-An IIST is a kind of "invertible" list/stream processor. It emits more output as you feed more input, and has an inverse processor that can recover more elements of the original input as you give more outputs.
+An IIST is a kind of "invertible" list/stream processor. It produces more output more input is provided, and has an inverse processor that can recover more elements of the original input as more outputs are given.
 
 ### Definitions of IISTs
 
-Here are formal definitions of IIST and related concepts for finite inputs.
+The following are formal definitions of IIST and related concepts for finite inputs.
 
-A *Sequence Transformation*(ST) is a partial function on lists.
+A *Sequence Transformation* (ST) is a partial function on lists.
 ```agda
 ST : Set → Set → Set
 ST X Y = List X → Maybe (List Y)
 ```
-An ST `st` is an *Incremental* ST(IST), if `st` outputs `ys` for some `xs`, `st` outputs some prefix of `ys` for any prefix of `xs`.
+An ST `st` is an *Incremental* ST (IST) if it is prefix-preserving. That is, if `st` produces an output `ys` for some input `xs`, any prefix of `st` will produce a prefix of `ys`.
 ```agda
 infix 4 _≺_
 
@@ -66,7 +64,7 @@ IsIncremental st = ∀ {xs' xs ys}
   → st xs ≡ just ys
   → ∃[ ys' ] (ys' ≺ ys) × (st xs' ≡ just ys')
 ```
-An ST `st` is an *d-Incremental* ST (d-IST), if it is incremental and the length of the output is always `d` less than the length of the input.
+An ST `st` is an *d-Incremental* ST (d-IST), if it is incremental and the length of output is always `d` less than the length of input.
 ```agda
 HasDelay : ℕ → ST X Y → Set
 HasDelay d st = ∀ xs {ys}
@@ -78,9 +76,9 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
     isIncremental : IsIncremental st
     hasDelay : HasDelay d st
 ```
-An ST `st` is an *Inverse* IST (IIST) of another ST `st'`, if `st'` outputs `ys` for some `xs`, `st` recovers a prefix of `xs` from `ys`.
-Especially, `st` is an *d-Inverse* IST (d-IIST) of `st'`, if `st` can always recover the original input of `st'` but the last `d` elements.
-So, the notion of inverse here is a relaxed version of the usual inverse.
+An ST `st` is an *Inverse* IST (IIST) of another ST `st'`, when `st'` outputs `ys` for some `xs`, `st` recovers a prefix of `xs` from `ys`.
+Specifically, `st` is a *d-Inverse* IST (d-IIST) of `st'`, if `st` can always recover the original input of `st'` except for the last `d` elements.
+The notion of inverse here is a relaxed version of the usual inverse.
 ```agda
 _IsIISTOf_ : ST X Y → ST Y X → Set
 st' IsIISTOf st = ∀ {xs ys}
@@ -125,7 +123,7 @@ _ = refl
 
 ### A Langauge for IISTs
 
-It tunred out that any (d, d')-IIST can be expressed as a term of the `E` datatype defined below and that is what we are trying to mechanically prove it.
+It turned out that any (d, d')-IIST can be expressed as a term of the `E` datatype defined below. This is one of the properties we are trying to mechanically prove.
 ```agda
 -- Invertible partial function
 record _⇌_ (A B : Set) : Set where
@@ -151,7 +149,7 @@ data E : Set → Set → Set₁ where
   _`⊗_ : E X Y → E Z W → E (X × Z) (Y × W)
 ```
 `F⟦-⟧` and `B⟦-⟧` are forward and backward semantics of `E` terms, respectively.
-```
+```agda
 shift : X → List X → List X
 shift _ [] = []
 shift x (y ∷ xs) = x ∷ shift y xs
@@ -193,7 +191,7 @@ B⟦ `hasten x ⟧ = just ∘ shift x
 B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ >=> B⟦ e ⟧
 B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊗ B⟦ e' ⟧
 ```
-`F⟦ e ⟧` and `B⟦ e ⟧` are mechanically proved to be an (DF⟦ e ⟧, DB⟦ e ⟧)-IIST and an (DB⟦ e ⟧, DF⟦ e ⟧)-IIST respectively for any `E` term `e` where the inverse of `F⟦ e ⟧` is `B⟦ e ⟧` and vice versa.
+`F⟦ e ⟧` and `B⟦ e ⟧` are mechanically proved to be an (`DF⟦ e ⟧`, `DB⟦ e ⟧`)-IIST and an (`DB⟦ e ⟧`, `DF⟦ e ⟧`)-IIST, respectively, for any `E` term `e` where the inverse of `F⟦ e ⟧` is `B⟦ e ⟧` and vice versa.
 ```agda
 D⟦_⟧ : E X Y → ℕ × ℕ
 D⟦ `map-fold a f g ⟧ = 0 , 0
