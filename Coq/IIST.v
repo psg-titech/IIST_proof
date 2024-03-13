@@ -2,7 +2,27 @@ Require Import List.
 Import ListNotations.
 Require Import Lia.
 Require Import Coq.Classes.EquivDec.
-(* 最初は試しに有限長のリストで処理をするが、無限長にしたいならCoInductiveなList-likeな型を定義しないといけない *)
+
+
+Section app_length_destruct.
+
+Context {A : Type}.
+
+Theorem app_length_destruct :
+ forall (l : list A) n,
+  n <= length l
+  -> exists l1 l2, l = l1 ++ l2 /\ length l1 = n.
+intro l; induction l as [ | a l Hl]; simpl; intros n Hlen.
++ exists [], []; simpl; split; auto; lia.
++ destruct n.
+  - exists [], (a :: l); simpl; split; now auto.
+  - destruct (Hl n) as [l1 [l2 [Heq Hl1]]].
+    * lia.
+    * exists (a :: l1), l2; subst; simpl; split; now auto.
+Qed.
+
+
+End app_length_destruct.
 
 Section slide.
 
@@ -48,6 +68,11 @@ intros l1 l2 H; induction H; simpl in *.
 Qed.
 
 Theorem app_prefix :
+ forall l1 l2, prefix l1 (l1 ++ l2).
+induction l1; intros; simpl in *; subst; try constructor; now auto.
+Qed.
+
+Theorem app_prefix' :
  forall l1 l2 l3, l1 ++ l3 = l2 -> prefix l1 l2.
 induction l1; intros; simpl in *; subst; try constructor; now eauto.
 Qed.
@@ -62,7 +87,26 @@ inversion H0; subst.
 constructor; now eauto.
 Qed.
 
-(* ちょっと特殊ケース過ぎるか？ *)
+
+Theorem prefix_nil_r :
+ forall l,
+  prefix l [] -> l = [].
+intros l H; now inversion H.
+Qed.
+
+
+Theorem prefix_inv_head :
+ forall l l1 l2,
+  prefix (l ++ l1) (l ++ l2)
+  -> prefix l1 l2.
+intros l l1 l2 H.
+induction l; simpl in H; auto.
+inversion H; subst.
+now auto.
+Qed.
+
+
+
 Theorem slide_prefix :
  forall a al,
   prefix (slide a al) (a :: al).
@@ -74,6 +118,24 @@ Theorem prefix_slide :
   prefix al1 al2 -> prefix (slide a al1) (slide a al2).
 intros a al1 al2 H; revert a; induction H; intros; simpl in *; constructor; now auto.
 Qed.
+
+
+Theorem prefix_length_det :
+ forall al1 al2 al3,
+  prefix al1 al3 ->
+   prefix al2 al3 ->
+   length al1 = length al2 ->
+   al1 = al2.
+intro al1.
+induction al1 as [ | a al1 IHal]; intros al2 al3 H1 H2 Hl.
++ simpl in Hl.
+  destruct al2; [now auto | simpl in Hl; now inversion Hl].
++ simpl in Hl.
+  inversion H1; subst.
+  inversion H2; subst; simpl in Hl; inversion Hl; subst.
+  erewrite IHal; eauto.
+Qed.
+
 
 
 End prefix.
@@ -125,6 +187,46 @@ Qed.
 
 
 End prefix2.
+
+
+Section combine.
+
+Theorem combine_app_length_ge :
+ forall A B (l1 l2 : list A) (l3 : list B),
+  length l1 >= length l3 -> combine (l1 ++ l2) l3 = combine l1 l3.
+intros A B l1; induction l1 as [ | a l1 IHl1]; intros l2 l3 Hlen; destruct l3; simpl; auto.
++ destruct l2; now auto.
++ simpl in Hlen; lia.
++ simpl in Hlen.
+  rewrite IHl1; auto.
+  lia.
+Qed.
+
+
+Theorem combine_app_length_le :
+ forall A B (l1 : list A) (l2 l3 : list B),
+  length l1 <= length l2 -> combine l1 (l2 ++ l3) = combine l1 l2.
+intros A B l1; induction l1 as [ | a l1 IHl1]; intros l2 l3 Hlen; destruct l2; simpl; auto.
++ destruct l3; auto.
+  simpl in Hlen; lia.
++ simpl in Hlen.
+  rewrite IHl1; auto.
+  lia.
+Qed.
+
+
+
+Theorem combine_app_app :
+ forall A B (l1 l2 : list A) (l3 l4 : list B),
+  length l1 = length l3
+  -> combine (l1 ++ l2) (l3 ++ l4) = combine l1 l3 ++ combine l2 l4.
+intros A B l1; induction l1 as [ | a l1 IHl1]; intros l2 l3 l4 Hlen; destruct l3; simpl in *; auto; inversion Hlen; subst.
+rewrite IHl1; now auto.
+Qed.
+
+
+End combine.
+
 
 
 Section option_bind.
@@ -313,6 +415,26 @@ match xs with
 | x :: xs' =>
    option_bind ((forward _ _ (f a)) x) (fun y => option_bind (fwd_mapfold f g (g a x) xs') (fun ys => Some (cons y ys)))
 end.
+
+
+
+Lemma fwd_mapfold_app :
+ forall A X Y (f : A -> X <~~> Y) g a xs1 xs2,
+  fwd_mapfold f g a (xs1 ++ xs2) =
+    option_bind (fwd_mapfold f g a xs1)
+     (fun ys1 =>
+       option_bind (fwd_mapfold f g (fold_left g xs1 a) xs2)
+        (fun ys2 => Some (ys1 ++ ys2))).
+intros A X Y f g a xs1 xs2.
+revert a.
+induction xs1 as [ | x xs1 Hxs1]; intros a; simpl.
++ destruct (fwd_mapfold f g a xs2); simpl; now auto.
++ destruct (forward X Y (f a) x) as [y | ]; simpl; auto.
+  rewrite Hxs1.
+  destruct (fwd_mapfold f g (g a x) xs1) as [ys1 | ]; simpl; auto.
+  destruct (fwd_mapfold f g (fold_left g xs1 (g a x)) xs2) as [ys2 | ]; simpl; now auto.
+Qed.
+
 
 Fixpoint fwd {X Y : Type} (e : IIST X Y) : list X -> option (list Y) :=
 match e with
@@ -687,7 +809,11 @@ Section Math_IIST.
 
 Definition MST X Y := list X -> option (list Y).
 
+Definition MIST_nil {X Y} (mst : MST X Y) :=
+ ~(mst [] = None).
+
 Definition MIST {X Y} (mst : MST X Y) :=
+ MIST_nil mst /\
  forall xs xs' ys,
   prefix xs' xs
   -> mst xs = Some ys
@@ -731,6 +857,95 @@ Qed.
 
 
 
+Lemma d_MST_nil :
+ forall X Y (mst : MST X Y) d xs ys,
+  d_MST mst d
+  -> length xs <= d
+  -> mst xs = Some ys
+  -> ys = nil.
+intros X Y mst d xs ys Hd Hlen Hmst.
+apply length_zero_iff_nil.
+apply Hd in Hmst.
+lia.
+Qed.
+
+
+
+Lemma MIST_None_ind :
+ forall X Y (mst : MST X Y) xs xs',
+  MIST mst
+  -> mst xs = None
+  -> mst (xs ++ xs') = None.
+intros X Y mst xs xs' Hist H.
+destruct Hist as [_ Hist].
+destruct (mst (xs ++ xs')) as [ys | ] eqn: Hys; auto.
+destruct Hist with (xs ++ xs') xs ys as [ys' [Hys' _]]; auto.
++ now apply app_prefix.
++ rewrite H in Hys'; now inversion Hys'.
+Qed.
+
+
+Lemma d_MIST_length_case :
+ forall X Y (mst : MST X Y) d xs ys x,
+  MIST mst
+  -> d_MST mst d
+  -> length xs >= d
+  -> mst xs = Some ys
+  -> mst (xs ++ [x]) = None
+  \/ exists y, mst (xs ++ [x]) = Some (ys ++ [y]).
+intros X Y mst d xs ys x Hist Hd Hlen Hsome.
+destruct (mst (xs ++ [x])) as [ys' | ] eqn: Hys'; auto.
+right.
+destruct Hist as [_ Hist].
+destruct Hist with (xs ++ [x]) xs ys' as [ys'' [Hys'' Hpre]]; auto.
++ now apply app_prefix.
++ destruct (prefix_app _ _ Hpre) as [y0 Hy0].
+  subst.
+  rewrite Hys'' in Hsome; inversion Hsome; subst.
+  assert (length y0 = 1) as Hy0l.
+  {
+    unfold d_MST in Hd.
+    assert (Hlys := Hd _ _ Hys'').
+    assert (Hlys' := Hd _ _ Hys').
+    repeat rewrite app_length in Hlys'; simpl in Hlys'.
+    lia.
+  }
+  destruct y0 as [ | y]; simpl in Hy0l; inversion Hy0l.
+  destruct y0 as [ | y']; simpl in H0; inversion H0.
+  exists y; now auto.
+Qed.
+
+
+Lemma d_MIST_oneapp :
+ forall X Y (mst : MST X Y) d xs ys x,
+  MIST mst
+  -> d_MST mst d
+  -> length xs >= d
+  -> mst (xs ++ [x]) = Some ys
+  -> exists y ys', ys = ys' ++ [y] /\ mst xs = Some ys'.
+intros X Y mst d xs ys x Hist Hd Hlen Hxs.
+destruct Hist as [_ Hist].
+assert (H := app_prefix xs [x]).
+induction ys as [ | y ys _] using list_inv_ind.
++ apply Hd in Hxs.
+  rewrite app_length in Hxs; simpl in Hxs.
+  lia.
++ exists y, ys.
+  split; auto.
+  assert (Hl := Hd _ _ Hxs).
+  repeat rewrite app_length in Hl; simpl in Hl.
+  apply Hist with (xs' := xs) in Hxs.
+  - destruct Hxs as [ys' [H' Hpre]].
+    rewrite H'.
+    rewrite (prefix_length_det _ ys _ Hpre); auto.
+    * now apply app_prefix.
+    * apply Hd in H'.
+      lia.
+  - now apply app_prefix.
+Qed.
+
+
+
 End Math_IIST.
 
 
@@ -738,11 +953,34 @@ End Math_IIST.
 
 Section IIST_Math.
 
+Lemma IIST_fwd_MIST_nil :
+ forall X Y (e : IIST X Y),
+  fwd e [] = Some [].
+induction e; eauto; simpl.
++ rewrite IHe1; simpl; now auto.
++ rewrite IHe1; simpl.
+  rewrite IHe2; simpl; now auto.
+Qed.
+
+Lemma IIST_bwd_MIST_nil :
+ forall X Y (e : IIST X Y),
+  bwd e [] = Some [].
+induction e; eauto; simpl.
++ rewrite IHe2; simpl; now auto.
++ rewrite IHe1; simpl.
+  rewrite IHe2; simpl; now auto.
+Qed.
+
+
 Lemma IIST_MIST :
  forall X Y (e : IIST X Y),
   MIST (fwd e).
 unfold MIST.
-intros; eapply fwd_prefix; eauto.
+intros; split.
++ intro H.
+  rewrite IIST_fwd_MIST_nil with X Y e in H.
+  now inversion H.
++ eapply fwd_prefix; now eauto.
 Qed.
 
 Lemma IIST_d_MST :
@@ -770,7 +1008,11 @@ Lemma IIST_bwd_MIST :
  forall X Y (e : IIST X Y),
   MIST (bwd e).
 unfold MIST.
-intros; eapply bwd_prefix; eauto.
+intros; split.
++ intro H.
+  rewrite IIST_bwd_MIST_nil with X Y e in H.
+  now inversion H.
++ eapply bwd_prefix; now eauto.
 Qed.
 
 Lemma IIST_bwd_d_MST :
@@ -781,7 +1023,22 @@ intros; apply bwd_length_delay; now auto.
 Qed.
 
 
+Lemma IIST_fwd_None_app :
+ forall X Y (e : IIST X Y) xs xs',
+  fwd e xs = None -> fwd e (xs ++ xs') = None.
+intros X Y e xs xs'.
+apply MIST_None_ind.
+now apply IIST_MIST.
+Qed.
 
+
+(** First theorem:
+    for any FIRSD e,
+     a pair of its forward-semantics and backward-semantics is
+     a (d, d')-FIRST pair,
+     and a pair of backward-semantics and forward-semantics is
+     a (d', d)-FIRST pair.
+**)
 Theorem IIST_is_d_d'_MIIST_pair :
  forall X Y (e : IIST X Y),
   d_d'_MIIST_pair (fwd e) (bwd e) (delay_fwd e) (delay_bwd e).
@@ -853,32 +1110,80 @@ Instance option_Some_None_eqdec {A} : @EqOneDec (option (maybe A)) (Some Nothing
 
 
 
+Fixpoint nothing_list {A} len : list (maybe A) :=
+match len with
+| O => nil
+| S len => Nothing :: nothing_list len
+end.
+
+
+Lemma nothing_list_len :
+ forall A n, length (@nothing_list A n) = n.
+induction n; intros; simpl in *; auto.
+Qed.
+
+Lemma nothing_list_app :
+ forall A m n, @nothing_list A (m + n) = nothing_list m ++ nothing_list n.
+intros A m n; induction m as [ | m IHm]; simpl; try rewrite IHm; now auto.
+Qed.
+
+
+Lemma combine_nothing_list_l :
+ forall A B n (xs : list (maybe A)) (ys : list B),
+  length ys <= n
+  -> combine (nothing_list n ++ xs) ys = combine (nothing_list (length ys)) ys.
+intros A B n xs ys Hlen.
+rewrite combine_app_length_ge.
++ assert (n = length ys + (n - length ys)) as Hn by lia.
+  rewrite Hn.
+  rewrite (nothing_list_app _ (length ys) (n - length ys)).
+  rewrite combine_app_length_ge; auto.
+  rewrite nothing_list_len; now auto.
++ rewrite nothing_list_len; lia.
+Qed.
+
+Lemma combine_nothing_list_r :
+ forall A B n (xs : list A) (ys : list (maybe B)),
+  length xs <= n
+  -> combine xs (nothing_list n ++ ys) = combine xs (nothing_list (length xs)).
+intros A B n xs ys Hlen.
+rewrite combine_app_length_le.
++ assert (n = length xs + (n - length xs)) as Hn by lia.
+  rewrite Hn.
+  rewrite (nothing_list_app _ (length xs) (n - length xs)).
+  rewrite combine_app_length_le; auto.
+  rewrite nothing_list_len; now auto.
++ rewrite nothing_list_len; lia.
+Qed.
+
 
 Definition IIST_f1 {X Y}
                    (mst : MST X Y) d (xs : list X) x : option (maybe Y * X) :=
- if Compare_dec.le_gt_dec d (length xs) then
-   option_bind (mst (xs ++ [x]))
-    (fun ys =>
+ option_bind (mst (xs ++ [x]))
+  (fun ys =>
+    if Compare_dec.le_gt_dec d (length xs) then
       option_bind (last ys)
-       (fun y => Some (Just y, x))) (* このペアのせいでyのdecidable equalityがいる？ *)
- else Some (Nothing, x).
+       (fun y => Some (Just y, x)) (* このペアのせいでyのdecidable equalityがいる？ *)
+    else Some (Nothing, x)).
 
 
 Definition IIST_f1' {X Y} `{EqDec Y eq} (* f1と違いこちらはequalityの判定が必要 *)
-                    (mst : MST X Y) d (xs : list X) my_x : option X :=
- if Compare_dec.le_gt_dec d (length xs) then
-   match my_x with
-   | (Nothing, _) => None (* 十分な長さがあるので値があるはず *)
-   | (Just y, x) =>
-       option_bind (mst (xs ++ [x])) (* 逆行に失敗したときにNoneを返さなければならないので計算が必要 *)
-        (fun ys =>
-          option_bind (last ys)
-           (fun y' => if equiv_dec y y' then Some x else None))
-   end
- else match my_x with
-      | (Nothing, x) => Some x
-      | (Just _, _) => None
-      end.
+                    (mst : MST X Y) d (xs : list X) (my_x : maybe Y * X) : option X :=
+ let (my, x) := my_x in
+ option_bind (mst (xs ++ [x])) (* 逆行に失敗したときにNoneを返すのでmyを使わずこちらで対処 *)
+  (fun ys =>
+    if Compare_dec.le_gt_dec d (length xs) then
+      match my with
+      | Just y =>
+         option_bind (last ys)
+          (fun y' => if equiv_dec y y' then Some x else None)
+      | Nothing => None
+      end
+    else
+      match my with  (* 短いのでyはNothingのはず *)
+      | Just _ => None
+      | Nothing => Some x
+      end).
 
 
 Program Definition IIST_pinv_f1 {X Y} `{E : EqDec Y eq}
@@ -888,53 +1193,32 @@ Program Definition IIST_pinv_f1 {X Y} `{E : EqDec Y eq}
 |}.
 Next Obligation.
 unfold IIST_f1, IIST_f1', equiv_dec.
-destruct (Compare_dec.le_gt_dec d (length xs)) as [Hlen | Hlen]; simpl.
-2: {
-  split; intro Hsome.
-  + inversion Hsome; now auto.
-  + destruct m; inversion Hsome.
-    now auto.
-}
-destruct m as [y | ].
-2: {
-  destruct (mst (xs ++ [a])); simpl.
-  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
-  + split; intro Hcon; now inversion Hcon.
-}
-destruct (mst (xs ++ [a])) as [ys | ] eqn: Hmst; simpl.
-2: {
-  split; intro Hcon.
-  + now inversion Hcon.
-  + destruct (mst (xs ++ [x])) as [ys | ] eqn: Hmst1; simpl in Hcon.
-    - destruct (last ys); simpl in Hcon; try now inversion Hcon.
-      destruct (E y y0); simpl in Hcon; inversion Hcon.
-      subst.
-      rewrite Hmst in Hmst1; now inversion Hmst1.
-    - now inversion Hcon.
-}
-assert (length ys > 0) as Hylen.
-{
-  unfold d_MST in Hd.
-  apply Hd in Hmst.
-  rewrite app_length in Hmst.
-  simpl in Hmst.
-  lia.
-}
-apply last_Some in Hylen.
-destruct Hylen as [y' Hlast].
-rewrite Hlast; simpl.
-split; intro Hxy.
-+ inversion Hxy; subst.
-  rewrite Hmst; simpl.
-  rewrite Hlast; simpl.
-  destruct (E y y) as [Hy | Hy]; auto.
-  elim Hy; now auto.
-+ destruct (mst (xs ++ [x])) as [ys' |] eqn: Hys'; simpl in Hxy; try now inversion Hxy.
-  destruct (last ys') as [y'' | ] eqn: Hy''; simpl in Hxy; try now inversion Hxy.
-  destruct (E y y'') as[e | e]; simpl in Hxy; inversion Hxy; unfold equiv in e; subst.
-  rewrite Hmst in Hys'; inversion Hys'; subst.
-  rewrite Hlast in Hy''; inversion Hy''.
-  now auto.
+split; intro Hsome.
++ destruct (mst (xs ++ [a])) as [ys | ] eqn: Hmst; simpl in Hsome; try now inversion Hsome.
+  destruct (Compare_dec.le_gt_dec d (length xs)) as [e | e]; simpl in *.
+  - destruct (last ys) as [y | ] eqn: Hlast; simpl in Hsome; inversion Hsome; subst.
+    rewrite Hmst; simpl; rewrite Hlast; simpl.
+    destruct (E y y) as [e' | e']; auto; elim e'; now auto.
+  - inversion Hsome; subst.
+    rewrite Hmst; simpl; now auto.
++ assert (x = a).
+  {
+    destruct (mst (xs ++ [x])) as [ys | ]; simpl in Hsome; try now inversion Hsome.
+    destruct (Compare_dec.le_gt_dec d (length xs)); simpl in Hsome.
+    + destruct m as [y | ]; try now inversion Hsome.
+      destruct (last ys) as [y' | ]; simpl in Hsome; try now inversion Hsome.
+      destruct (E y y') as [e | e]; simpl in Hsome; inversion Hsome; now auto.
+    + destruct m as [y | ]; now inversion Hsome.
+  }
+  subst.
+  destruct (mst (xs ++ [a])) as [ys | ]; simpl in *; try now inversion Hsome.
+  destruct (Compare_dec.le_gt_dec d (length xs)) as [e | e].
+  - destruct m; try now inversion Hsome.
+    destruct (last ys) as [y' | ]; try now inversion Hsome.
+    simpl in *.
+    destruct (E y y') as [e' | e']; simpl in Hsome; try now inversion Hsome.
+    unfold equiv in e'; subst; auto.
+  - destruct m; now inversion Hsome.
 Qed.
 
 
@@ -944,6 +1228,89 @@ Definition IIST_g1 {X} (xs : list X) x : list X := xs ++ [x].
 Definition IIST_e1 {X Y} `{E : EqDec Y eq}
                           (mst : MST X Y) d (Hd : d_MST mst d) : IIST X (maybe Y * X) :=
  IIST_mapfold [] (IIST_pinv_f1 mst d Hd) IIST_g1.
+
+
+
+Lemma fold_left_IIST_g1_app :
+ forall X (xs1 xs2: list X), fold_left IIST_g1 xs1 xs2 = xs2 ++ xs1.
+intros X xs1.
+induction xs1 as [ | x xs1 Hxs1]; intro xs2; simpl.
++ rewrite app_nil_r; now auto.
++ rewrite Hxs1.
+  unfold IIST_g1.
+  rewrite <- app_assoc.
+  simpl; now auto.
+Qed.
+
+
+Lemma IIST_e1_fwd_None :
+ forall X Y `{E : EqDec Y eq} (mst : MST X Y) d Hd (Hist : MIST mst) xs,
+  mst xs = None -> fwd (IIST_e1 mst d Hd) xs = None.
+intros X Y E E' mst d Hd Hist xs.
+unfold fwd; simpl.
+induction xs as [ | x xs Hxs] using list_inv_ind; intro H; simpl.
++ destruct Hist as [Hist _].
+  destruct Hist; now auto.
++ rewrite fwd_mapfold_app.
+  rewrite fold_left_IIST_g1_app; simpl.
+  unfold IIST_f1.
+  rewrite H; simpl.
+  destruct (fwd_mapfold (IIST_pinv_f1 mst d Hd) IIST_g1 [] xs); simpl; now auto.
+Qed.
+
+
+Lemma IIST_e1_fwd_Some :
+ forall X Y `{E : EqDec Y eq} (mst : MST X Y) d Hd (Hist : MIST mst) xs ys,
+  mst xs = Some ys ->
+   fwd (IIST_e1 mst d Hd) xs = Some (combine (nothing_list d ++ map Just ys) xs).
+intros X Y E E' mst d Hd Hist xs.
+unfold fwd; simpl.
+induction xs as [ | x xs Hxs] using list_inv_ind; simpl; intros ys H.
++ destruct (nothing_list d ++ map Just ys); simpl; now auto.
++ rewrite fwd_mapfold_app.
+  unfold fwd_mapfold at 2; simpl.
+  unfold IIST_f1; simpl.
+  rewrite fold_left_IIST_g1_app; simpl.
+  rewrite H; simpl.
+  destruct (Compare_dec.le_gt_dec d (length xs)) as [e | e]; simpl.
+  - destruct (d_MIST_oneapp _ _ mst d xs ys x) as [y [ys' [Heq Hx]]]; auto.
+    subst.
+    rewrite (Hxs _ Hx); simpl.
+    rewrite last_correct; simpl.
+    rewrite map_app.
+    rewrite app_assoc.
+    rewrite combine_app_app; simpl; auto.
+    rewrite app_length.
+    rewrite nothing_list_len.
+    rewrite map_length.
+    apply Hd in Hx.
+    lia.
+  - assert (ys = nil).
+    {
+      eapply d_MST_nil; eauto.
+      rewrite app_length; simpl.
+      lia.
+    }
+    subst; simpl.
+    assert (mst xs = Some nil).
+    {
+      unfold MIST in Hist.
+      destruct Hist as [_ Hist].
+      destruct (Hist (xs ++ [x]) xs nil) as [ys [Hxs' Hpre]]; auto.
+      + now apply app_prefix.
+      + apply prefix_nil_r in Hpre.
+        subst; now auto.
+    }
+    rewrite Hxs with (ys := nil); auto; simpl.
+    assert (length (xs ++ [x]) = length xs + 1) as Hll by (now rewrite app_length).
+    rewrite combine_nothing_list_l; try lia.
+    rewrite combine_nothing_list_l; try lia.
+    rewrite Hll.
+    rewrite nothing_list_app; simpl.
+    rewrite combine_app_app; simpl; auto.
+    now apply nothing_list_len.
+Qed.
+
 
 
 
@@ -982,34 +1349,182 @@ Definition IIST_e2 {X Y} d d' : IIST (maybe Y * X) (Y * maybe X):=
  IIST_parcomp (IIST_e2_1 d) (IIST_e2_2 d').
 
 
+Lemma IIST_e2_1_fwd_le :
+ forall X d d',
+  d' <= d
+  -> fwd (IIST_e2_1 d) (@nothing_list X d') = Some [].
+intros X d; induction d as [ | d Hd]; intros d' Hle; destruct d' as [ | d']; simpl.
++ now auto.
++ lia.
++ inversion Hle; subst.
+  apply Hd in H0; simpl in H0.
+  now auto.
++ apply Hd.
+  lia.
+Qed.
+
+Lemma IIST_e2_1_fwd_ge :
+ forall X d xs,
+  fwd (IIST_e2_1 d) (@nothing_list X d ++ map Just xs) = Some xs.
+intros X d; induction d as [ | d Hd]; intros xs; simpl.
++ induction xs as [ | x xs Hxs]; simpl; auto.
+  rewrite Hxs; simpl; now auto.
++ now auto.
+Qed.
+
+
+
+Fixpoint nth_nothing_slide {X} (n : nat) (xs : list (maybe X)) : list (maybe X) :=
+ match n with
+ | O => xs
+ | S n => slide Nothing (nth_nothing_slide n xs)
+ end.
+
+Lemma IIST_e2_2_fwd_nth_nothing :
+ forall X d (xs : list X),
+  fwd (IIST_e2_2 d) xs = Some (nth_nothing_slide d (map Just xs)).
+intros X d; induction d as [ | d Hd]; intro xs; simpl.
++ induction xs as [ | x xs Hxs]; simpl; auto.
+  rewrite Hxs; simpl.
+  now auto.
++ rewrite Hd.
+  simpl.
+  now auto.
+Qed.
+
+
+
+Lemma nth_nothing_slide_prefix :
+ forall X d (xs : list (maybe X)),
+  prefix (nth_nothing_slide d xs) (nothing_list d ++ xs).
+intros X d xs; induction d as [ | d Hd]; simpl.
++ now apply prefix_reflexive.
++ apply prefix_transitive with (l2 := Nothing :: (nth_nothing_slide d xs)).
+  - now apply slide_prefix.
+  - constructor.
+    now auto.
+Qed.
+
+
+Lemma nth_nothing_slide_length :
+ forall X d (xs : list (maybe X)),
+  length (nth_nothing_slide d xs) = length xs.
+intros X d xs; induction d as [ | d Hd]; simpl; auto.
+rewrite <- slide_length.
+now auto.
+Qed.
+
+
+Lemma IIST_e2_2_fwd :
+ forall X d (xs : list X),
+  exists mxs,
+   fwd (IIST_e2_2 d) xs = Some mxs
+   /\ prefix mxs (nothing_list d ++ map Just xs)
+   /\ length mxs = length xs.
+intros X d xs.
+exists (nth_nothing_slide d (map Just xs)).
+split; [ | split].
++ now apply IIST_e2_2_fwd_nth_nothing.
++ now apply nth_nothing_slide_prefix.
++ rewrite nth_nothing_slide_length.
+  now apply map_length.
+Qed.
+
+
+
+
+Lemma IIST_e2_fwd :
+ forall X Y (mst : MST X Y) d d' (Hd : d_MST mst d) (Hist : MIST mst) xs ys,
+  mst xs = Some ys ->
+   fwd (IIST_e2 d d') (combine (nothing_list d ++ map Just ys) xs)
+    = Some (combine ys (nothing_list d' ++ map Just xs)).
+intros X Y mst d d' Hd Hist xs ys H.
+destruct (IIST_e2_2_fwd _ d' xs) as [mxs [Hfwd_2 [Hpre_2 Hlen_2]]].
+destruct (Compare_dec.le_gt_dec (length xs) d).
++ rewrite combine_nothing_list_l; auto.
+  simpl.
+  rewrite combine_split.
+  - rewrite IIST_e2_1_fwd_le; auto; simpl.
+    assert (ys = nil).
+    {
+      apply length_zero_iff_nil.
+      apply Hd in H.
+      lia.
+    }
+    subst.
+    assert (@combine Y _ [] (nothing_list d' ++ map Just xs) = nil) as Hl.
+    {
+      destruct (nothing_list d' ++ map Just xs); simpl; now auto.
+    }
+    rewrite Hl.
+    rewrite Hfwd_2; simpl.
+    now auto.
+  - rewrite nothing_list_len; now auto.
++ assert (length (nothing_list d ++ map Just ys) = length xs) as Hlen.
+  {
+    rewrite app_length.
+    rewrite nothing_list_len.
+    rewrite map_length.
+    apply Hd in H.
+    lia.
+  }
+  simpl.
+  rewrite combine_split; auto.
+  rewrite IIST_e2_1_fwd_ge; simpl.
+  rewrite Hfwd_2; simpl.
+  destruct (app_length_destruct (nothing_list d' ++ map Just xs) (length xs)) as [mxs1 [mxs2 [Heq Hlen12]]].
+  - rewrite app_length.
+    rewrite map_length.
+    lia.
+  - rewrite Heq.
+    assert (prefix mxs1 (nothing_list d' ++ map Just xs)) as Hpre.
+    {
+      rewrite Heq.
+      now apply app_prefix.
+    }
+    assert (mxs = mxs1).
+    {
+      apply prefix_length_det with (nothing_list d' ++ map Just xs); auto.
+      lia.
+    }
+    subst.
+    rewrite combine_app_length_le; auto.
+    apply Hd in H.
+    lia.
+Qed.
+
+
+
 
 
 (* originalではf2/g2だったが、項の番号と合わせるためにf3に変更 *)
 Definition IIST_f3 {X Y} `{EqDec X eq}
-                   (inv : MST Y X) d' (ys : list Y) y_mx : option Y :=
- if Compare_dec.le_gt_dec d' (length ys) then
-   match y_mx with
-   | (_, Nothing) => None (* xとしてNoneを出すのはd'までのはず *)
-   | (y, Just x) =>
-       option_bind (inv (ys ++ [y])) (* 逆行に失敗したときにNoneを返さなければならないので計算が必要 *)
-        (fun xs =>
-          option_bind (last xs)
-           (fun x' => if equiv_dec x x' then Some y else None))
-   end
- else match y_mx with
-      | (y, Nothing) => Some y
-      | (_, Just _) => None (* ここはxは来ないはず *)
-      end.
+                   (inv : MST Y X) d' (ys : list Y) (y_mx : Y * maybe X) : option Y :=
+ let (y, mx) := y_mx in
+ option_bind (inv (ys ++ [y]))
+  (fun xs =>
+    if Compare_dec.le_gt_dec d' (length ys) then
+      match mx with
+      | Just x =>
+         option_bind (last xs)
+          (fun x' => if equiv_dec x x' then Some y else None)
+      | Nothing => None (* xにNothingが来るのはd'まで *)
+      end
+    else
+      match mx with
+      | Just _ => None
+      | Nothing => Some y
+      end).
 
 
 Definition IIST_f3' {X Y}
                     (inv : MST Y X) d' (ys : list Y) y : option (Y * maybe X) :=
- if Compare_dec.le_gt_dec d' (length ys) then
-   option_bind (inv (ys ++ [y]))
-    (fun xs =>
+ option_bind (inv (ys ++ [y]))
+  (fun xs =>
+    if Compare_dec.le_gt_dec d' (length ys) then
       option_bind (last xs)
-       (fun x => Some (y, Just x)))
- else Some (y, Nothing).
+       (fun x => Some (y, Just x))
+    else Some (y, Nothing)).
 
 
 Program Definition IIST_pinv_f3 {X Y} `{E : EqDec X eq}
@@ -1019,53 +1534,32 @@ Program Definition IIST_pinv_f3 {X Y} `{E : EqDec X eq}
 |}.
 Next Obligation.
 unfold IIST_f3, IIST_f3', equiv_dec.
-destruct (Compare_dec.le_gt_dec d' (length ys)) as [Hlen | Hlen]; simpl.
-2: {
-  split; intro Hsome.
-  + destruct m; inversion Hsome.
-    now auto.
-  + inversion Hsome; now auto.
-}
-destruct m as [x | ].
-2: {
-  destruct (inv (ys ++ [b])); simpl.
-  + destruct (last l); simpl; split; intro Hcon; now inversion Hcon.
-  + split; intro Hcon; now inversion Hcon.
-}
-destruct (inv (ys ++ [b])) as [xs | ] eqn: Hinv; simpl.
-2: {
-  split; intro Hcon.
-  + destruct (inv (ys ++ [y])) as [xs | ] eqn: Hinv1; simpl in Hcon.
-    - destruct (last xs); simpl in Hcon; try now inversion Hcon.
-      destruct (E x x0); simpl in Hcon; inversion Hcon.
-      subst.
-      rewrite Hinv in Hinv1; now inversion Hinv1.
-    - now inversion Hcon.
-  + now inversion Hcon.
-}
-assert (length xs > 0) as Hxlen.
-{
-  unfold d_MST in Hd'.
-  apply Hd' in Hinv.
-  rewrite app_length in Hinv.
-  simpl in Hinv.
-  lia.
-}
-apply last_Some in Hxlen.
-destruct Hxlen as [x' Hlast].
-rewrite Hlast; simpl.
-split; intro Hxy.
-+ destruct (inv (ys ++ [y])) as [xs' |] eqn: Hxs'; simpl in Hxy; try now inversion Hxy.
-  destruct (last xs') as [x'' | ] eqn: Hx''; simpl in Hxy; try now inversion Hxy.
-  destruct (E x x'') as[e | e]; simpl in Hxy; inversion Hxy; unfold equiv in e; subst.
-  rewrite Hinv in Hxs'; inversion Hxs'; subst.
-  rewrite Hlast in Hx''; inversion Hx''.
-  now auto.
-+ inversion Hxy; subst.
-  rewrite Hinv; simpl.
-  rewrite Hlast; simpl.
-  destruct (E x x) as [Hx | Hx]; auto.
-  elim Hx; now auto.
+split; intro Hsome.
++ assert (y = b).
+  {
+    destruct (inv (ys ++ [y])) as [xs | ]; simpl in Hsome; try now inversion Hsome.
+    destruct (Compare_dec.le_gt_dec d' (length ys)); simpl in Hsome.
+    + destruct m as [x | ]; try now inversion Hsome.
+      destruct (last xs) as [x' | ]; simpl in Hsome; try now inversion Hsome.
+      destruct (E x x') as [e | e]; simpl in Hsome; inversion Hsome; now auto.
+    + destruct m as [x | ]; now inversion Hsome.
+  }
+  subst.
+  destruct (inv (ys ++ [b])) as [xs | ]; simpl in *; try now inversion Hsome.
+  destruct (Compare_dec.le_gt_dec d' (length ys)) as [e | e].
+  - destruct m; try now inversion Hsome.
+    destruct (last xs) as [x' | ]; try now inversion Hsome.
+    simpl in *.
+    destruct (E x x') as [e' | e']; simpl in Hsome; try now inversion Hsome.
+    unfold equiv in e'; subst; auto.
+  - destruct m; now inversion Hsome.
++ destruct (inv (ys ++ [b])) as [xs | ] eqn: Hmst; simpl in Hsome; try now inversion Hsome.
+  destruct (Compare_dec.le_gt_dec d' (length ys)) as [e | e]; simpl in *.
+  - destruct (last xs) as [x | ] eqn: Hlast; simpl in Hsome; inversion Hsome; subst.
+    rewrite Hmst; simpl; rewrite Hlast; simpl.
+    destruct (E x x) as [e' | e']; auto; elim e'; now auto.
+  - inversion Hsome; subst.
+    rewrite Hmst; simpl; now auto.
 Qed.
 
 
@@ -1076,6 +1570,116 @@ Definition IIST_g3 {X Y} (ys : list Y) (y_mx : Y * maybe X) : list Y :=
 Definition IIST_e3 {X Y} `{E : EqDec X eq}
                           (inv : MST Y X) d' (Hd' : d_MST inv d') :=
  IIST_mapfold [] (IIST_pinv_f3 inv d' Hd') IIST_g3.
+
+
+Lemma fold_left_IIST_g3_app :
+ forall X Y (xs1 xs2: list X) (ys : list (maybe Y)),
+  length xs1 <= length ys
+  -> fold_left IIST_g3 (combine xs1 ys) xs2 = xs2 ++ xs1.
+intros X Y xs1.
+induction xs1 as [ | x xs1 Hxs1]; intros xs2 ys Hl; simpl.
++ rewrite app_nil_r; now auto.
++ destruct ys; simpl in *.
+  - lia.
+  - rewrite Hxs1.
+    * rewrite <- app_assoc; simpl; now auto.
+    * lia.
+Qed.
+
+
+
+Lemma IIST_e3_fwd :
+ forall X Y `{E : EqDec X eq} (mst : MST X Y) (inv : MST Y X) d (Hd : d_MST mst d) d' (Hd' : d_MST inv d') (Hist : MIST mst) (Hinv : MInv mst inv) (Hiist : MIST inv) xs ys,
+  mst xs = Some ys ->
+   fwd (IIST_e3 inv d' Hd') (combine ys (nothing_list d' ++ map Just xs))
+    = Some ys.
+intros X Y eq0 E mst inv d Hd d' Hd' Hist Hinv Hiist xs.
+unfold fwd; simpl.
+induction xs as [ | x xs Hxs] using list_inv_ind; intros ys H; simpl.
++ assert (ys = nil).
+  - apply length_zero_iff_nil.
+    apply Hd in H.
+    simpl in H.
+    auto.
+  - subst; simpl.
+    now auto.
++ assert (length (xs ++ [x]) = length xs + 1) as Hlenxs by (now apply app_length).
+  destruct (Compare_dec.le_gt_dec d (length xs)) as [e | e].
+  2: {
+    assert (ys = nil).
+    {
+      apply length_zero_iff_nil.
+      apply Hd in H.
+      lia.
+    }
+    subst.
+    destruct (nothing_list d' ++ map Just (xs ++ [x])); simpl; now auto.
+  }
+  destruct (d_MIST_oneapp _ _ mst d xs ys x) as [y [ys' [Heq Hx]]]; auto.
+  subst.
+  assert (length (ys' ++ [y]) = length ys' + 1) as Hlenys by (now apply app_length).
+  assert (Hx' := Hxs ys' Hx).
+  clear Hxs.
+  destruct (Hinv _ _ H) as [xs' [H' H'pre]].
+  destruct (Compare_dec.le_gt_dec d' (length ys')) as [e' | e'] eqn:He'.
+  - destruct (app_length_destruct xs (length ys' - d')) as [xs1 [xs2 [Hxseq Hxs1len]]].
+    * apply Hd in Hx.
+      lia.
+    * rewrite Hxseq in *; clear xs Hxseq.
+      rewrite <- app_assoc in *.
+      rewrite map_app in *.
+      assert (length (map Just xs1) = length xs1) as Hmap by (now apply map_length).
+      rewrite app_assoc.
+      rewrite app_assoc in Hx'.
+      assert (length (nothing_list d' ++ map Just xs1) = length ys') as Hnxs1.
+      {
+        rewrite app_length.
+        rewrite nothing_list_len.
+        lia.
+      }
+      rewrite combine_app_length_le in Hx'; try lia.
+      rewrite combine_app_app; auto.
+      rewrite fwd_mapfold_app.
+      rewrite fold_left_IIST_g3_app; try lia.
+      rewrite Hx'; simpl.
+      destruct (d_MIST_oneapp _ _ inv d' ys' xs' y) as [x' [xs'1 [? H'1]]]; auto.
+      subst.
+      assert (xs'1 = xs1).
+      {
+        eapply prefix_length_det.
+        + eapply prefix_transitive.
+          - now apply app_prefix.
+          - exact H'pre.
+        + now apply app_prefix.
+        + rewrite Hxs1len.
+          symmetry.
+          apply Hd'.
+          now auto.
+      }
+      subst.
+      apply prefix_inv_head in H'pre.
+      apply prefix_app in H'pre.
+      destruct H'pre as [xs3 Hpre].
+      rewrite <- Hpre in *; simpl.
+      rewrite H'; rewrite He'; simpl.
+      rewrite last_correct; simpl.
+      destruct (x' == x') as [ex | ex]; simpl; auto.
+      elim ex.
+      now constructor.
+  - rewrite combine_nothing_list_r; try lia.
+    rewrite combine_nothing_list_r in Hx'; try lia.
+    rewrite Hlenys.
+    rewrite nothing_list_app.
+    assert (Hnll := nothing_list_len X (length ys')).
+    rewrite combine_app_app; try lia.
+    rewrite fwd_mapfold_app.
+    rewrite Hx'.
+    rewrite fold_left_IIST_g3_app; try lia; simpl.
+    rewrite He'; simpl.
+    rewrite H'; simpl.
+    now auto.
+Qed.
+
 
 
 
@@ -1122,6 +1726,7 @@ rewrite IHd'; lia.
 Qed.
 
 
+
 Lemma IIST_e_mst :
  forall X Y `{EqDec X eq} `{EqDec Y eq}
             (mst : MST X Y) d inv d' Hd Hd',
@@ -1130,9 +1735,29 @@ Lemma IIST_e_mst :
  -> MIST inv
  -> forall xs,
      mst xs = fwd (IIST_e mst d inv d' Hd Hd') xs.
-Admitted. (* ラスボス *)
+intros X Y eqX EX eqY EY mst d inv d' Hd Hd' Hist Hinv Hiist xs.
+unfold IIST_e; simpl.
+destruct (mst xs) as [ys | ] eqn:Heq.
++ assert (He1 := IIST_e1_fwd_Some X Y mst d Hd Hist xs ys).
+  unfold fwd in He1; simpl in He1.
+  rewrite (He1 Heq); simpl.
+  assert (He2 := IIST_e2_fwd X Y mst d d' Hd Hist xs ys Heq).
+  simpl in He2.
+  rewrite He2; simpl.
+  symmetry.
+  eapply IIST_e3_fwd with (d := d); now eauto.
++ assert (He1 := IIST_e1_fwd_None X Y mst d Hd Hist xs Heq).
+  unfold fwd in He1; simpl in He1.
+  rewrite He1; simpl.
+  now auto.
+Qed.
 
 
+(** Second theorem:
+     for any (d, d')-FIRST pair (mst, inv),
+     there exists FIRSD e such that
+     forward semantics of it behaves the same as mst,
+     and its forward(backward)-delay is d (d'). **)
 Theorem d_d'_MIIST_IIST :
  forall X Y `{EqDec X eq} `{EqDec Y eq} (mst : MST X Y) d d',
   (exists inv, d_d'_MIIST_pair mst inv d d')
@@ -1143,7 +1768,7 @@ Theorem d_d'_MIIST_IIST :
 intros X Y eq1 EX eq2 EY mst d d' H.
 destruct H as [inv Hpair].
 apply d_d'_MIIST_pair_min in Hpair.
-destruct Hpair as [Hmist [Hd [Hinv [Himist Hd']]]].
+destruct Hpair as [Hist [Hd [Hinv [Hiist Hd']]]].
 exists (IIST_e mst d inv d' Hd Hd').
 intro xs; intuition.
 + apply IIST_e_mst; now auto.
@@ -1153,81 +1778,66 @@ Qed.
 
 
 
-
-
-
-
-
-(* 上の証明に使ったものの簡略化版（dに対する性質が弱いので上では使えない） *)
-Definition MIST_coord {X Y} (mst : MST X Y) (xs : list X) : option Y :=
-option_bind (mst xs) last.
-
-
-Definition inc_coord_elem {X Y} (mst : MST X Y) coord :=
- forall xs x y,
-  (exists ys, mst (xs ++ [x]) = Some (ys ++ [y]))
-  <-> coord (xs ++ [x]) = Some y.
-
-
-Definition inc_coord_none {X Y} (mst : MST X Y) (coord : list X -> option Y) d :=
- forall xs,
-  mst xs = None \/ length xs <= d
-  <-> coord xs = None.
-
-
-Theorem d_MIST_coord_correct :
- forall X Y (mst : MST X Y) d,
-  d_MIST mst d
-  ->
-    let coord := MIST_coord mst in
-     inc_coord_elem mst coord
-     /\
-     inc_coord_none mst coord d.
-unfold inc_coord_elem, inc_coord_none, MIST_coord.
-intros X Y mst d [Hmist Hd_mst]; split; intros; split; intro.
-+ destruct H as [ys H]; rewrite H; simpl. now apply last_correct.
-+ destruct (mst (xs ++ [x])); simpl in H; try now inversion H.
-  apply last_correct' in H.
-  destruct H as [l' H]; exists l'; rewrite H; now auto.
-+ destruct H.
-  - rewrite H; simpl; now auto.
-  - destruct (mst xs) as [ys | ] eqn: H0; simpl; auto.
-    assert (H1 := Hd_mst xs ys H0).
-    destruct ys; auto.
-    simpl in H1; lia.
-+ destruct (mst xs) as [ys | ] eqn: H0; auto.
-  right.
-  simpl in H.
-  assert (H1 := Hd_mst _ _ H0).
-  destruct ys; simpl in *; inversion H.
-  lia.
+Lemma IIST_e_inv :
+ forall X Y `{EqDec X eq} `{EqDec Y eq}
+            (mst : MST X Y) d inv d' Hd Hd',
+ MIST mst
+ -> MInv mst inv
+ -> MIST inv
+ -> forall xs ys,
+     mst xs = Some ys ->
+     inv ys = bwd (IIST_e mst d inv d' Hd Hd') ys.
+intros X Y EQ0 EX EQ1 EY mst d inv d' Hd Hd' Hist Hinv Hiist xs ys Hxs.
+destruct (Hinv _ _ Hxs) as [xs' [Hxs' Hpre']].
+rewrite Hxs'.
+assert (Hlen' := Hd' _ _ Hxs').
+assert (Hinv' := IIST_MInv _ _ (IIST_e mst d inv d' Hd Hd')).
+erewrite IIST_e_mst in Hxs; eauto.
+destruct (Hinv' _ _ Hxs) as [xs'' [Hxs'' Hpre'']].
+rewrite Hxs''.
+assert (Hd'' := IIST_bwd_d_MST _ _ (IIST_e mst d inv d' Hd Hd')).
+rewrite IIST_e_delay_bwd in Hd''.
+assert (Hlen'' := Hd'' _ _ Hxs'').
+rewrite (prefix_length_det xs' xs'' xs); auto.
+lia.
 Qed.
 
 
 
-Fixpoint coord_MIST {X Y} (coord : list X -> option Y) (xt : list X) (xs : list X) : option (list Y) :=
- match xs with
- | [] => Some []
- | x :: xs' =>
-    option_bind (coord (xt ++ [x]))
-      (fun y => option_bind (coord_MIST coord (xt ++ [x]) xs')
-         (fun ys => Some (y :: ys)))
-end.
-
-(* これって正しい？d_MIST（の一部）になってる？ヘッダとしてxtを持っている列変換になると思うのだけど *)
-
-
-Fixpoint coord_d_MIST {X Y} d (coord : list X -> option Y) (xt : list X) : MST X Y :=
- fun xs =>
-   match d with
-   | O => coord_MIST coord xt xs (* 先頭dをxtにしてリストを計算 *)
-   | S d' =>
-      match xs with
-      | [] => Some []
-      | x :: xs' => coord_d_MIST d' coord (xt ++ [x]) xs'
-      end
-   end.
-
+(** Third theorem:
+     for any (d, d')-FIRST pair (mst, inv),
+     there exists d'-FIRST inv' such that
+     (mst, inv') is a (d, d')-FIRST pair and
+     (inv', mst) is a (d', d)-FIRST pair. **)
+Theorem d_d'_MIIST_representative_inv :
+ forall X Y `{EqDec X eq} `{EqDec Y eq} (mst : MST X Y) d d',
+  (exists inv, d_d'_MIIST_pair mst inv d d')
+  -> exists inv',
+      d_d'_MIIST_pair mst inv' d d' /\
+      d_d'_MIIST_pair inv' mst d' d.
+intros X Y eq1 EX eq2 EY mst d d' [inv Hpair].
+apply d_d'_MIIST_pair_min in Hpair.
+destruct Hpair as [Hist [Hd [Hinv [Hiist Hd']]]].
+exists (bwd (IIST_e mst d inv d' Hd Hd')).
+assert (Hfwd := IIST_e_mst _ _ mst d inv d' Hd Hd' Hist Hinv Hiist).
+assert (Hd'_mst := IIST_bwd_d_MST _ _ (IIST_e mst d inv d' Hd Hd')).
+rewrite (IIST_e_delay_bwd X Y mst d inv d' Hd Hd') in Hd'_mst.
+split; apply d_d'_MIIST_pair_min; intuition; try apply IIST_bwd_MIST.
++ unfold MInv in *.
+  intros xs ys Hfwd'.
+  destruct (Hinv _ _ Hfwd') as [xs' [Hbwd Hpre]].
+  exists xs'; intuition.
+  rewrite <- Hbwd.
+  symmetry.
+  apply IIST_e_inv with xs; now auto.
++ assert (Hiinv := IIST_bwd_MInv _ _ (IIST_e mst d inv d' Hd Hd')).
+  unfold MInv in *.
+  intros ys xs Hbwd.
+  destruct (Hiinv _ _ Hbwd) as [ys' [Hfwd' Hpre]].
+  exists ys'; intuition.
+  rewrite <- Hfwd'.
+  now apply IIST_e_mst.
+Qed.
 
 
 
