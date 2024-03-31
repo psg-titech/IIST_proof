@@ -38,18 +38,27 @@ private
 
 ## What are IISTs?
 
-An IIST is a kind of "invertible" list/stream processor. It produces more output as more input is provided, and has an inverse processor that can recover more elements of the original input as more outputs are given.
+An IIST is a kind of "invertible" list/stream processor.
+It produces more output as more input is provided, and has an inverse processor that can recover more elements of the original input as more outputs are given.
+
+Why do we need the notion of invertible computation at all? What does it do for us?
+Like parsing and printing, or compression and decompression, there are many pairs of computations that are inverses of each other.
+If each is developed separately, it is possible that some inconsistencies are introduced between them.
+This is where the notion of invertible computation comes in.
+It allows us to develop both computations simultaneously, ensuring that they are consistent with each other.
+The IIST framework aims to provide a fundamental theory of invertible computation specifically for stream processing.
 
 ### Definitions of IISTs
 
-The following are formal definitions of IIST and related concepts for finite inputs.
+The following are formal definitions of IIST and related concepts.
+Here we only consider IISTs as partial functions on lists.
 
 A *Sequence Transformation* (ST) is a partial function on lists.
 ```agda
 ST : Set → Set → Set
 ST X Y = List X → Maybe (List Y)
 ```
-An ST `st` is an *Incremental* ST (IST) if it is prefix-preserving. That is, if `st` produces an output `ys` for some input `xs`, any prefix of `st` will produce a prefix of `ys`.
+An ST `st` is an *Incremental* ST (IST) if it preserves the prefix relation. That is, if `st` produces an output `ys` for some input `xs`, any prefix of `st` will produce a prefix of `ys`.
 ```agda
 infix 4 _≺_
 
@@ -78,7 +87,7 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
 ```
 An ST `st` is an *Inverse* IST (IIST) of another ST `st'`, when `st'` outputs `ys` for some `xs`, `st` recovers a prefix of `xs` from `ys`.
 Specifically, `st` is a *d-Inverse* IST (d-IIST) of `st'`, if `st` can always recover the original input of `st'` except for the last `d` elements.
-The notion of inverse here is a relaxed version of the usual inverse.
+The notion of inverse here is a relaxed version of the usual inverse. We believe this is unique to IISTs.
 ```agda
 _IsIISTOf_ : ST X Y → ST Y X → Set
 st' IsIISTOf st = ∀ {xs ys}
@@ -142,15 +151,15 @@ Eq : Set → Set
 Eq A = IsDecEquivalence {A = A} _≡_ -- Discrete
 
 data E : Set → Set → Set₁ where
-  -- map + fold.
+  -- Inseparable into map and fold!
   `map-fold : A → (A → X ⇌ Y) → (A → X → A) → E X Y
-  -- delay the output by one step. The argument is the initial value.
+  -- Delay the output by one step. The argument is the initial value.
   `delay : {{_ : Eq X}} → X → E X X
-  -- the inverse of `delay`.
+  -- The inverse of `delay`.
   `hasten : {{_ : Eq X}} → X → E X X
-  -- sequential composition.
+  -- Sequential composition.
   _`⋙_ : E X Y → E Y Z → E X Z
-  -- parallel composition.
+  -- Parallel composition.
   _`⊗_ : E X Y → E Z W → E (X × Z) (Y × W)
 ```
 `F⟦-⟧` and `B⟦-⟧` are forward and backward semantics of `E` terms, respectively.
