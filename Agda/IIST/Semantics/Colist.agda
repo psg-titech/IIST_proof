@@ -109,6 +109,43 @@ B⟦ e `⋙ e' ⟧ = B⟦ e' ⟧ ⋙ B⟦ e ⟧
 B⟦ e `⊗ e' ⟧ = B⟦ e ⟧ ⊗ B⟦ e' ⟧
 
 --------------------------------------------------------------------------------
+-- I inverts the semantics
+
+F∘I≡B : ∀ (e : E X Y) → F⟦ I⟦ e ⟧ ⟧ ≡ B⟦ e ⟧
+F∘I≡B (`map-fold a f g) = helper a
+  where
+    helper : ∀ a → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ≡ B⟦ `map-fold a f g ⟧
+    helper a i [] = []
+    helper a i ⊥ = ⊥
+    helper a i (y ∷ ys) with f a .from y
+    ... | nothing = ⊥
+    ... | just x = x ∷ λ where .force → helper (g a x) i (force ys)
+F∘I≡B (`delay x) = refl
+F∘I≡B (`hasten x) = refl
+F∘I≡B (e `⋙ e') = cong₂ _⋙_ (F∘I≡B e') (F∘I≡B e)
+F∘I≡B (e `⊗ e') = cong₂ _⊗_ (F∘I≡B e) (F∘I≡B e')
+
+B∘I≡F : ∀ (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≡ F⟦ e ⟧
+B∘I≡F (`map-fold a f g) = helper {a} refl
+  where
+    helper : ∀ {a a'} → a ≡ a' → B⟦ I⟦ `map-fold a f g ⟧ ⟧ ≡ F⟦ `map-fold a' f g ⟧
+    helper eq i [] = []
+    helper eq i ⊥ = ⊥
+    helper {a} eq i (x ∷ xs) rewrite pathToEq (sym eq) with f a .to x | inspect (f a .to) x
+    ... | nothing | [ eq' ]ᵢ = ⊥
+    ... | just y | [ eq' ]ᵢ = y ∷ λ where .force → helper (congS (Maybe.rec a (g a)) (f a .to→from eq')) i (force xs)
+B∘I≡F (`delay x) = refl
+B∘I≡F (`hasten x) = refl
+B∘I≡F (e `⋙ e') = cong₂ _⋙_ (B∘I≡F e) (B∘I≡F e')
+B∘I≡F (e `⊗ e') = cong₂ _⊗_ (B∘I≡F e) (B∘I≡F e')
+
+F-B-lemma : (P : ∀ {X Y} → ℕ → ST X Y → ST Y X → Type)
+  → (∀ {X Y} → (e : E X Y) → P DF⟦ e ⟧ F⟦ e ⟧ B⟦ e ⟧)
+  → (e : E X Y) → P DB⟦ e ⟧ B⟦ e ⟧ F⟦ e ⟧
+F-B-lemma P p e =
+  transport (λ i → P (DF∘I≡DB e i) (F∘I≡B e i) (B∘I≡F e i)) (p I⟦ e ⟧)
+
+--------------------------------------------------------------------------------
 
 F-empty : ∀ (e : E X Y) → F⟦ e ⟧ [] ≡ []
 F-empty (`map-fold a f g) = refl
@@ -118,11 +155,7 @@ F-empty (e `⋙ e') = cong F⟦ e' ⟧ (F-empty e) ∙ F-empty e'
 F-empty (e `⊗ e') = cong₂ zip (F-empty e) (F-empty e')
 
 B-empty : ∀ (e : E X Y) → B⟦ e ⟧ [] ≡ []
-B-empty (`map-fold a f g) = refl
-B-empty (`delay x) = refl
-B-empty (`hasten x) = refl
-B-empty (e `⋙ e') = cong B⟦ e ⟧ (B-empty e') ∙ B-empty e
-B-empty (e `⊗ e') = cong₂ zip (B-empty e) (B-empty e')
+B-empty = F-B-lemma (λ _ st _ → st [] ≡ []) F-empty
 
 --------------------------------------------------------------------------------
 -- Incrementality of F and B
@@ -188,26 +221,9 @@ prefix-cong-F (e `⊗ e') = prefix-cong-⊗ (prefix-cong-F e) (prefix-cong-F e')
 prefix-cong-B : ∀ (e : E X Y) {xs' xs}
   → Prefix k xs' xs
   → Prefix k (B⟦ e ⟧ xs') (B⟦ e ⟧ xs)
-prefix-cong-B (`map-fold a f g) = helper a
-  where
-    helper : ∀ a {xs' xs}
-      → Prefix k xs' xs
-      → Prefix k (B⟦ `map-fold a f g ⟧ xs') (B⟦ `map-fold a f g ⟧ xs)
-    helper a {[]} {xs} p = con tt
-    helper {k = ⊥≺⊥} a {⊥} {[]} (con ())
-    helper {k = ⊥≺⊥} a {⊥} {⊥} p = con tt
-    helper {k = ⊥≺⊥} a {⊥} {_ ∷ _} (con ())
-    helper {k = ⊥≺} a {⊥} {xs} p = con tt
-    helper a {_ ∷ _} {[]} (con ())
-    helper a {_ ∷ _} {⊥} (con ())
-    helper a {y ∷ _} {_ ∷ _} (con (p , q)) rewrite pathToEq (sym p) with f a .from y
-    helper a {y ∷ _} {_ ∷ _} (con (p , q)) | just x = con (refl , λ where .force → helper (g a x) (force q))
-    helper {k = ⊥≺⊥} a {y ∷ _} {_ ∷ _} (con (p , q)) | nothing = con tt
-    helper {k = ⊥≺} a {y ∷ _} {_ ∷ _} (con (p , q)) | nothing = con tt
-prefix-cong-B (`delay x) = prefix-cong-unshift x
-prefix-cong-B (`hasten x) = prefix-cong-shift x
-prefix-cong-B (e `⋙ e') = prefix-cong-B e ∘ prefix-cong-B e'
-prefix-cong-B (e `⊗ e') = prefix-cong-⊗ (prefix-cong-B e) (prefix-cong-B e')
+prefix-cong-B {k = k} = F-B-lemma
+  (λ _ st _ → ∀ {xs' xs} → Prefix k xs' xs → Prefix k (st xs') (st xs))
+  prefix-cong-F
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
 F-incremental = prefix-cong-F
@@ -275,18 +291,7 @@ module _ where
   F-hasDelay (e `⊗ e') = ⊗-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
 
   B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
-  B-hasDelay (`map-fold a f g) = helper a
-    where
-      helper : ∀ a → HasDelay 0 B⟦ `map-fold a f g ⟧
-      helper a [] = con tt
-      helper a ⊥ = con tt
-      helper a (y ∷ ys) with f a .from y
-      ... | nothing = con tt
-      ... | just x = con λ where .force → helper (g a x) (force ys)
-  B-hasDelay (`delay x) = unshift-hasDelay x
-  B-hasDelay (`hasten x) = shift-hasDelay x
-  B-hasDelay (e `⋙ e') = ∘-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
-  B-hasDelay (e `⊗ e') = ⊗-hasDelay DB⟦ e ⟧ DB⟦ e' ⟧ (B-hasDelay e) (B-hasDelay e')
+  B-hasDelay = F-B-lemma (λ d st _ → HasDelay d st) F-hasDelay
 
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
@@ -362,19 +367,7 @@ F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (prefix-co
 F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e') (prefix-cong-F e) (prefix-cong-F e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (`map-fold a f g) = helper a
-  where
-    helper : ∀ a → B⟦ `map-fold a f g ⟧ IsIISTOf F⟦ `map-fold a f g ⟧
-    helper a [] = con tt
-    helper a ⊥ = con tt
-    helper a (x ∷ xs) with f a .to x | inspect (f a .to) x
-    ... | nothing | [ eq ]ᵢ = con tt
-    ... | just y | [ eq ]ᵢ rewrite pathToEq (f a .to→from eq) =
-          con (refl , λ where .force → helper (g a x) (force xs))
-B-IIST (`delay x) = unshift-IIST x
-B-IIST (`hasten x) = shift-IIST x
-B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (prefix-cong-B e)
-B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e') (prefix-cong-B e) (prefix-cong-B e')
+B-IIST = F-B-lemma (λ _ st st' → st IsIISTOf st') F-IIST
 
 --------------------------------------------------------------------------------
 -- Bundles
@@ -412,34 +405,3 @@ B-d-d'-IIST e = record
   ; is-d-IST = B-d-IST e
   ; inverse-is-d'-IIST = F-d-IIST e
   }
-
---------------------------------------------------------------------------------
--- I inverts the semantics
-
-F∘I≡B : ∀ (e : E X Y) → F⟦ I⟦ e ⟧ ⟧ ≡ B⟦ e ⟧
-F∘I≡B (`map-fold a f g) = helper a
-  where
-    helper : ∀ a → F⟦ I⟦ `map-fold a f g ⟧ ⟧ ≡ B⟦ `map-fold a f g ⟧
-    helper a i [] = []
-    helper a i ⊥ = ⊥
-    helper a i (y ∷ ys) with f a .from y
-    ... | nothing = ⊥
-    ... | just x = x ∷ λ where .force → helper (g a x) i (force ys)
-F∘I≡B (`delay x) = refl
-F∘I≡B (`hasten x) = refl
-F∘I≡B (e `⋙ e') = cong₂ _⋙_ (F∘I≡B e') (F∘I≡B e)
-F∘I≡B (e `⊗ e') = cong₂ _⊗_ (F∘I≡B e) (F∘I≡B e')
-
-B∘I≡F : ∀ (e : E X Y) → B⟦ I⟦ e ⟧ ⟧ ≡ F⟦ e ⟧
-B∘I≡F (`map-fold a f g) = helper {a} refl
-  where
-    helper : ∀ {a a'} → a ≡ a' → B⟦ I⟦ `map-fold a f g ⟧ ⟧ ≡ F⟦ `map-fold a' f g ⟧
-    helper eq i [] = []
-    helper eq i ⊥ = ⊥
-    helper {a} eq i (x ∷ xs) rewrite pathToEq (sym eq) with f a .to x | inspect (f a .to) x
-    ... | nothing | [ eq' ]ᵢ = ⊥
-    ... | just y | [ eq' ]ᵢ = y ∷ λ where .force → helper (congS (Maybe.rec a (g a)) (f a .to→from eq')) i (force xs)
-B∘I≡F (`delay x) = refl
-B∘I≡F (`hasten x) = refl
-B∘I≡F (e `⋙ e') = cong₂ _⋙_ (B∘I≡F e) (B∘I≡F e')
-B∘I≡F (e `⊗ e') = cong₂ _⊗_ (B∘I≡F e) (B∘I≡F e')

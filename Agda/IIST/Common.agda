@@ -47,3 +47,7 @@ record _⇌_ (A B : Type) : Type where
   from→to inverse = to→from
 
 open _⇌_ hiding ( inverse ) public
+open _⇌_
+
+inverse-involutive : (f : A ⇌ B) → inverse (inverse f) ≡ f
+inverse-involutive f = refl
