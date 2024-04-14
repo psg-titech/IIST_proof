@@ -18,7 +18,7 @@ module README where
 
 import Level
 open import Data.List using ( List; []; _∷_; length; zip; unzip )
-open import Data.Maybe using ( Maybe; just; nothing; _>>=_ )
+open import Data.Maybe using ( Maybe; just; nothing; _>>=_; maybe )
 open import Data.Maybe.Effectful using () renaming ( monad to monadMaybe )
 open import Data.Nat using ( ℕ; zero; suc; _+_; _∸_; _≤?_; _⊔_ )
 open import Data.Product using ( ∃-syntax; _×_; _,_; proj₁; proj₂ )
@@ -142,6 +142,12 @@ record _⇌_ (A B : Set) : Set where
     to→from : ∀ {x y} → to x ≡ just y → from y ≡ just x
     from→to : ∀ {x y} → from y ≡ just x → to x ≡ just y
 
+  inverse : B ⇌ A
+  to inverse = from
+  from inverse = to
+  to→from inverse = from→to
+  from→to inverse = to→from
+
 open _⇌_
 
 infixr 9 _`⋙_
@@ -223,4 +229,18 @@ D⟦ e `⊗ e' ⟧ =
 DF⟦_⟧ DB⟦_⟧ : E X Y → ℕ
 DF⟦ e ⟧ = proj₁ D⟦ e ⟧
 DB⟦ e ⟧ = proj₂ D⟦ e ⟧
+
+F-IIST : ∀ (e : E X Y) → Is⟨ DF⟦ e ⟧ , DB⟦ e ⟧ ⟩-IIST F⟦ e ⟧
+B-IIST : ∀ (e : E X Y) → Is⟨ DB⟦ e ⟧ , DF⟦ e ⟧ ⟩-IIST B⟦ e ⟧
+```
+We also have a function `I⟦-⟧` that "inverts" the semantics of `E` terms.
+That is, `F⟦ I⟦ e ⟧ ⟧ ≡ B⟦ e ⟧` and `B⟦ I⟦ e ⟧ ⟧ ≡ F⟦ e ⟧`.
+`I⟦-⟧` is not involutive though.
+```agda
+I⟦_⟧ : E X Y → E Y X
+I⟦ `map-fold a f g ⟧ = `map-fold a (inverse ∘ f) (λ a → maybe (g a) a ∘ f a .from)
+I⟦ `delay x ⟧ = `hasten x
+I⟦ `hasten x ⟧ = `delay x
+I⟦ e `⋙ e' ⟧ = I⟦ e' ⟧ `⋙ I⟦ e ⟧
+I⟦ e `⊗ e' ⟧ = I⟦ e ⟧ `⊗ I⟦ e' ⟧
 ```
