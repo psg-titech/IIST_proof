@@ -212,6 +212,12 @@ B∘I≡F (`hasten x) = refl
 B∘I≡F (e `⋙ e') = congP₂ (λ _ → _⋙_) (B∘I≡F e) (B∘I≡F e')
 B∘I≡F (e `⊗ e') = congP₂ (λ _ → _⊗_) (B∘I≡F e) (B∘I≡F e')
 
+F-B-lemma : (P : ∀ {X Y} → (df db : ℕ) → IST X Y df → IST Y X db → Type)
+  → (∀ {X Y} → (e : E X Y) → P DF⟦ e ⟧ DB⟦ e ⟧ F⟦ e ⟧ B⟦ e ⟧)
+  → (e : E X Y) → P DB⟦ e ⟧ DF⟦ e ⟧ B⟦ e ⟧ F⟦ e ⟧
+F-B-lemma P p e =
+  transport (λ i → P (DF∘I≡DB e i) (DB∘I≡DF e i) (F∘I≡B e i) (B∘I≡F e i)) (p I⟦ e ⟧)
+
 --------------------------------------------------------------------------------
 
 _IsIISTOf_ : IST X Y d₁ → IST Y X d₂ → Set
@@ -495,14 +501,4 @@ F-IIST (e `⋙ e') = ⋙-IIST (F-IIST e') (F-IIST e)
 F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e')
 
 B-IIST : (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (`map-fold a f g) = helper a
-  where
-    helper : ∀ a → (F⟦ `map-fold a f g ⟧ ⋙ B⟦ `map-fold a f g ⟧) ⊑ id
-    same-d (helper a) = refl
-    step (helper a) x with f a .to x | inspect (f a .to) x
-    ... | nothing | [ eq ]ᵢ = con tt
-    ... | just y | [ eq ]ᵢ rewrite pathToEq (f a .to→from eq) = con (refl , helper (g a x))
-B-IIST (`delay x) = unshift-IIST x
-B-IIST (`hasten x) = shift-IIST x
-B-IIST (e `⋙ e') = ⋙-IIST (B-IIST e) (B-IIST e')
-B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e')
+B-IIST = F-B-lemma (λ _ _ → _IsIISTOf_) F-IIST

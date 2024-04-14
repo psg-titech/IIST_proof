@@ -139,11 +139,11 @@ B∘I≡F (`hasten x) = refl
 B∘I≡F (e `⋙ e') = cong₂ _⋙_ (B∘I≡F e) (B∘I≡F e')
 B∘I≡F (e `⊗ e') = cong₂ _⊗_ (B∘I≡F e) (B∘I≡F e')
 
-F-B-lemma : (P : ∀ {X Y} → ℕ → ST X Y → ST Y X → Type)
-  → (∀ {X Y} → (e : E X Y) → P DF⟦ e ⟧ F⟦ e ⟧ B⟦ e ⟧)
-  → (e : E X Y) → P DB⟦ e ⟧ B⟦ e ⟧ F⟦ e ⟧
+F-B-lemma : (P : ∀ {X Y} → ℕ → ℕ → ST X Y → ST Y X → Type)
+  → (∀ {X Y} → (e : E X Y) → P DF⟦ e ⟧ DB⟦ e ⟧ F⟦ e ⟧ B⟦ e ⟧)
+  → (e : E X Y) → P DB⟦ e ⟧ DF⟦ e ⟧ B⟦ e ⟧ F⟦ e ⟧
 F-B-lemma P p e =
-  transport (λ i → P (DF∘I≡DB e i) (F∘I≡B e i) (B∘I≡F e i)) (p I⟦ e ⟧)
+  transport (λ i → P (DF∘I≡DB e i) (DB∘I≡DF e i) (F∘I≡B e i) (B∘I≡F e i)) (p I⟦ e ⟧)
 
 --------------------------------------------------------------------------------
 
@@ -155,7 +155,7 @@ F-empty (e `⋙ e') = cong F⟦ e' ⟧ (F-empty e) ∙ F-empty e'
 F-empty (e `⊗ e') = cong₂ zip (F-empty e) (F-empty e')
 
 B-empty : ∀ (e : E X Y) → B⟦ e ⟧ [] ≡ []
-B-empty = F-B-lemma (λ _ st _ → st [] ≡ []) F-empty
+B-empty = F-B-lemma (λ _ _ st _ → st [] ≡ []) F-empty
 
 --------------------------------------------------------------------------------
 -- Incrementality of F and B
@@ -222,7 +222,7 @@ prefix-cong-B : ∀ (e : E X Y) {xs' xs}
   → Prefix k xs' xs
   → Prefix k (B⟦ e ⟧ xs') (B⟦ e ⟧ xs)
 prefix-cong-B {k = k} = F-B-lemma
-  (λ _ st _ → ∀ {xs' xs} → Prefix k xs' xs → Prefix k (st xs') (st xs))
+  (λ _ _ st _ → ∀ {xs' xs} → Prefix k xs' xs → Prefix k (st xs') (st xs))
   prefix-cong-F
 
 F-incremental : ∀ (e : E X Y) → IsIncremental F⟦ e ⟧
@@ -291,7 +291,7 @@ module _ where
   F-hasDelay (e `⊗ e') = ⊗-hasDelay DF⟦ e ⟧ DF⟦ e' ⟧ (F-hasDelay e) (F-hasDelay e')
 
   B-hasDelay : ∀ (e : E X Y) → HasDelay DB⟦ e ⟧ B⟦ e ⟧
-  B-hasDelay = F-B-lemma (λ d st _ → HasDelay d st) F-hasDelay
+  B-hasDelay = F-B-lemma (λ d _ st _ → HasDelay d st) F-hasDelay
 
 --------------------------------------------------------------------------------
 -- F⟦_⟧ and B⟦_⟧ are inverse of each other
@@ -367,7 +367,7 @@ F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (prefix-co
 F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e') (prefix-cong-F e) (prefix-cong-F e')
 
 B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST = F-B-lemma (λ _ st st' → st IsIISTOf st') F-IIST
+B-IIST = F-B-lemma (λ _ _ st st' → st IsIISTOf st') F-IIST
 
 --------------------------------------------------------------------------------
 -- Bundles
