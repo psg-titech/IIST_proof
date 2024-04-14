@@ -32,7 +32,7 @@ IsIncremental : ST X Y → Set
 IsIncremental st = _≺_ =[ st ]⇒ _≺_
 
 HasDelay : ℕ → ST X Y → Set
-HasDelay d st = ∀ xs → colength (st xs) ⊑ (colength xs ∸ℕ d)
+HasDelay d st = ∀ xs → colength (st xs) Coℕ⊥.⊑ (colength xs ∸ℕ d)
 
 record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
   field
@@ -40,8 +40,12 @@ record Is_-IST_ (d : ℕ) (st : ST X Y) : Set where
     isIncremental : IsIncremental st
     hasDelay : HasDelay d st
 
-_IsIISTOf_ : ST X Y → ST Y X → Set
-st' IsIISTOf st = ∀ xs → st' (st xs) ≺≺ xs
+_IsIISTOf_ _IsIISTOf₁_ _IsIISTOf₂_ : ST X Y → ST Y X → Set
+-- the output of (st' ∘ st) is a prefix of the input (may fail early)
+st' IsIISTOf₁ st = ∀ xs → st' (st xs) ≺≺ xs
+-- ⊥ appears in the output of (st' ∘ st) iff it appears in the output of st
+st' IsIISTOf₂ st = ∀ xs → st xs Colist⊥.⊑ st' (st xs)
+st' IsIISTOf st = st' IsIISTOf₁ st × st' IsIISTOf₂ st
 
 record _Is_-IISTOf_ (st' : ST X Y) (d : ℕ) (st : ST Y X) : Set where
   field
@@ -183,7 +187,7 @@ B-incremental = prefix-cong-B
 -- d-Incrementality of F and B
 
 module _ where
-  open ⊑-Reasoning
+  open Coℕ⊥.⊑-Reasoning
 
   shift-hasDelay : ∀ (x : A) → HasDelay 0 (shift x)
   shift-hasDelay x [] = zero
@@ -195,7 +199,7 @@ module _ where
   unshift-hasDelay x ⊥ = ⊥ₗ
   unshift-hasDelay x (y ∷ xs) with x ≟ y
   ... | no _ = ⊥ₗ
-  ... | yes _ = ⊑-refl
+  ... | yes _ = Coℕ⊥.⊑-refl
 
   ∘-hasDelay : ∀ {f : ST Y Z} {g : ST X Y} d d'
     → HasDelay d f
@@ -265,26 +269,26 @@ shift-≺≺-∷ x [] = []
 shift-≺≺-∷ x ⊥ = ⊥ₗ
 shift-≺≺-∷ x (y ∷ xs) = x ∷ λ where .force → shift-≺≺-∷ y (force xs)
 
-shift-IIST : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf unshift x
-shift-IIST x [] = []
-shift-IIST x ⊥ = ⊥ₗ
-shift-IIST x (y ∷ xs) with x ≟ y
+shift-IIST₁ : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf₁ unshift x
+shift-IIST₁ x [] = []
+shift-IIST₁ x ⊥ = ⊥ₗ
+shift-IIST₁ x (y ∷ xs) with x ≟ y
 ... | no _ = ⊥ₗ
 ... | yes refl = shift-≺≺-∷ x (force xs)
 
-unshift-IIST : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf shift x
-unshift-IIST x [] = []
-unshift-IIST x ⊥ = ⊥ₗ
-unshift-IIST x (y ∷ xs) with x ≟ x
+unshift-IIST₁ : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf₁ shift x
+unshift-IIST₁ x [] = []
+unshift-IIST₁ x ⊥ = ⊥ₗ
+unshift-IIST₁ x (y ∷ xs) with x ≟ x
 ... | no ¬refl with () ← ¬refl refl
 ... | yes refl = shift-≺≺-∷ y (force xs)
 
-∘-IIST : ∀ {f : ST Y Z} {f' : ST Z Y} {g : ST X Y} {g' : ST Y X}
-  → f IsIISTOf f'
-  → g IsIISTOf g'
+∘-IIST₁ : ∀ {f : ST Y Z} {f' : ST Z Y} {g : ST X Y} {g' : ST Y X}
+  → f IsIISTOf₁ f'
+  → g IsIISTOf₁ g'
   → _≺≺_ =[ f ]⇒ _≺≺_
-  → (f ∘ g) IsIISTOf (g' ∘ f')
-∘-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc zs =
+  → (f ∘ g) IsIISTOf₁ (g' ∘ f')
+∘-IIST₁ {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc zs =
   begin
     f (g (g' (f' zs)))
   ≲⟨ f-inc (g-inv-g' (f' zs)) ⟩
@@ -294,13 +298,13 @@ unshift-IIST x (y ∷ xs) with x ≟ x
   ∎
   where open PrefixReasoning
 
-⊗-IIST : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
-  → f IsIISTOf f'
-  → g IsIISTOf g'
+⊗-IIST₁ : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
+  → f IsIISTOf₁ f'
+  → g IsIISTOf₁ g'
   → _≺≺_ =[ f ]⇒ _≺≺_
   → _≺≺_ =[ g ]⇒ _≺≺_
-  → (f ⊗ g) IsIISTOf (f' ⊗ g')
-⊗-IIST {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
+  → (f ⊗ g) IsIISTOf₁ (f' ⊗ g')
+⊗-IIST₁ {f = f} {f'} {g} {g'} f-inv-f' g-inv-g' f-inc g-inc yws =
   begin
     (f ⊗ g) ((f' ⊗ g') yws)
   ≡⟨⟩
@@ -319,35 +323,103 @@ unshift-IIST x (y ∷ xs) with x ≟ x
   ∎
   where open PrefixReasoning
 
-F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
-F-IIST (`map-fold a f g) = helper a
+F-IIST₁ : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf₁ B⟦ e ⟧
+F-IIST₁ (`map-fold a f g) = helper a
   where
-    helper : ∀ a → F⟦ `map-fold a f g ⟧ IsIISTOf B⟦ `map-fold a f g ⟧
+    helper : ∀ a → F⟦ `map-fold a f g ⟧ IsIISTOf₁ B⟦ `map-fold a f g ⟧
     helper a [] = []
     helper a ⊥ = ⊥ₗ
     helper a (y ∷ ys) with f a .from y in eq
     ... | nothing = ⊥ₗ
     ... | just x rewrite f a .from→to eq =
           y ∷ λ where .force → helper (g a x) (force ys)
-F-IIST (`delay x) = shift-IIST x
-F-IIST (`hasten x) = unshift-IIST x
-F-IIST (e `⋙ e') = ∘-IIST {g = F⟦ e ⟧} (F-IIST e') (F-IIST e) (prefix-cong-F e')
-F-IIST (e `⊗ e') = ⊗-IIST (F-IIST e) (F-IIST e') (prefix-cong-F e) (prefix-cong-F e')
+F-IIST₁ (`delay x) = shift-IIST₁ x
+F-IIST₁ (`hasten x) = unshift-IIST₁ x
+F-IIST₁ (e `⋙ e') = ∘-IIST₁ {g = F⟦ e ⟧} (F-IIST₁ e') (F-IIST₁ e) (prefix-cong-F e')
+F-IIST₁ (e `⊗ e') = ⊗-IIST₁ (F-IIST₁ e) (F-IIST₁ e') (prefix-cong-F e) (prefix-cong-F e')
 
-B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
-B-IIST (`map-fold a f g) = helper a
+B-IIST₁ : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf₁ F⟦ e ⟧
+B-IIST₁ (`map-fold a f g) = helper a
   where
-    helper : ∀ a → B⟦ `map-fold a f g ⟧ IsIISTOf F⟦ `map-fold a f g ⟧
+    helper : ∀ a → B⟦ `map-fold a f g ⟧ IsIISTOf₁ F⟦ `map-fold a f g ⟧
     helper a [] = []
     helper a ⊥ = ⊥ₗ
     helper a (x ∷ xs) with f a .to x in eq
     ... | nothing = ⊥ₗ
     ... | just y rewrite f a .to→from eq =
           x ∷ λ where .force → helper (g a x) (force xs)
-B-IIST (`delay x) = unshift-IIST x
-B-IIST (`hasten x) = shift-IIST x
-B-IIST (e `⋙ e') = ∘-IIST {g = B⟦ e' ⟧} (B-IIST e) (B-IIST e') (prefix-cong-B e)
-B-IIST (e `⊗ e') = ⊗-IIST (B-IIST e) (B-IIST e') (prefix-cong-B e) (prefix-cong-B e')
+B-IIST₁ (`delay x) = unshift-IIST₁ x
+B-IIST₁ (`hasten x) = shift-IIST₁ x
+B-IIST₁ (e `⋙ e') = ∘-IIST₁ {g = B⟦ e' ⟧} (B-IIST₁ e) (B-IIST₁ e') (prefix-cong-B e)
+B-IIST₁ (e `⊗ e') = ⊗-IIST₁ (B-IIST₁ e) (B-IIST₁ e') (prefix-cong-B e) (prefix-cong-B e')
+
+-- shift is not a source of ⊥, i.e. if shift x xs contains ⊥, then xs contains ⊥
+⊑-shift : ∀ (x : A) xs → xs Colist⊥.⊑ shift x xs
+⊑-shift x [] = []ᵣ
+⊑-shift x ⊥ = ⊥ₗ
+⊑-shift x (y ∷ xs) = -∷ λ where .force → ⊑-shift y (force xs)
+
+shift-IIST₂ : ∀ {{_ : Eq X}} (x : X) → shift x IsIISTOf₂ unshift x
+shift-IIST₂ x [] = []ᵣ
+shift-IIST₂ x ⊥ = ⊥ₗ
+shift-IIST₂ x (y ∷ xs) with x ≟ y
+... | no _ = ⊥ₗ
+... | yes refl = ⊑-shift x (force xs)
+
+unshift-IIST₂ : ∀ {{_ : Eq X}} (x : X) → unshift x IsIISTOf₂ shift x
+unshift-IIST₂ x [] = []ᵣ
+unshift-IIST₂ x ⊥ = ⊥ₗ
+unshift-IIST₂ x (y ∷ xs) with x ≟ x
+... | no ¬refl with () ← ¬refl refl
+... | yes refl = ⊑-uncons x (shift y (force xs))
+
+∘-IIST₂ : ∀ {f : ST Y Z} {f' : ST Z Y} {g : ST X Y} {g' : ST Y X}
+  → f IsIISTOf₂ f'
+  → g IsIISTOf₂ g'
+  → (f ∘ g) IsIISTOf₂ (g' ∘ f')
+∘-IIST₂ {f = f} {f'} {g} {g'} h1 h2 xs = {!   !}
+
+⊗-IIST₂ : ∀ {f : ST X Y} {f' : ST Y X} {g : ST Z W} {g' : ST W Z}
+  → f IsIISTOf₂ f'
+  → g IsIISTOf₂ g'
+  → (f ⊗ g) IsIISTOf₂ (f' ⊗ g')
+⊗-IIST₂ {f = f} {f'} {g} {g'} h1 h2 xs = {!   !}
+
+F-IIST₂ : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf₂ B⟦ e ⟧
+F-IIST₂ (`map-fold a f g) = helper a
+  where
+    helper : ∀ a → F⟦ `map-fold a f g ⟧ IsIISTOf₂ B⟦ `map-fold a f g ⟧
+    helper a [] = []ᵣ
+    helper a ⊥ = ⊥ₗ
+    helper a (y ∷ ys) with f a .from y in eq
+    ... | nothing = ⊥ₗ
+    ... | just x rewrite f a .from→to eq =
+          -∷ λ where .force → helper (g a x) (force ys)
+F-IIST₂ (`delay x) = shift-IIST₂ x
+F-IIST₂ (`hasten x) = unshift-IIST₂ x
+F-IIST₂ (e `⋙ e') = ∘-IIST₂ {f = F⟦ e' ⟧} {g = F⟦ e ⟧} (F-IIST₂ e') (F-IIST₂ e)
+F-IIST₂ (e `⊗ e') = ⊗-IIST₂ {f = F⟦ e ⟧} {g = F⟦ e' ⟧} (F-IIST₂ e) (F-IIST₂ e')
+
+B-IIST₂ : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf₂ F⟦ e ⟧
+B-IIST₂ (`map-fold a f g) = helper a
+  where
+    helper : ∀ a → B⟦ `map-fold a f g ⟧ IsIISTOf₂ F⟦ `map-fold a f g ⟧
+    helper a [] = []ᵣ
+    helper a ⊥ = ⊥ₗ
+    helper a (x ∷ xs) with f a .to x in eq
+    ... | nothing = ⊥ₗ
+    ... | just y rewrite f a .to→from eq =
+          -∷ λ where .force → helper (g a x) (force xs)
+B-IIST₂ (`delay x) = unshift-IIST₂ x
+B-IIST₂ (`hasten x) = shift-IIST₂ x
+B-IIST₂ (e `⋙ e') = ∘-IIST₂ {f = B⟦ e ⟧} {g = B⟦ e' ⟧} (B-IIST₂ e) (B-IIST₂ e')
+B-IIST₂ (e `⊗ e') = ⊗-IIST₂ {f = B⟦ e ⟧} {g = B⟦ e' ⟧} (B-IIST₂ e) (B-IIST₂ e')
+
+F-IIST : ∀ (e : E X Y) → F⟦ e ⟧ IsIISTOf B⟦ e ⟧
+F-IIST e = F-IIST₁ e , F-IIST₂ e
+
+B-IIST : ∀ (e : E X Y) → B⟦ e ⟧ IsIISTOf F⟦ e ⟧
+B-IIST e = B-IIST₁ e , B-IIST₂ e
 
 --------------------------------------------------------------------------------
 -- Bundles

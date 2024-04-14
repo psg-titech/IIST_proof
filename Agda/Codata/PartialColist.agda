@@ -344,6 +344,49 @@ zip-unzipᵣ (x ∷ xs) (y ∷ ys) =
 
 --------------------------------------------------------------------------------
 
+infix 4 _≺₂_ _∞≺₂_
+
+mutual
+
+  data _≺₂_ {A} : Colist⊥ A → Colist⊥ A → Set where
+    [] : [] ≺₂ []
+    []ₗ : ∀ {y ys} → delay [] ∞≺₂ ys → [] ≺₂ y ∷ ys
+    ⊥ₗ : ∀ {ys} → ⊥ ≺₂ ys
+    _∷_ : ∀ x {xs ys} → xs ∞≺₂ ys → x ∷ xs ≺₂ x ∷ ys
+
+  record _∞≺₂_ (xs ys : ∞Colist⊥ A) : Set where
+    coinductive
+    field force : force xs ≺₂ force ys
+
+open _∞≺₂_ public
+
+≺₂-reflexive : ∀ {xs ys : Colist⊥ A} → xs ≈ ys → xs ≺₂ ys
+≺₂-reflexive [] = []
+≺₂-reflexive ⊥ = ⊥ₗ
+≺₂-reflexive (x ∷ p) = x ∷ λ where .force → ≺₂-reflexive (force p)
+
+≺₂-trans : ∀ {xs ys zs : Colist⊥ A} → xs ≺₂ ys → ys ≺₂ zs → xs ≺₂ zs
+≺₂-trans [] [] = []
+≺₂-trans [] ([]ₗ q) = []ₗ λ where .force → ≺₂-trans [] (force q)
+≺₂-trans ([]ₗ p) (_ ∷ q) = []ₗ λ where .force → ≺₂-trans (force p) (force q)
+≺₂-trans ⊥ₗ q = ⊥ₗ
+≺₂-trans (x ∷ p) (.x ∷ q) = x ∷ λ where .force → ≺₂-trans (force p) (force q)
+
+≺₂-isPreorder : ∀ {A} → IsPreorder {A = Colist⊥ A} _≈_ _≺₂_
+≺₂-isPreorder = record
+  { isEquivalence = ≈-isEquivalence
+  ; reflexive = ≺₂-reflexive
+  ; trans = ≺₂-trans
+  }
+
+≺₂-preorder : ∀ {A} → Preorder _ _ _
+≺₂-preorder {A} = record { isPreorder = ≺₂-isPreorder {A} }
+
+module ≺₂-Reasoning {A} where
+  open import Relation.Binary.Reasoning.Preorder (≺₂-preorder {A}) public
+
+--------------------------------------------------------------------------------
+
 infix 4 _⊑_ _∞⊑_
 infix 5 -∷_
 
@@ -430,6 +473,12 @@ module ⊑-Reasoning {A} where
 ≺-to-⊑ [] = []ᵣ
 ≺-to-⊑ ⊥ = ⊥ₗ
 ≺-to-⊑ (x ∷ p) = -∷ λ where .force → ≺-to-⊑ (force p)
+
+≺₂-to-⊑ : ∀ {xs ys : Colist⊥ A} → xs ≺₂ ys → xs ⊑ ys
+≺₂-to-⊑ [] = []ᵣ
+≺₂-to-⊑ ([]ₗ p) = []ₗ λ where .force → ≺₂-to-⊑ (force p)
+≺₂-to-⊑ ⊥ₗ = ⊥ₗ
+≺₂-to-⊑ (x ∷ p) = -∷ λ where .force → ≺₂-to-⊑ (force p)
 
 -- interaction with No⊥ and Eventually⊥
 
