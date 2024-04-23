@@ -3,6 +3,10 @@ Import ListNotations.
 Require Import Lia.
 Require Import Coq.Classes.EquivDec.
 
+Require Import IIST.OptionBind.
+Require Import IIST.PartInvFun.
+Require Import IIST.EqOneDec.
+
 
 Section app_length_destruct.
 
@@ -229,29 +233,6 @@ End combine.
 
 
 
-Section option_bind.
-
-Definition option_bind {A B : Type} (a : option A) (f : A -> option B) : option B :=
-match a with
-| Some a => f a
-| None => None
-end.
-
-End option_bind.
-
-
-
-
-Section pinv_fun.
-
-
-Record partial_invertible_function (A : Type) (B : Type) : Type := {
-  forward : A -> option B;
-  backward : B -> option A;
-  invertible : forall (a : A) (b : B), forward a = Some b <-> backward b = Some a
-}.
-
-End pinv_fun.
 
 
 Section list_tail.
@@ -347,66 +328,12 @@ Qed.
 
 End list_tail.
 
-
-
-Section EqOneDec.
-
-Class EqOneDec {A} (a : A) :=
-  equiv_one_dec : forall b : A, { a = b } + { a <> b }.
-
-
-Definition eqdec_one {A} `{EqDec A eq} a : EqOneDec a :=
-   fun b => equiv_dec a b.
-
-
-#[global]
-Program Instance option_None_eqdec {A} : @EqOneDec (option A) None.
-Next Obligation.
-destruct b.
-+ right; intro H; now inversion H.
-+ left; now auto.
-Defined.
-
-
-#[global]
-Program Instance list_nil_eqdec {A} : @EqOneDec (list A) [].
-Next Obligation.
-destruct b.
-+ left; now auto.
-+ right; intro H; now inversion H.
-Defined.
-
-
-
-Definition eqdec_Some_eqdec {A} (a : A) `{EqOneDec A a} : @EqOneDec (option A) (Some a).
-intro b.
-destruct b.
-+ destruct H with a0.
-  - left; subst; now auto.
-  - right; intro H'; apply n; inversion H'; now auto.
-+ right; intro H'; now inversion H'.
-Defined.
-
-
-End EqOneDec.
-
-
+Open Scope part_inv_fun_scope.
+Require Import IIST.IISTData.
 
 Section IIST.
 
 
-Notation "A <~~> B" := (partial_invertible_function A B) (at level 95, no associativity).
-
-
-
-Inductive IIST : Type -> Type -> Type :=
-| IIST_mapfold : forall {A X Y : Type},
-   A -> (A -> X <~~> Y) -> (A -> X -> A) -> IIST X Y
-| IIST_delay : forall {X : Type} (x : X) `{e : EqOneDec X x}, IIST X X
-| IIST_hasten : forall {X : Type} (x : X) `{e : EqOneDec X x}, IIST X X
-| IIST_seqcomp : forall {X Y Z : Type}, IIST X Y -> IIST Y Z -> IIST X Z
-| IIST_parcomp : forall {X1 X2 Y1 Y2 : Type}, IIST X1 Y1 -> IIST X2 Y2 -> IIST (X1 * X2) (Y1 * Y2)
-.
 
 
 Fixpoint fwd_mapfold {A X Y : Type} (f : A -> X <~~> Y) (g : A -> X -> A) (a : A) xs : option (list Y) :=
@@ -479,24 +406,6 @@ match e with
 end.
 
 
-
-Fixpoint delay_fwd {X Y : Type} (e : IIST X Y) : nat :=
-match e with
-| IIST_mapfold _ _ _ => 0
-| IIST_delay _ => 0
-| IIST_hasten _ => 1
-| IIST_seqcomp xz zy => delay_fwd xz + delay_fwd zy
-| IIST_parcomp xy1 xy2 => max (delay_fwd xy1) (delay_fwd xy2)
-end.
-
-Fixpoint delay_bwd {X Y : Type} (e : IIST X Y) : nat :=
-match e with
-| IIST_mapfold _ _ _ => 0
-| IIST_delay _ => 1
-| IIST_hasten _ => 0
-| IIST_seqcomp xz zy => delay_bwd xz + delay_bwd zy
-| IIST_parcomp xy1 xy2 => max (delay_bwd xy1) (delay_bwd xy2)
-end.
 
 
 Lemma fwd_length_delay : forall {X Y : Type} (e : IIST X Y) (xs : list X) (ys : list Y),

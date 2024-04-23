@@ -1,3 +1,7 @@
 *.agdai
 *.cache
 *.vo
+*.vos
+*.vok
+*.aux
+*.glob
