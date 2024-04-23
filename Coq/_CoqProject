@@ -4,3 +4,4 @@ PartInvFun.v
 EqOneDec.v
 IISTData.v
 IIST.v
+PartialColist.v
