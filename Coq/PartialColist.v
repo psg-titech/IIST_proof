@@ -45,6 +45,55 @@ intros A l; destruct l; simpl; now auto.
 Qed.
 
 
+Ltac cl_red e := rewrite colist_frob_eq with e.
+Ltac cl_red_in e H := rewrite colist_frob_eq with e in H.
+
+
+CoInductive colist_cong {A : Type} :
+ PartialColist A -> PartialColist A -> Prop :=
+| cong_cnil : colist_cong [] []
+| cong_ccons : forall a l1 l2, colist_cong l1 l2 -> colist_cong (a :: l1) (a :: l2)
+| cong_cfail : colist_cong -*- -*-.
+(* cubical TT か HoTT ほしい... *)
+
+Infix "~=~" := colist_cong (at level 70, no associativity).
+
+
+
+Lemma colist_cong_reflexive :
+ forall {A : Type} (l : PartialColist A),
+  colist_cong l l.
+intro A.
+cofix cf.
+intros [ | a l | ]; constructor.
+now auto.
+Qed.
+
+
+Lemma colist_cong_symmetric :
+ forall {A : Type} (l1 l2 : PartialColist A),
+  colist_cong l1 l2 -> colist_cong l2 l1.
+intro A.
+cofix cf.
+intros l1 l2 Hcong.
+inversion Hcong; subst; constructor.
+now auto.
+Qed.
+
+
+Lemma colist_cong_transitive :
+ forall {A : Type} (l1 l2 l3 : PartialColist A),
+  colist_cong l1 l2 -> colist_cong l2 l3 -> colist_cong l1 l3.
+intro A.
+cofix cf.
+intros l1 l2 l3 Hcong12 Hcong23.
+inversion Hcong12; subst; inversion Hcong23; subst; constructor.
+now eauto.
+Qed.
+
+
+
+
 
 
 (* 使う？ *)
@@ -102,8 +151,8 @@ Theorem coprefix_slide :
   coprefix l1 l2 -> coprefix (coslide a l1) (coslide a l2).
 intro A; cofix cf.
 intros a l1 l2 Hpre.
-rewrite colist_frob_eq with (coslide a l1).
-rewrite colist_frob_eq with (coslide a l2).
+cl_red (coslide a l1).
+cl_red (coslide a l2).
 inversion Hpre; subst; simpl; constructor.
 apply cf; now auto.
 Qed.
@@ -113,11 +162,29 @@ Qed.
 
 CoFixpoint cozip {A B : Type} (la : PartialColist A) (lb : PartialColist B) : PartialColist (A*B) :=
  match la, lb with
- | [], _ | _, [] => []
  | -*-, _ | _, -*- => -*-
+ | [], _ | _, [] => []
  | a :: la, b :: lb => (a, b) :: cozip la lb
  end.
 
+
+Theorem cozip_prefix :
+ forall {A B : Type} (la1 la2 : PartialColist A)
+                     (lb1 lb2 : PartialColist B),
+  coprefix la1 la2
+  -> coprefix lb1 lb2
+  -> coprefix (cozip la1 lb1) (cozip la2 lb2).
+intros A B.
+cofix cf.
+intros la1 la2 lb1 lb2 Hpre1 Hpre2.
+cl_red (cozip la1 lb1).
+cl_red (cozip la2 lb2).
+inversion Hpre1; subst;
+ inversion Hpre2; subst;
+ simpl; try constructor.
++ destruct la2; simpl; now constructor.
++ now auto.
+Qed.
 
 
 CoFixpoint coleft {A B : Type} (lab : PartialColist (A * B)) : PartialColist A :=
@@ -137,28 +204,275 @@ CoFixpoint coright {A B : Type} (lab : PartialColist (A * B)) : PartialColist B 
 
 
 
+Theorem coleft_prefix :
+ forall {A B : Type} (l1 l2 : PartialColist (A * B)),
+  coprefix l1 l2 -> coprefix (coleft l1) (coleft l2).
+intros A B.
+cofix cf.
+intros l1 l2 Hpre.
+cl_red (coleft l1).
+cl_red (coleft l2).
+inversion Hpre; subst; simpl; try constructor.
+destruct a; simpl.
+constructor.
+now auto.
+Qed.
+
+Theorem coright_prefix :
+ forall {A B : Type} (l1 l2 : PartialColist (A * B)),
+  coprefix l1 l2 -> coprefix (coright l1) (coright l2).
+intros A B.
+cofix cf.
+intros l1 l2 Hpre.
+cl_red (coright l1).
+cl_red (coright l2).
+inversion Hpre; subst; simpl; try constructor.
+destruct a; simpl.
+constructor.
+now auto.
+Qed.
+
+
+
 CoInductive n_list_status : Set :=
-| le_n | fail_n | more_n.
+| lt_n | fail_n | more_n.
 
 Fixpoint n_look_ahead {A : Type} (n : nat) (l : PartialColist A) : n_list_status :=
  match n, l with
- | _, [] => le_n
  | O, _ => more_n
+ | _, [] => lt_n
  | S n, -*- => fail_n
  | S n, _ :: l => n_look_ahead n l
  end.
 
+(* 自明なのでカット(場合分けは3種類しかないから前提なくてもそうなる) *)
+(*
+Lemma coprefix_n_look_ahead_le :
+ forall {A : Type} (n : nat) (l1 l2 : PartialColist A),
+  coprefix l1 l2
+   -> n_look_ahead n l1 = le_n
+   -> n_look_ahead n l2 = le_n
+      \/ n_look_ahead n l2 = more_n
+      \/ n_look_ahead n l2 = fail_n.
+*)
+
+
+Lemma coprefix_n_look_ahead_more :
+ forall {A : Type} (n : nat) (l1 l2 : PartialColist A),
+  coprefix l1 l2
+   -> n_look_ahead n l1 = more_n
+   -> n_look_ahead n l2 = more_n.
+intros A n.
+induction n as [ | n IHn]; intros l1 l2 Hpre Hl1;
+ inversion Hpre; subst; simpl in *; auto.
++ discriminate.
++ now eauto.
+Qed.
+
+
+Lemma coprefix_n_look_ahead_fail :
+ forall {A : Type} (n : nat) (l1 l2 : PartialColist A),
+  coprefix l1 l2
+   -> n_look_ahead n l1 = fail_n
+   -> n_look_ahead n l2 = fail_n.
+intros A n.
+induction n as [ | n IHn]; intros l1 l2 Hpre Hl1;
+ inversion Hpre; subst; simpl in *; auto.
++ discriminate.
++ now eauto.
+Qed.
+
+
+Lemma cong_n_look_ahead_eq :
+ forall {A : Type} (n : nat) (l1 l2 : PartialColist A),
+  l1 ~=~ l2 -> n_look_ahead n l1 = n_look_ahead n l2.
+intros A n.
+induction n as [ | n IHn]; intros l1 l2 Hcong; inversion Hcong; simpl; now auto.
+Qed.
+
+
+
+
+
 CoFixpoint drop_tl_n {A : Type} (n : nat) (l : PartialColist A) : PartialColist A :=
- match n_look_ahead n l with
- | le_n => []
- | fail_n => -*-
- | more_n =>
-   match l with
-   | [] | -*- => l
-   | a :: l => a :: drop_tl_n n l
+ match l with
+ | [] | -*- => l
+ | a :: l =>
+   match n_look_ahead n l with
+   | lt_n => []
+   | fail_n => -*-
+   | more_n => a :: drop_tl_n n l
    end
  end.
 
+
+Lemma drop_prefix :
+ forall {A : Type} (n : nat) (l1 l2 : PartialColist A),
+  coprefix l1 l2 -> coprefix (drop_tl_n n l1) (drop_tl_n n l2).
+intros A.
+cofix cf.
+intros n l1 l2 Hpre.
+cl_red (drop_tl_n n l1).
+cl_red (drop_tl_n n l2).
+inversion Hpre; subst.
++ simpl.
+  now constructor.
++ simpl.
+  destruct (n_look_ahead n l0) eqn: Hn.
+  - now constructor.
+  - rewrite coprefix_n_look_ahead_fail with (l1 := l0); auto.
+    now constructor.
+  - rewrite coprefix_n_look_ahead_more with (l1 := l0); auto.
+    constructor.
+    now auto.
++ simpl.
+  now constructor.
+Qed.
+
+
+Lemma drop_0_cong :
+ forall {A : Type} (l : PartialColist A),
+  drop_tl_n 0 l ~=~ l.
+intro A.
+cofix cf.
+intro l.
+cl_red (drop_tl_n 0 l).
+destruct l as [ | a l | ]; simpl; constructor.
+now auto.
+Qed.
+
+
+Lemma drop_n_cnil :
+ forall {A : Type} (n : nat), @drop_tl_n A n [] = [].
+intros A n.
+cl_red (@drop_tl_n A n []).
+simpl; now auto.
+Qed.
+
+Lemma drop_n_cfail :
+ forall {A : Type} (n : nat), @drop_tl_n A n -*- = -*-.
+intros A n.
+cl_red (@drop_tl_n A n -*-).
+simpl; now auto.
+Qed.
+
+Lemma drop_n_ccons :
+ forall {A : Type} (n : nat) (a : A) l,
+  drop_tl_n n (a :: l) = [] /\ n_look_ahead n l = lt_n
+   \/ drop_tl_n n (a :: l) = a :: drop_tl_n n l /\ n_look_ahead n l = more_n
+   \/ drop_tl_n n (a :: l) = -*- /\ n_look_ahead n l = fail_n.
+intros A n a l.
+cl_red (drop_tl_n n (a :: l)).
+destruct n; simpl; auto.
+destruct l; simpl; auto.
+destruct (n_look_ahead n l); now auto.
+Qed.
+
+
+
+
+Lemma cong_drop_rewrite :
+ forall {A : Type} (l1 l2 : PartialColist A) (n : nat),
+  l1 ~=~ l2 -> drop_tl_n n l1 ~=~ drop_tl_n n l2.
+intro A.
+cofix cf.
+intros l1 l2 n Hcong.
+inversion Hcong; subst; try apply colist_cong_reflexive.
+assert (Hla := cong_n_look_ahead_eq n l0 l3 H).
+destruct (drop_n_ccons n a l0) as [[Heq Hla0] | [[Heq Hla0] | [Heq Hla0]]]; rewrite Heq, Hla0 in *;
+ destruct (drop_n_ccons n a l3) as [[Heq' Hla3] | [[Heq' Hla3] | [Heq' Hla3]]]; rewrite Heq', Hla3 in *;
+  try discriminate; constructor.
+now auto.
+Qed.
+
+
+
+Lemma look_ahead_tail_lt :
+ forall {A : Type} (n : nat) (a : A) l,
+  n_look_ahead n (a :: l) = lt_n -> n_look_ahead n l = lt_n.
+intros A n.
+induction n as [ | n IHn]; simpl; intros a l Hla.
++ discriminate.
++ clear a.
+  destruct l as [ | a l | ].
+  - now auto.
+  - now eauto.
+  - destruct n; simpl in Hla; discriminate.
+Qed.
+
+Lemma look_ahead_tail_fail :
+ forall {A : Type} (n : nat) (a : A) l,
+  n_look_ahead n (a :: l) = fail_n -> n_look_ahead n l = fail_n.
+intros A n.
+induction n as [ | n IHn]; simpl; intros a l Hla.
++ discriminate.
++ clear a.
+  destruct l as [ | a l | ].
+  - destruct n; simpl in Hla; discriminate.
+  - now eauto.
+  - now auto.
+Qed.
+
+
+
+
+Lemma drop_S_n_cong :
+ forall {A : Type} (n : nat) (l : PartialColist A),
+  drop_tl_n 1 (drop_tl_n n l) ~=~ drop_tl_n (S n) l.
+intros A n.
+cofix cf.
+intro l.
+destruct l as [ | a l | ].
++ clear cf.
+  repeat rewrite drop_n_cnil.
+  now constructor.
++ destruct (drop_n_ccons n a l)
+   as [[Heqn Hlan] | [[Heqn Hlan] | [Heqn Hlan]]]; rewrite Heqn.
+  - clear cf.
+    rewrite drop_n_cnil.
+    cl_red (drop_tl_n (S n) (a :: l)); simpl.
+    destruct l as [ | a' l | ]; simpl.
+    * now constructor.
+    * rewrite (look_ahead_tail_lt _ _ _ Hlan).
+      now constructor.
+    * destruct n; simpl in Hlan; discriminate.
+  - cl_red (drop_tl_n 1 (a :: drop_tl_n n l)).
+    cl_red (drop_tl_n (S n) (a :: l)).
+    simpl.
+    destruct l as [ | a' l' | ] eqn: Heq; simpl; try constructor.
+    destruct (n_look_ahead n l'); constructor.
+    rewrite <- Heq in *; clear a' l' Heq.
+    now apply cf.
+  - clear cf.
+    cl_red (drop_tl_n (S n) (a :: l)); simpl.
+    destruct l as [ | a' l | ]; simpl.
+    * destruct n; simpl in Hlan; discriminate.
+    * rewrite (look_ahead_tail_fail _ _ _ Hlan).
+      rewrite drop_n_cfail.
+      now constructor.
+    * rewrite drop_n_cfail.
+      now constructor.
++ clear cf.
+  repeat rewrite drop_n_cfail.
+  now constructor.
+Qed.
+
+
+
+Lemma drop_nest_add_cong :
+ forall {A : Type} (m n : nat) (l : PartialColist A),
+  drop_tl_n m (drop_tl_n n l) ~=~ drop_tl_n (m + n) l.
+intros A m n l.
+induction m as [ | m IHm]; simpl.
++ now apply drop_0_cong.
++ apply colist_cong_transitive with (drop_tl_n 1 (drop_tl_n m (drop_tl_n n l))).
+  - apply colist_cong_symmetric.
+    now apply drop_S_n_cong.
+  - apply colist_cong_transitive with (drop_tl_n 1 (drop_tl_n (m + n) l)).
+    * apply cong_drop_rewrite.
+      now apply IHm.
+    * now apply drop_S_n_cong.
+Qed.
 
 
 
@@ -233,15 +547,15 @@ Fixpoint cobwd {X Y : Type} (e : IIST X Y) : PartialColist Y -> PartialColist X 
  end.
 
 
-Lemma cofwd_prefix : forall {X Y : Type} (e : IIST X Y) (xs xs' : PartialColist X),
+Theorem cofwd_prefix : forall {X Y : Type} (e : IIST X Y) (xs xs' : PartialColist X),
   coprefix xs' xs -> coprefix (cofwd e xs') (cofwd e xs).
 intros X Y e.
 induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X2 Y1 Y2 e1 IHe1 e2 IHe2]; simpl.
 + revert a.
   cofix mf.
   intros a xs xs' Hpre.
-  rewrite colist_frob_eq with (cofwd_mapfold f g a xs').
-  rewrite colist_frob_eq with (cofwd_mapfold f g a xs).
+  cl_red (cofwd_mapfold f g a xs').
+  cl_red (cofwd_mapfold f g a xs).
   inversion Hpre; subst; simpl.
   - now constructor.
   - destruct (forward X Y (f a) a0); simpl; constructor.
@@ -254,5 +568,536 @@ induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X
   - now auto.
   - now constructor.
 + now eauto.
-+ admit.
++ intros xs xs' Hpre.
+  apply cozip_prefix.
+  - apply drop_prefix.
+    apply IHe1.
+    apply coleft_prefix.
+    now auto.
+  - apply drop_prefix.
+    apply IHe2.
+    apply coright_prefix.
+    now auto.
+Qed.
+
+
+Theorem cobwd_prefix : forall {X Y : Type} (e : IIST X Y) (ys ys' : PartialColist Y),
+  coprefix ys' ys -> coprefix (cobwd e ys') (cobwd e ys).
+intros X Y e.
+induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X2 Y1 Y2 e1 IHe1 e2 IHe2]; simpl.
++ revert a.
+  cofix mf.
+  intros a ys ys' Hpre.
+  cl_red (cobwd_mapfold f g a ys').
+  cl_red (cobwd_mapfold f g a ys).
+  inversion Hpre; subst; simpl.
+  - now constructor.
+  - destruct (backward X Y (f a) a0); simpl; constructor.
+    apply mf; now auto.
+  - now constructor.
++ intros ys ys' Hpre.
+  inversion Hpre; subst; simpl; try constructor.
+  destruct equiv_one_dec with a.
+  - now auto.
+  - now constructor.
++ intros ? ?; now apply coprefix_slide.
++ now eauto.
++ intros ys ys' Hpre.
+  apply cozip_prefix.
+  - apply drop_prefix.
+    apply IHe1.
+    apply coleft_prefix.
+    now auto.
+  - apply drop_prefix.
+    apply IHe2.
+    apply coright_prefix.
+    now auto.
+Qed.
+
+
+
+
+Lemma cofwd_nil :
+ forall {X Y : Type} (e : IIST X Y),
+  cofwd e [] = [].
+intros X Y e.
+induction e; rewrite colist_frob_eq with (cofwd _ []); simpl; auto.
++ rewrite IHe1.
+  rewrite IHe2.
+  simpl; now auto.
++ rewrite colist_frob_eq with (coleft []); simpl.
+  rewrite IHe1.
+  rewrite colist_frob_eq with (coright []); simpl.
+  rewrite IHe2.
+  destruct (delay_fwd e2 - delay_fwd e1);
+   destruct (delay_fwd e1 - delay_fwd e2); simpl; now auto.
+Qed.
+
+
+Lemma cofwd_fail : 
+ forall {X Y : Type} (e : IIST X Y),
+  cofwd e -*- = -*-.
+intros X Y e.
+induction e; rewrite colist_frob_eq with (cofwd _ -*-); simpl; auto.
++ rewrite IHe1; rewrite IHe2; simpl.
+  now auto.
++ rewrite colist_frob_eq with (coleft -*-); simpl.
+  rewrite IHe1.
+  now auto.
+Qed.
+
+
+CoInductive failless_colist {A : Type} : PartialColist A -> Prop :=
+| flcnil : failless_colist []
+| flccons : forall a l, failless_colist l -> failless_colist (a :: l).
+
+
+Lemma failless_coslide_iff :
+ forall {A : Type} (a : A) l,
+  failless_colist l <-> failless_colist (coslide a l).
+intros A a l.
+split; revert a l; cofix cf; intros a l Hfl.
++ cl_red (coslide a l).
+  destruct l as [ | a' l | ]; simpl.
+  - now constructor.
+  - constructor.
+    inversion Hfl; subst; now auto.
+  - now inversion Hfl.
++ cl_red_in (coslide a l) Hfl.
+  destruct l as [ | a' l | ]; simpl in Hfl.
+  - now constructor.
+  - constructor.
+    now inversion Hfl; subst; now eauto.
+  - now inversion Hfl.
+Qed.
+
+
+Lemma failless_coleft_iff :
+ forall {A B : Type} (l : PartialColist (A * B)),
+  failless_colist l <-> failless_colist (coleft l).
+intros A B l.
+split; revert l; cofix cf; intros l Hfl.
++ cl_red (coleft l).
+  destruct l as [ | [a b] l | ]; simpl.
+  - now constructor.
+  - constructor.
+    inversion Hfl; subst; now auto.
+  - now inversion Hfl.
++ cl_red_in (coleft l) Hfl.
+  destruct l as [ | [a b] l | ]; simpl in Hfl.
+  - now constructor.
+  - constructor.
+    now inversion Hfl; subst; now eauto.
+  - now inversion Hfl.
+Qed.
+
+
+Lemma failless_coright_iff :
+ forall {A B : Type} (l : PartialColist (A * B)),
+  failless_colist l <-> failless_colist (coright l).
+intros A B l.
+split; revert l; cofix cf; intros l Hfl.
++ cl_red (coright l).
+  destruct l as [ | [a b] l | ]; simpl.
+  - now constructor.
+  - constructor.
+    inversion Hfl; subst; now auto.
+  - now inversion Hfl.
++ cl_red_in (coright l) Hfl.
+  destruct l as [ | [a b] l | ]; simpl in Hfl.
+  - now constructor.
+  - constructor.
+    now inversion Hfl; subst; now eauto.
+  - now inversion Hfl.
+Qed.
+
+
+
+Lemma failless_lookup_not_fail :
+ forall {A : Type} (n : nat) (l : PartialColist A),
+  failless_colist l -> n_look_ahead n l <> fail_n.
+intros A n.
+induction n as [ | n IHn]; simpl; intros l Hfl Hnl.
++ inversion Hfl; subst; now inversion Hnl.
++ inversion Hfl; subst; inversion Hnl.
+  eapply IHn; now eauto.
+Qed.
+
+
+Lemma failless_drop :
+ forall {A : Type} (n : nat) (l : PartialColist A),
+  failless_colist l <-> failless_colist (drop_tl_n n l).
+intros A n l.
+split; revert n l; cofix cf; intros n l Hfl.
++ cl_red (drop_tl_n n l).
+  destruct l as [ | a l | ]; simpl.
+  - destruct n; simpl; now constructor.
+  - destruct (n_look_ahead n l) eqn: Heq.
+    * now constructor.
+    * inversion Hfl; subst.
+      elim failless_lookup_not_fail with n l; now auto.
+    * constructor.
+      inversion Hfl; now auto.
+  - now inversion Hfl.
++ cl_red_in (drop_tl_n n l) Hfl.
+  destruct l as [ | a l | ].
+  - now constructor.
+  - simpl in Hfl.
+    constructor.
+    destruct (n_look_ahead n l) eqn: Heq.
+    * apply cf with n.
+      rewrite colist_frob_eq.
+      unfold drop_tl_n; simpl.
+      {
+      destruct l as [ | a' l | ].
+      + now constructor.
+      + rewrite (look_ahead_tail_lt _ _ _ Heq).
+        now constructor.
+      + destruct n; discriminate.
+      }
+    * now inversion Hfl.
+    * inversion Hfl; subst.
+      now eauto.
+  - destruct n; simpl in Hfl; now inversion Hfl.
+Qed.
+
+
+CoInductive failless_coprefix {A : Type} : PartialColist A -> PartialColist A -> Prop :=
+| flcopre_nil : forall l, failless_coprefix [] l
+| flcopre_cons : forall a l1 l2, failless_coprefix l1 l2 -> failless_coprefix (a :: l1) (a :: l2).
+
+
+
+Lemma failless_coprefix_prefix :
+ forall {A : Type} (l1 l2 : PartialColist A),
+  failless_coprefix l1 l2 -> coprefix l1 l2.
+intro A.
+cofix cf.
+intros l1 l2 Hflpre.
+inversion Hflpre; subst; constructor; now auto.
+Qed.
+
+
+Lemma failless_coprefix_failless :
+ forall {A : Type} (l1 l2 : PartialColist A),
+  failless_coprefix l1 l2 -> failless_colist l1.
+intro A.
+cofix cf.
+intros l1 l2 Hflpre.
+inversion Hflpre; subst; constructor; now eauto.
+Qed.
+
+
+Lemma coprefix_failless_flprefix :
+ forall {A : Type} (l1 l2 : PartialColist A),
+  coprefix l1 l2 -> failless_colist l1 -> failless_coprefix l1 l2.
+intro A.
+cofix cf.
+intros l1 l2 Hpre Hfl.
+inversion Hfl; subst; try constructor.
+inversion Hpre; subst; constructor; now auto.
+Qed.
+
+
+Lemma failless_coprefix_prefix_compose :
+ forall {A : Type} (l1 l2 l3 : PartialColist A),
+  failless_coprefix l1 l2 -> coprefix l2 l3 -> failless_coprefix l1 l3.
+intro A.
+cofix cf.
+intros l1 l2 l3 Hflpre Hpre.
+inversion Hflpre; subst; try constructor.
+inversion Hpre; subst; constructor; now eauto.
+Qed.
+
+
+
+
+CoInductive sync_colist {A B: Type} :
+ PartialColist A -> PartialColist B -> Prop :=
+| sycnil : sync_colist [] []
+| syccons : forall a b l1 l2, sync_colist l1 l2 -> sync_colist (a :: l1) (b :: l2)
+| sycfail_l : forall l, sync_colist -*- l
+| sycfail_r : forall l, sync_colist l   -*-.
+
+
+
+Lemma sync_colist_reflexive :
+ forall {A : Type} (l : PartialColist A),
+  sync_colist l l.
+intro A.
+cofix cf.
+intro l.
+destruct l; constructor.
+now auto.
+Qed.
+
+
+Lemma sync_colist_symmetric :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  sync_colist l1 l2 -> sync_colist l2 l1.
+intros A B.
+cofix cf.
+intros l1 l2 Hsyn.
+inversion Hsyn; subst; constructor.
+now auto.
+Qed.
+
+
+(* transitivityは成り立たない（つなぐものがfailだと各々に条件がない） *)
+
+
+Lemma sync_colist_zip_failless_left :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  sync_colist l1 l2 -> failless_colist (cozip l1 l2) -> failless_colist l1.
+intros A B.
+cofix cf.
+intros l1 l2 Hsyn Hfl.
+cl_red_in (cozip l1 l2) Hfl.
+inversion Hsyn; subst; simpl in *.
++ now constructor.
++ constructor.
+  inversion Hfl; subst.
+  now eauto.
++ now inversion Hfl; subst.
++ destruct l1; simpl in Hfl; now inversion Hfl.
+Qed.
+
+
+Lemma sync_colist_zip_failless_right :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  sync_colist l1 l2 -> failless_colist (cozip l1 l2) -> failless_colist l2.
+intros A B.
+cofix cf.
+intros l1 l2 Hsyn Hfl.
+cl_red_in (cozip l1 l2) Hfl.
+inversion Hsyn; subst; simpl in *.
++ now constructor.
++ inversion Hfl; subst; constructor; now eauto.
++ now inversion Hfl.
++ destruct l1; simpl in Hfl; now inversion Hfl.
+Qed.
+
+
+
+CoInductive oneway_sync_colist {A B : Type} :
+ PartialColist A -> PartialColist B -> Prop :=
+| owsycnil : oneway_sync_colist [] []
+| owsyccons : forall a b l1 l2, oneway_sync_colist l1 l2 -> oneway_sync_colist (a :: l1) (b :: l2)
+| owsycfail : forall l, oneway_sync_colist l -*-.
+
+
+Lemma oneway_sync_reflexive :
+ forall {A : Type} (l : PartialColist A),
+  oneway_sync_colist l l.
+intro A.
+cofix cf.
+intro l.
+destruct l; constructor.
+now auto.
+Qed.
+
+
+Lemma oneway_sync_transitive :
+ forall {A B C : Type} (l1 : PartialColist A) (l2 : PartialColist B) (l3 : PartialColist C),
+  oneway_sync_colist l1 l2 -> oneway_sync_colist l2 l3 -> oneway_sync_colist l1 l3.
+intros A B C.
+cofix cf.
+intros l1 l2 l3 Hos12 Hos23.
+inversion Hos12; subst; inversion Hos23; subst; constructor.
+now eauto.
+Qed.
+
+
+Lemma oneway_sync_sync :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  oneway_sync_colist l1 l2 -> sync_colist l1 l2.
+intros A B.
+cofix cf.
+intros l1 l2 Hos.
+inversion Hos; subst; constructor; now auto.
+Qed.
+
+
+
+CoInductive strict_sync_colist {A B : Type} :
+ PartialColist A -> PartialColist B -> Prop :=
+| stsycnil : strict_sync_colist [] []
+| stsyccons : forall a b l1 l2, strict_sync_colist l1 l2 -> strict_sync_colist (a :: l1) (b :: l2)
+| stsycfail : strict_sync_colist -*- -*-.
+
+
+Lemma strict_sync_reflexive :
+ forall {A : Type} (l : PartialColist A),
+  strict_sync_colist l l.
+intro A.
+cofix cf.
+intro l.
+destruct l; constructor.
+now auto.
+Qed.
+
+
+Lemma strict_sync_symmetric :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  strict_sync_colist l1 l2 -> strict_sync_colist l2 l1.
+intros A B.
+cofix cf.
+intros l1 l2 Hss.
+inversion Hss; subst; constructor.
+now auto.
+Qed.
+
+
+Lemma strict_sync_transitive :
+ forall {A B C : Type} (l1 : PartialColist A) (l2 : PartialColist B) (l3 : PartialColist C),
+  strict_sync_colist l1 l2 -> strict_sync_colist l2 l3 -> strict_sync_colist l1 l3.
+intros A B C.
+cofix cf.
+intros l1 l2 l3 Hss12 Hss23.
+inversion Hss12; subst; inversion Hss23; subst; constructor.
+now eauto.
+Qed.
+
+
+Lemma strict_sync_oneway :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  strict_sync_colist l1 l2 -> oneway_sync_colist l1 l2.
+intros A B.
+cofix cf.
+intros l1 l2 Hss.
+inversion Hss; subst; constructor.
+now auto.
+Qed.
+
+
+
+Lemma coleft_right_strict_sync_colist :
+ forall {A B : Type} (l : PartialColist (A * B)),
+  strict_sync_colist (coleft l) (coright l).
+intros A B.
+cofix cf.
+intro l.
+cl_red (coleft l).
+cl_red (coright l).
+destruct l as [ | [a b] l | ]; simpl; constructor.
+now auto.
+Qed.
+
+
+
+Lemma strict_oneway_sync :
+ forall {A B C D : Type}
+        (la : PartialColist A)
+        (lb : PartialColist B)
+        (lc : PartialColist C)
+        (ld : PartialColist D),
+ strict_sync_colist la lb
+  -> oneway_sync_colist la lc
+  -> oneway_sync_colist lb ld
+  -> sync_colist lc ld.
+intros A B C D.
+cofix cf.
+intros la lb lc ld Hss Hos1 Hos2.
+inversion Hss; subst;
+ inversion Hos1; subst;
+  inversion Hos2; subst;
+   try constructor.
+now eauto.
+Qed.
+
+
+
+Lemma cofwd_drop_oneway_sync :
+ forall {X Y : Type} (e : IIST X Y) (n : nat) (xs : PartialColist X),
+  oneway_sync_colist (drop_tl_n (delay_fwd e + n) xs) (drop_tl_n n (cofwd e xs)).
+intros X Y e.
+induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X2 Y1 Y2 e1 IHe1 e2 IHe2];
+ intros n xs; simpl.
 Admitted.
+
+
+
+
+Theorem cofwd_sync_colist :
+ forall {X1 X2 Y1 Y2 : Type} (e1 : IIST X1 Y1) (e2 : IIST X2 Y2)
+        (l1 : PartialColist X1) (l2 : PartialColist X2),
+  strict_sync_colist l1 l2
+  -> sync_colist (drop_tl_n (delay_fwd e2 - delay_fwd e1) (cofwd e1 l1))
+                 (drop_tl_n (delay_fwd e1 - delay_fwd e2) (cofwd e2 l2)).
+(*
+intros X1 X2 Y1 Y2 e1 e2 l1 l2 Hss.
+apply (strict_oneway_sync _ _ _ _ Hss).
++ apply cofwd_drop_oneway_sync.
+*)
+(*
+intros X1 X2 Y1 Y2 e1 e2.
+cofix cf.
+intros l1 l2 Hss.
+inversion Hss; subst; simpl.
++ repeat rewrite cofwd_nil.
+  repeat rewrite drop_n_cnil.
+  now constructor.
++ admit. (* 真面目に思いつかない。1stepではaやbが外に出てくるとは限らない。 *)
++ rewrite cofwd_fail.
+  rewrite drop_n_cfail.
+  now constructor.
+*)
+Admitted.
+
+Theorem cofwd_failless_origin :
+ forall {X Y : Type} (e : IIST X Y) xs,
+  failless_colist (cofwd e xs) -> failless_colist xs.
+intros X Y e.
+induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X2 Y1 Y2 e1 IHe1 e2 IHe2];
+ simpl.
++ revert a.
+  cofix cf.
+  intros a xs Hfl.
+  cl_red_in (cofwd_mapfold f g a xs) Hfl.
+  destruct xs; simpl in *; try constructor.
+  - destruct (forward X Y (f a) x); simpl in Hfl; inversion Hfl; subst.
+    now eauto.
+  - now inversion Hfl.
++ intro xs; apply failless_coslide_iff.
++ intros xs Hfl.
+  destruct xs as [ | x' xs | ].
+  - now constructor.
+  - destruct (equiv_one_dec x').
+    * constructor; now auto.
+    * now inversion Hfl.
+  - now inversion Hfl.
++ now eauto.
++ intros xs Hfl.
+  apply failless_coleft_iff.
+  apply IHe1.
+  assert (Hss := coleft_right_strict_sync_colist xs).
+  apply cofwd_sync_colist with (e1 := e1) (e2 := e2) in Hss.
+  apply sync_colist_zip_failless_left in Hfl; auto.
+  apply failless_drop in Hfl.
+  now auto.
+Qed.
+
+
+
+Theorem cofwd_failless_inverse :
+ forall {X Y : Type} (e : IIST X Y) xs ys,
+  failless_coprefix ys (cofwd e xs)
+  -> exists xs', cofwd e xs' = ys /\ failless_coprefix xs' xs.
+Abort.
+
+
+
+Theorem cofwd_bwd :
+ forall {X Y : Type} (e : IIST X Y) xs ys,
+  failless_coprefix ys (cofwd e xs)
+  -> failless_coprefix (cobwd e ys) xs.
+Abort.
+
+
+(* ある種の長さ制約 *)
+Theorem cofwd_bwd_length :
+ forall {X Y : Type} (e : IIST X Y) xs,
+  failless_colist (cofwd e xs) ->
+   cobwd e (cofwd e xs) = drop_tl_n (delay_fwd e + delay_bwd e) xs.
+Abort.
+
