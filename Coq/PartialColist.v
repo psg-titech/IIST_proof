@@ -3,6 +3,20 @@ Require Import IIST.OptionBind.
 Require Import IIST.PartInvFun.
 
 
+
+Require Import Lia.
+Lemma max_minus_plus1 : forall m n, max m n = m - n + n.
+lia.
+Qed.
+
+Lemma max_minus_plus2 : forall m n, max m n = n - m + m.
+lia.
+Qed.
+
+
+
+
+
 CoInductive PartialColist (A : Type) : Type :=
 | cnil : PartialColist A
 | ccons : A -> PartialColist A -> PartialColist A
@@ -230,6 +244,21 @@ inversion Hpre; subst; simpl; try constructor.
 destruct a; simpl.
 constructor.
 now auto.
+Qed.
+
+
+
+Lemma cozip_left_right_cong :
+ forall {A B : Type} (l : PartialColist (A * B)),
+  l ~=~ cozip (coleft l) (coright l).
+intros A B.
+cofix cf.
+intro l.
+cl_red (cozip (coleft l) (coright l)).
+cl_red (coleft l).
+cl_red (coright l).
+destruct l as [ | [a b] l | ]; simpl; constructor.
+now apply cf.
 Qed.
 
 
@@ -908,6 +937,19 @@ now eauto.
 Qed.
 
 
+Lemma cong_oneway_sync_rewrite_l :
+ forall {A B : Type} (l1 l1' : PartialColist A) (l2 : PartialColist B),
+  l1 ~=~ l1' -> oneway_sync_colist l1 l2 -> oneway_sync_colist l1' l2.
+intros A B.
+cofix cf.
+intros l1 l1' l2 Hcong How;
+ inversion Hcong; subst;
+  inversion How; subst;
+   try constructor.
+now eauto.
+Qed.
+
+
 Lemma oneway_sync_sync :
  forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
   oneway_sync_colist l1 l2 -> sync_colist l1 l2.
@@ -916,6 +958,66 @@ cofix cf.
 intros l1 l2 Hos.
 inversion Hos; subst; constructor; now auto.
 Qed.
+
+
+
+Lemma oneway_sync_look_ahead_lt :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A) (l2 : PartialColist B),
+  oneway_sync_colist l1 l2 -> n_look_ahead n l2 = lt_n -> n_look_ahead n l1 = lt_n.
+intros A B n.
+induction n as [ | n IHn]; intros l1 l2 How Hnl;
+ inversion How; subst; simpl in *; try discriminate; now eauto.
+Qed.
+
+
+Lemma oneway_sync_look_ahead_more :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A) (l2 : PartialColist B),
+  oneway_sync_colist l1 l2 -> n_look_ahead n l2 = more_n -> n_look_ahead n l1 = more_n.
+intros A B n.
+induction n as [ | n IHn]; intros l1 l2 How Hnl;
+ inversion How; subst; simpl in *; try discriminate; now eauto.
+Qed.
+
+
+
+
+
+Lemma oneway_sync_drop_rewrite :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A) (l2 : PartialColist B),
+  oneway_sync_colist l1 l2 -> oneway_sync_colist (drop_tl_n n l1) (drop_tl_n n l2).
+intros A B n; cofix cf; intros l1 l2 How.
+cl_red (drop_tl_n n l1).
+cl_red (drop_tl_n n l2).
+inversion How; subst; simpl; try constructor.
+destruct (n_look_ahead n l3) eqn: Heq.
++ rewrite (oneway_sync_look_ahead_lt _ _ _ H Heq).
+  now constructor.
++ now constructor.
++ rewrite (oneway_sync_look_ahead_more n _ _ H Heq).
+  constructor.
+  now auto.
+Qed.
+
+
+
+Lemma oneway_sync_zip :
+ forall {A B C D : Type}
+        (la : PartialColist A) (lb : PartialColist B)
+        (lc : PartialColist C) (ld : PartialColist D),
+  oneway_sync_colist la lb
+  -> oneway_sync_colist lc ld
+  -> oneway_sync_colist (cozip la lc) (cozip lb ld).
+intros A B C D.
+cofix cf.
+intros la lb lc ld Hosab Hoscd.
+cl_red (cozip la lc).
+cl_red (cozip lb ld).
+inversion Hosab; subst;
+ inversion Hoscd; subst;
+  simpl; try constructor.
+now eauto.
+Qed.
+
 
 
 
@@ -985,6 +1087,77 @@ Qed.
 
 
 
+Lemma strict_sync_look_ahead :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A) (l2 : PartialColist B),
+  strict_sync_colist l1 l2 -> n_look_ahead n l1 = n_look_ahead n l2.
+intros A B n.
+induction n as [ | IHn]; intros l1 l2 Hss; inversion Hss; subst; simpl; now auto.
+Qed.
+
+
+Lemma strict_sync_drop_rewrite :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A) (l2 : PartialColist B),
+  strict_sync_colist l1 l2 -> strict_sync_colist (drop_tl_n n l1) (drop_tl_n n l2).
+intros A B n; cofix cf; intros l1 l2 Hss.
+cl_red (drop_tl_n n l1).
+cl_red (drop_tl_n n l2).
+inversion Hss; subst; simpl; try constructor.
+rewrite (strict_sync_look_ahead n _ _ H).
+destruct (n_look_ahead n l3); constructor.
+now eauto.
+Qed.
+
+
+Lemma strict_sync_coslide :
+ forall {A : Type} (a : A) l, strict_sync_colist l (coslide a l).
+intro A.
+cofix cf.
+intros a l.
+cl_red (coslide a l).
+destruct l as [ | a' l | ]; simpl; constructor.
+now auto.
+Qed.
+
+
+
+Lemma strict_sync_zip :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  strict_sync_colist l1 l2
+  -> strict_sync_colist l1 (cozip l1 l2).
+intros A B.
+cofix cf.
+intros l1 l2 Hss.
+cl_red (cozip l1 l2).
+inversion Hss; subst; simpl; constructor.
+now auto.
+Qed.
+
+
+Lemma cozip_drop_strict_distributive :
+ forall {A B : Type} (n : nat) (l1 : PartialColist A)(l2 : PartialColist B),
+  strict_sync_colist l1 l2
+  -> cozip (drop_tl_n n l1) (drop_tl_n n l2) ~=~ drop_tl_n n (cozip l1 l2).
+intros A B n.
+cofix cf.
+intros l1 l2 Hss.
+cl_red (cozip (drop_tl_n n l1) (drop_tl_n n l2)).
+cl_red (drop_tl_n n (cozip l1 l2)).
+cl_red (drop_tl_n n l1).
+cl_red (drop_tl_n n l2).
+cl_red (cozip l1 l2).
+inversion Hss; simpl; try constructor.
++ rewrite <- (strict_sync_look_ahead _ _ _ H).
+  rewrite <- (strict_sync_look_ahead _ _ _ (strict_sync_zip _ _ H)).
+  destruct (n_look_ahead n l0) eqn: Heq; constructor.
+  now apply cf.
+Qed.
+
+
+
+
+
+
+
 Lemma strict_oneway_sync :
  forall {A B C D : Type}
         (la : PartialColist A)
@@ -1008,12 +1181,71 @@ Qed.
 
 
 Lemma cofwd_drop_oneway_sync :
- forall {X Y : Type} (e : IIST X Y) (n : nat) (xs : PartialColist X),
-  oneway_sync_colist (drop_tl_n (delay_fwd e + n) xs) (drop_tl_n n (cofwd e xs)).
+ forall {X Y : Type} (e : IIST X Y) (xs : PartialColist X),
+  oneway_sync_colist (drop_tl_n (delay_fwd e) xs) (cofwd e xs).
 intros X Y e.
 induction e as [A X Y a f g | X x e' | X x e' | X Y Z exy IHexy eyz IHeyz | X1 X2 Y1 Y2 e1 IHe1 e2 IHe2];
- intros n xs; simpl.
-Admitted.
+ intro xs; simpl.
++ apply cong_oneway_sync_rewrite_l with xs.
+  - apply colist_cong_symmetric.
+    now apply drop_0_cong.
+  - revert a xs.
+    cofix cf.
+    intros a xs.
+    cl_red (cofwd_mapfold f g a xs).
+    destruct xs as [ | x xs | ]; simpl; try constructor.
+    destruct (forward X Y (f a) x) as [ y | ]; simpl; constructor.
+    now apply cf.
++ apply cong_oneway_sync_rewrite_l with xs.
+  - apply colist_cong_symmetric.
+    now apply drop_0_cong.
+  - apply strict_sync_oneway.
+    now apply strict_sync_coslide.
++ destruct xs as [ | x' xs | ]; simpl; try constructor.
+  - rewrite drop_n_cnil.
+    now constructor.
+  - destruct (equiv_one_dec x') as [e | e]; try constructor.
+    rewrite <- e; clear x' e e'.
+    revert x xs; cofix cf; intros x xs.
+    cl_red (drop_tl_n 1 (x :: xs)).
+    destruct xs as [ | x' xs | ]; simpl; try constructor.
+    now apply cf.
++ apply cong_oneway_sync_rewrite_l
+   with (l1 := drop_tl_n (delay_fwd eyz) (drop_tl_n (delay_fwd exy) xs)).
+  - rewrite PeanoNat.Nat.add_comm.
+    now apply drop_nest_add_cong.
+  - apply oneway_sync_transitive with (drop_tl_n (delay_fwd eyz) (cofwd exy xs)).
+    * apply oneway_sync_drop_rewrite.
+      now apply IHexy.
+    * now apply IHeyz.
++ apply cong_oneway_sync_rewrite_l
+   with (l1 := drop_tl_n (Nat.max (delay_fwd e1) (delay_fwd e2)) (cozip (coleft xs) (coright xs))).
+  {
+    apply cong_drop_rewrite.
+    apply colist_cong_symmetric.
+    now apply cozip_left_right_cong.
+  }
+  apply cong_oneway_sync_rewrite_l
+   with (l1 := cozip (drop_tl_n (max (delay_fwd e1) (delay_fwd e2)) (coleft xs))
+                     (drop_tl_n (max (delay_fwd e1) (delay_fwd e2)) (coright xs))).
+  {
+    apply cozip_drop_strict_distributive.
+    now apply coleft_right_strict_sync_colist.
+  }
+  apply oneway_sync_zip.
+  - rewrite max_minus_plus2.
+    apply cong_oneway_sync_rewrite_l
+     with (l1 := drop_tl_n (delay_fwd e2 - delay_fwd e1) (drop_tl_n (delay_fwd e1) (coleft xs))).
+    * now apply drop_nest_add_cong.
+    * apply oneway_sync_drop_rewrite.
+      now auto.
+  - rewrite max_minus_plus1.
+    apply cong_oneway_sync_rewrite_l
+     with (l1 := drop_tl_n (delay_fwd e1 - delay_fwd e2) (drop_tl_n (delay_fwd e2) (coright xs))).
+    * now apply drop_nest_add_cong.
+    * apply oneway_sync_drop_rewrite.
+      now auto.
+Qed.
 
 
 
@@ -1024,27 +1256,26 @@ Theorem cofwd_sync_colist :
   strict_sync_colist l1 l2
   -> sync_colist (drop_tl_n (delay_fwd e2 - delay_fwd e1) (cofwd e1 l1))
                  (drop_tl_n (delay_fwd e1 - delay_fwd e2) (cofwd e2 l2)).
-(*
 intros X1 X2 Y1 Y2 e1 e2 l1 l2 Hss.
+apply strict_sync_drop_rewrite with (n := max (delay_fwd e1) (delay_fwd e2)) in Hss.
 apply (strict_oneway_sync _ _ _ _ Hss).
-+ apply cofwd_drop_oneway_sync.
-*)
-(*
-intros X1 X2 Y1 Y2 e1 e2.
-cofix cf.
-intros l1 l2 Hss.
-inversion Hss; subst; simpl.
-+ repeat rewrite cofwd_nil.
-  repeat rewrite drop_n_cnil.
-  now constructor.
-+ admit. (* 真面目に思いつかない。1stepではaやbが外に出てくるとは限らない。 *)
-+ rewrite cofwd_fail.
-  rewrite drop_n_cfail.
-  now constructor.
-*)
-Admitted.
++ rewrite max_minus_plus2.
+  apply cong_oneway_sync_rewrite_l
+   with (l1 := drop_tl_n (delay_fwd e2 - delay_fwd e1) (drop_tl_n (delay_fwd e1) l1)).
+  - now apply drop_nest_add_cong.
+  - apply oneway_sync_drop_rewrite.
+    now apply cofwd_drop_oneway_sync.
++ rewrite max_minus_plus1.
+  apply cong_oneway_sync_rewrite_l
+   with (l1 := drop_tl_n (delay_fwd e1 - delay_fwd e2) (drop_tl_n (delay_fwd e2) l2)).
+  - now apply drop_nest_add_cong.
+  - apply oneway_sync_drop_rewrite.
+    now apply cofwd_drop_oneway_sync.
+Qed.
 
-Theorem cofwd_failless_origin :
+
+
+Theorem cofwd_failless_input :
  forall {X Y : Type} (e : IIST X Y) xs,
   failless_colist (cofwd e xs) -> failless_colist xs.
 intros X Y e.
