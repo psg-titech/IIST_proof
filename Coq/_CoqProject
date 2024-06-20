@@ -5,3 +5,5 @@ EqOneDec.v
 IISTData.v
 IIST.v
 PartialColist.v
+FinPartColist.v
+IISTListColist.v

@@ -1310,10 +1310,36 @@ Qed.
 
 
 
+
+Lemma failless_oneway_strict_sync :
+ forall {A B : Type} (l1 : PartialColist A) (l2 : PartialColist B),
+  failless_colist l2 -> oneway_sync_colist l1 l2 -> strict_sync_colist l1 l2.
+intros A B.
+cofix cf.
+intros l1 l2 Hfl How.
+inversion Hfl; subst; inversion How; subst; constructor.
+apply cf; now auto.
+Qed.
+
+
+Lemma cofwd_failless_drop_strict_sync :
+ forall {X Y : Type} (e : IIST X Y) (xs : PartialColist X),
+  failless_colist (cofwd e xs)
+  -> strict_sync_colist (drop_tl_n (delay_fwd e) xs) (cofwd e xs).
+intros X Y e xs Hfl.
+apply failless_oneway_strict_sync; auto.
+now apply cofwd_drop_oneway_sync.
+Qed.
+
+
+(*
+(* xs'がfaillessなのは保証される（上の定理による）が、prefixかはわからない。 *)
+(* induction eで多くのケースは解けそうな気がする *)
+(* mapfoldのとき証明できるか...？ysの長さ（？）がわからないと示せないぞ...？ *)
 Theorem cofwd_failless_inverse :
  forall {X Y : Type} (e : IIST X Y) xs ys,
   failless_coprefix ys (cofwd e xs)
-  -> exists xs', cofwd e xs' = ys /\ failless_coprefix xs' xs.
+  -> exists xs', cofwd e xs' ~=~ ys /\ failless_coprefix xs' xs.
 Abort.
 
 
@@ -1322,13 +1348,32 @@ Theorem cofwd_bwd :
  forall {X Y : Type} (e : IIST X Y) xs ys,
   failless_coprefix ys (cofwd e xs)
   -> failless_coprefix (cobwd e ys) xs.
-Abort.
+Admitted.
+
+
+Lemma cong_is_prefix_and_strict_sync :
+ forall {A : Type} (l1 l2 : PartialColist A),
+  coprefix l1 l2 -> strict_sync_colist l1 l2 -> l1 ~=~ l2.
+intro A.
+cofix cf.
+intros l1 l2 Hpre Hss.
+inversion Hpre; subst;
+ inversion Hss; subst; constructor.
+now auto.
+Qed.
 
 
 (* ある種の長さ制約 *)
 Theorem cofwd_bwd_length :
  forall {X Y : Type} (e : IIST X Y) xs,
   failless_colist (cofwd e xs) ->
-   cobwd e (cofwd e xs) = drop_tl_n (delay_fwd e + delay_bwd e) xs.
-Abort.
-
+   cobwd e (cofwd e xs) ~=~ drop_tl_n (delay_bwd e + delay_fwd e) xs.
+intros X Y e xs Hfl.
+apply cong_is_prefix_and_strict_sync.
++ apply failless_coprefix_prefix.
+  apply cofwd_bwd.
+  admit.
++ apply strict_sync_transitive with (l2 := (drop_tl_n (delay_bwd e) (cofwd e xs))).
+  - admit.
+  - apply cofwd_failless_drop_strict_sync.
+*)
