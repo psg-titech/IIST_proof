@@ -1,13 +1,24 @@
-# 逐次可逆列変換の機械証明
+# Mechanized Formalization of Invertible Incremental Sequence Transformations
 
-a.k.a. 他人の研究の内容に熱を上げる変なやつらの祭り
+This repository contains mechanized formalizations of the paper "Invertible Incremental Sequence Transformations" by Shirai (JSSST 2023), implemented in both Coq and Agda (the latter is currently in progress).
 
-基にしている論文は以下の大会の予稿
-https://jssst.or.jp/files/user/taikai/2023/papers/15-R-S.pdf
+## Overview
 
-現在の定式化は以下のものがある。
+**Invertible Incremental Sequence Transformations (IISTs)** are a class of stream/list processors that are both incremental and invertible. Given more input, they produce more output; given more output, their inverse can reconstruct more of the original input.
 
-+ Coq (by chiguri)
-+ Agda (by wasabi315)
+The paper presents a formal framework for IISTs and proves properties such as invertibility through pen-and-paper proofs. This repository mechanizes those proofs using interactive theorem provers to rigorously verify their correctness. In addition, it extends the original framework to support infinite sequences, which were not covered in the paper.
 
-詳細は各フォルダのREADMEにて。
+## Formalizations
+
+This repository contains two formalizations:
+
+1. **Coq Formalization** (`Coq/`): A complete formalization of the paper's results in Coq.
+2. **Agda Formalization** (`Agda/`): A work-in-progress formalization in Agda.
+
+## Paper Reference
+
+Mizuki Shirai, Sosuke Moriguchi & Takuo Watanabe, **Construction of Inverse Computation in Synchronous Dataflow Programming**, Computer Software, Vol. 41, No. 3, pp. 34-40, Japan Society for Software Science and Technology, DOI: [10.11309/jssst.41.3_34](https://doi.org/10.11309/jssst.41.3_34), Jul., 2024 (in Japanese).
+
+## License
+
+MIT License
